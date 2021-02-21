@@ -6,8 +6,19 @@ BINPATH = $(JDKPATH)/bin
 JAVAC = $(JDKPATH)/bin/javac -classpath $(CLASSPATH)
 JAVA  = $(JDKPATH)/bin/java  -classpath $(CLASSPATH)
 
-# test buffer manager
+DominatesTest: DominatesTest.java
+	$(JAVAC) TestDriver.java DominatesTest.java
 
+dominatestest: DominatesTest
+	$(JAVA) tests.DominatesTest
+
+CompareTuplePrefTest: CompareTuplePrefTest.java
+	$(JAVAC) TestDriver.java CompareTuplePrefTest.java
+
+comparetuplepreftest: CompareTuplePrefTest
+	$(JAVA) tests.CompareTuplePrefTest
+	
+# test buffer manager
 BMTest:BMTest.java
 	$(JAVAC) TestDriver.java BMTest.java
 
