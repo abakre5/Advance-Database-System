@@ -329,6 +329,117 @@ public class TupleUtils {
         }
         return res_str_sizes;
     }
+
+
+    /**
+     * @param t1
+     * @param type1            this is the list of types of attributes in the relation
+     * @param t2
+     * @param type2            this is the list of types of attributes in the relation
+     * @param len_in           this is the number of attributes in the relation
+     * @param str_sizes        this is the list of string lengths for this attributes that are string type
+     * @param pref_list        an array containing indexes of the preference attributes
+     * @param pref_list_length number of preference attributes
+     * @return
+     */
+    public static boolean Dominates(Tuple t1, AttrType[] type1, Tuple t2, AttrType[] type2, short len_in, short[] str_sizes,
+                                    int[] pref_list, int pref_list_length) throws IOException, TupleUtilsException {
+        if (pref_list_length < 1) {
+            throw new TupleUtilsException("Number of preference attributes should be more than 0. However, provided " + pref_list_length);
+        }
+        for (int i = 0; i < pref_list_length; i++) {
+            int attrIndex = pref_list[i];
+            if (type1[attrIndex - 1].attrType == AttrType.attrInteger) {
+                if (intComparator(t1, t2, attrIndex)) return false;
+            } else if (type1[attrIndex - 1].attrType == AttrType.attrReal) {
+                if (floatComparator(t1, t2, attrIndex)) return false;
+            } else if (type1[attrIndex - 1].attrType == AttrType.attrString) {
+                if (stringComparator(t1, t2, attrIndex)) return false;
+            }
+        }
+        return true;
+    }
+
+    private static boolean intComparator(Tuple t1, Tuple t2, int attrIndex) throws IOException, TupleUtilsException {
+        try {
+            int t1AttrValue = t1.getIntFld(attrIndex);
+            int t2AttrValue = t2.getIntFld(attrIndex);
+            if (t1AttrValue <= t2AttrValue) {
+                return true;
+            }
+        } catch (FieldNumberOutOfBoundException e) {
+            throw new TupleUtilsException("Error occurred while getting integer field => " + e);
+        }
+        return false;
+    }
+
+    private static boolean floatComparator(Tuple t1, Tuple t2, int attrIndex) throws IOException, TupleUtilsException {
+        try {
+            float t1AttrValue = t1.getFloFld(attrIndex);
+            float t2AttrValue = t2.getFloFld(attrIndex);
+            if (t1AttrValue <= t2AttrValue) {
+                return true;
+            }
+        } catch (FieldNumberOutOfBoundException e) {
+            throw new TupleUtilsException("Error occurred while getting floating field => " + e);
+        }
+        return false;
+    }
+
+    private static boolean stringComparator(Tuple t1, Tuple t2, int attrIndex) throws IOException, TupleUtilsException {
+        try {
+            String t1AttrValue = t1.getStrFld(attrIndex);
+            String t2AttrValue = t2.getStrFld(attrIndex);
+            // t2 is dominating
+            if (true) {
+                return false;
+            }
+        } catch (FieldNumberOutOfBoundException e) {
+            throw new TupleUtilsException("Error occurred while getting string field => " + e);
+        }
+        return false;
+    }
+
+    /**
+     * @param t1
+     * @param type1
+     * @param t2
+     * @param type2
+     * @param len_in
+     * @param str_sizes
+     * @param pref_list
+     * @param pref_list_length
+     * @return
+     */
+    public static int CompareTupleWithTuplePref(Tuple t1, AttrType[] type1, Tuple t2, AttrType[] type2,
+                                                short len_in, short[] str_sizes, int[] pref_list,
+                                                int pref_list_length) throws TupleUtilsException, IOException, FieldNumberOutOfBoundException {
+        if (pref_list_length < 1) {
+            throw new TupleUtilsException("Number of preference attributes should be more than 0. However, provided " + pref_list_length);
+        }
+        float sumOfAttrInTuple1 = 0;
+        float sumOfAttrInTuple2 = 0;
+        for (int i = 0; i < pref_list_length; i++) {
+            int attrIndex = pref_list[i];
+            if (type1[attrIndex - 1].attrType == (AttrType.attrInteger)) {
+                sumOfAttrInTuple1 += (float) t1.getIntFld(attrIndex);
+                sumOfAttrInTuple2 += (float) t2.getIntFld(attrIndex);
+            } else if (type1[attrIndex - 1].attrType == (AttrType.attrReal)) {
+                sumOfAttrInTuple1 += t1.getFloFld(attrIndex);
+                sumOfAttrInTuple2 += t1.getFloFld(attrIndex);
+            } else {
+                throw new TupleUtilsException("Invalid operator for tuple comparision");
+            }
+        }
+        if (sumOfAttrInTuple1 == sumOfAttrInTuple2) {
+            return 0;
+        } else if (sumOfAttrInTuple1 > sumOfAttrInTuple2) {
+            return 1;
+        }
+        return -1;
+
+    }
+
 }
 
 
