@@ -1,5 +1,5 @@
-JDKPATH = /s/java
-LIBPATH = /p/course/cs784-raghu/minibase_share/javaminibase/construction
+JDKPATH =/usr
+LIBPATH =/mnt/d/ASU/CourseWorkRepo/CSE510-DMSI/MinibaseProject/construction
 CLASSPATH = $(JDKPATH)/lib/classes.zip:.:..:$(LIBPATH)
 BINPATH = $(JDKPATH)/bin
 JAVAC = $(JDKPATH)/bin/javac -classpath $(CLASSPATH)

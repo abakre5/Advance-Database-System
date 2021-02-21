@@ -17,7 +17,7 @@ CompareTuplePrefTest: CompareTuplePrefTest.java
 
 comparetuplepreftest: CompareTuplePrefTest
 	$(JAVA) tests.CompareTuplePrefTest
-	
+
 # test buffer manager
 BMTest:BMTest.java
 	$(JAVAC) TestDriver.java BMTest.java

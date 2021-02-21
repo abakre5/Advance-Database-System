@@ -6,7 +6,7 @@
 JARFILES=bufmgr/*.class diskmgr/*.class global/*.class iterator/*.class\
          heap/*.class chainexception/*.class  btree/*.class index/*.class tests/*.class
 
-JDKPATH = /usr/java/jdk1.3.1_02
+JDKPATH =/usr
 LIBPATH = .:..
 CLASSPATH = $(LIBPATH)
 BINPATH = $(JDKPATH)/bin
@@ -17,7 +17,7 @@ DOCFILES=bufmgr diskmgr global chainexception heap btree iterator index
 
 ##############  update the above for each assignment in making
 
-ASSIGN=/home/candan/Courses/CSE510spr02/minjava/javaminibase/src
+ASSIGN=D:\ASU\CourseWorkRepo\CSE 510 - DMSI\minjava\javaminibase\src
 LIBDIR=$(ASSIGN)/lib
 KEY=$(ASSIGN)/key
 SRC=$(ASSIGN)/src
@@ -28,7 +28,7 @@ PACKAGEINDEX=$(ASSIGN)/javadoc
 JAVADOC=javadoc -public -d $(PACKAGEINDEX)
 
 ### Generate jar and javadoc files.  Apply to most assignments.
-db: 
+db:
 	make -C global
 	make -C chainexception
 	make -C btree
@@ -37,7 +37,7 @@ db:
 	make -C heap
 	make -C index
 	make -C iterator
-	
+
 doc:
 	$(JAVADOC) $(DOCFILES)
 
