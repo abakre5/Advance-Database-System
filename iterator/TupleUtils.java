@@ -426,7 +426,7 @@ public class TupleUtils {
                 sumOfAttrInTuple2 += (float) t2.getIntFld(attrIndex);
             } else if (type1[attrIndex - 1].attrType == (AttrType.attrReal)) {
                 sumOfAttrInTuple1 += t1.getFloFld(attrIndex);
-                sumOfAttrInTuple2 += t1.getFloFld(attrIndex);
+                sumOfAttrInTuple2 += t2.getFloFld(attrIndex);
             } else {
                 throw new TupleUtilsException("Invalid operator for tuple comparision");
             }
@@ -440,6 +440,40 @@ public class TupleUtils {
 
     }
 
+    public static void SetValuePref(Tuple lastElem, Tuple tuple, AttrType[] sortFldType) throws TupleUtilsException, UnknowAttrType {
+
+        for (int i = 0;i < sortFldType.length;i++) {
+            int type = sortFldType[i].attrType;
+            switch (type) {
+                case AttrType.attrInteger:
+                    try {
+                        lastElem.setIntFld(i + 1, tuple.getIntFld(i + 1));
+                    } catch (FieldNumberOutOfBoundException | IOException e) {
+                        throw new TupleUtilsException(e, "FieldNumberOutOfBoundException is caught by TupleUtils.java");
+                    }
+                    break;
+                case AttrType.attrReal:
+                    try {
+                        lastElem.setFloFld(i + 1, tuple.getFloFld(i + 1));
+                    } catch (FieldNumberOutOfBoundException | IOException e) {
+                        throw new TupleUtilsException(e, "FieldNumberOutOfBoundException is caught by TupleUtils.java");
+                    }
+                    break;
+                case AttrType.attrString:
+                    try {
+                        lastElem.setStrFld(i + 1, tuple.getStrFld(i + 1));
+                    } catch (FieldNumberOutOfBoundException | IOException e) {
+                        throw new TupleUtilsException(e, "FieldNumberOutOfBoundException is caught by TupleUtils.java");
+                    }
+                    break;
+                default:
+                    throw new UnknowAttrType(null, "Don't know how to handle attrSymbol, attrNull");
+
+            }
+        }
+
+        return;
+    }
 }
 
 

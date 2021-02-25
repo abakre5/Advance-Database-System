@@ -1,10 +1,22 @@
 # modify the paths appropriately
-JDKPATH = /usr/lib/jvm/default-java
+JDKPATH = /usr
 LIBPATH = .:..
 CLASSPATH = $(LIBPATH)
 BINPATH = $(JDKPATH)/bin
 JAVAC = $(JDKPATH)/bin/javac -classpath $(CLASSPATH)
 JAVA  = $(JDKPATH)/bin/java  -classpath $(CLASSPATH)
+
+SortPrefTest: SortPrefTest.java
+	$(JAVAC) TestDriver.java SortPrefTest.java
+
+sortpreftest: SortPrefTest
+	$(JAVA) tests.SortPrefTest
+
+NestedLoopsSkyTest: NestedLoopsSkyTest.java
+	$(JAVAC) TestDriver.java NestedLoopsSkyTest.java
+
+nestedloopsskytest: NestedLoopsSkyTest
+	$(JAVA) tests.NestedLoopsSkyTest
 
 DominatesTest: DominatesTest.java
 	$(JAVAC) TestDriver.java DominatesTest.java
