@@ -250,6 +250,167 @@ class SORTPrefDriver extends TestDriver implements GlobalConst {
         return status;
     }
 
+
+    protected boolean test2() {
+        System.out.println("------------------------ TEST 2 --------------------------");
+
+        boolean status = OK;
+
+        AttrType[] attrType = new AttrType[3];
+        attrType[0] = new AttrType(AttrType.attrInteger);
+        attrType[1] = new AttrType(AttrType.attrReal);
+        attrType[2] = new AttrType(AttrType.attrString);
+        short[] attrSize = new short[1];
+        attrSize[0] = REC_LEN1;
+        TupleOrder[] order = new TupleOrder[2];
+        order[0] = new TupleOrder(TupleOrder.Ascending);
+        order[1] = new TupleOrder(TupleOrder.Descending);
+
+        // create a tuple of appropriate size
+        Tuple t = new Tuple();
+        try {
+            t.setHdr((short) 3, attrType, attrSize);
+        } catch (Exception e) {
+            status = FAIL;
+            e.printStackTrace();
+        }
+
+        int size = t.size();
+
+        // Create unsorted data file "test1.in"
+        RID rid;
+        Heapfile f = null;
+        try {
+            f = new Heapfile("test2.in");
+        } catch (Exception e) {
+            status = FAIL;
+            e.printStackTrace();
+        }
+
+        t = new Tuple(size);
+        try {
+            t.setHdr((short) 2, attrType, attrSize);
+        } catch (Exception e) {
+            status = FAIL;
+            e.printStackTrace();
+        }
+
+        for (int i = 0; i < NUM_RECORDS; i++) {
+            try {
+                t.setIntFld(1, data1[i]);
+                t.setFloFld(2, data2[i]);
+            } catch (Exception e) {
+                status = FAIL;
+                e.printStackTrace();
+            }
+
+            try {
+                rid = f.insertRecord(t.returnTupleByteArray());
+            } catch (Exception e) {
+                status = FAIL;
+                e.printStackTrace();
+            }
+        }
+
+        // create an iterator by open a file scan
+        FldSpec[] projlist = new FldSpec[3];
+        RelSpec rel = new RelSpec(RelSpec.outer);
+        projlist[0] = new FldSpec(rel, 1);
+        projlist[1] = new FldSpec(rel, 2);
+        projlist[2] = new FldSpec(rel, 3);
+
+        FileScan fscan = null;
+
+        try {
+            fscan = new FileScan("test2.in", attrType, attrSize, (short) 2, 2, projlist, null);
+        } catch (Exception e) {
+            status = FAIL;
+            e.printStackTrace();
+        }
+
+        // Sort "test1.in"
+        /*Sort sort = null;
+        try {
+            sort = new Sort(attrType, (short) 2, attrSize, fscan, 1, order[0], REC_LEN1, SORTPGNUM);
+        } catch (Exception e) {
+            status = FAIL;
+            e.printStackTrace();
+        }*/
+        int[] pref_list = new int[]{1, 2};
+        SortPref sort = null;
+        try {
+            sort = new SortPref(attrType, (short) 2, attrSize, fscan, order[0], pref_list, pref_list.length, SORTPGNUM);
+        } catch (Exception e) {
+            status = FAIL;
+            e.printStackTrace();
+        }
+
+
+        int count = 0;
+        t = null;
+        int outval1 = 0;
+        float outval2 = 0.0f;
+
+        try {
+            t = sort.get_next();
+        } catch (Exception e) {
+            status = FAIL;
+            e.printStackTrace();
+        }
+
+        boolean flag = true;
+
+        while (t != null) {
+            if (count >= NUM_RECORDS) {
+                System.err.println("Test2 -- OOPS! too many records");
+                status = FAIL;
+                flag = false;
+                break;
+            }
+
+            try {
+                outval1 = t.getIntFld(1);
+                outval2 = t.getFloFld(2);
+            } catch (Exception e) {
+                status = FAIL;
+                e.printStackTrace();
+            }
+
+            if (!(outval1 == data1[count] && outval2 == data2[count])) {
+                System.out.println();
+                System.err.println("outval = " + outval1 + "\tdata2[count] = " + data2[count]);
+
+                System.err.println("Test2 -- OOPS! test1.out not sorted");
+                status = FAIL;
+            }
+            count++;
+
+            try {
+                t = sort.get_next();
+            } catch (Exception e) {
+                status = FAIL;
+                e.printStackTrace();
+            }
+        }
+        if (count < NUM_RECORDS) {
+            System.err.println("Test2 -- OOPS! too few records");
+            status = FAIL;
+        } else if (flag && status) {
+            System.err.println("Test2 -- Sorting OK");
+        }
+
+        // clean up
+        try {
+            sort.close();
+        } catch (Exception e) {
+            status = FAIL;
+            e.printStackTrace();
+        }
+        System.err.println("------------------- TEST 2 completed ---------------------\n");
+
+        return status;
+    }
+
     protected String testName() {
         return "SortPref";
     }
