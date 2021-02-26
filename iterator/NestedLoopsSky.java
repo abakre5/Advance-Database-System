@@ -64,8 +64,10 @@ public class NestedLoopsSky extends Iterator {
                 for( int j=i+1; j<tuplesList.size(); j++ ) {
                     if( TupleUtils.Dominates( tuplesList.get(i), in1, tuplesList.get(j), in1, (short)in1.length, null, pref_list, pref_list.length ) ) {
                         tuplesList.remove( j );
+                        j--;
                     } else if( TupleUtils.Dominates( tuplesList.get(j), in1, tuplesList.get(i), in1, (short)in1.length, null, pref_list, pref_list.length )) {
                         tuplesList.remove( i );
+                        i--;
                         break;
                     }
                 }
