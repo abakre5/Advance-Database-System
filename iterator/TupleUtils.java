@@ -364,7 +364,7 @@ public class TupleUtils {
         try {
             int t1AttrValue = t1.getIntFld(attrIndex);
             int t2AttrValue = t2.getIntFld(attrIndex);
-            if (t1AttrValue <= t2AttrValue) {
+            if (t1AttrValue >= t2AttrValue) {
                 return true;
             }
         } catch (FieldNumberOutOfBoundException e) {
@@ -377,7 +377,7 @@ public class TupleUtils {
         try {
             float t1AttrValue = t1.getFloFld(attrIndex);
             float t2AttrValue = t2.getFloFld(attrIndex);
-            if (t1AttrValue <= t2AttrValue) {
+            if (t1AttrValue >= t2AttrValue) {
                 return true;
             }
         } catch (FieldNumberOutOfBoundException e) {
