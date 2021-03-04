@@ -41,6 +41,9 @@ public class KeyDataEntry {
             this.key = new IntegerKey(((IntegerKey) key).getKey());
         else if (key instanceof StringKey)
             this.key = new StringKey(((StringKey) key).getKey());
+        else if(key instanceof FloatKey){
+            this.key = new FloatKey(((FloatKey) key).getKey());
+        }
     }
 
     ;
@@ -51,6 +54,11 @@ public class KeyDataEntry {
      */
     public KeyDataEntry(String key, PageId pageNo) {
         this.key = new StringKey(key);
+        this.data = new IndexData(pageNo);
+    }
+
+    public KeyDataEntry(Float key, PageId pageNo) {
+        this.key = new FloatKey(key);
         this.data = new IndexData(pageNo);
     }
 
@@ -75,6 +83,9 @@ public class KeyDataEntry {
             this.key = new IntegerKey(((IntegerKey) key).getKey());
         else if (key instanceof StringKey)
             this.key = new StringKey(((StringKey) key).getKey());
+        else if (key instanceof FloatKey){
+            this.key = new FloatKey(((FloatKey) key).getKey());
+        }
     }
 
     ;
@@ -96,6 +107,9 @@ public class KeyDataEntry {
     public KeyDataEntry(KeyClass key, DataClass data) {
         if (key instanceof IntegerKey)
             this.key = new IntegerKey(((IntegerKey) key).getKey());
+        else if (key instanceof FloatKey){
+            this.key = new FloatKey(((FloatKey) key).getKey());
+        }
         else if (key instanceof StringKey)
             this.key = new StringKey(((StringKey) key).getKey());
 
@@ -114,9 +128,14 @@ public class KeyDataEntry {
     public boolean equals(KeyDataEntry entry) {
         boolean st1, st2;
 
-        if (key instanceof IntegerKey)
+        if (key instanceof IntegerKey) {
             st1 = ((IntegerKey) key).getKey().equals
                     (((IntegerKey) entry.key).getKey());
+        }
+        else if (key instanceof FloatKey){
+            st1 = ((FloatKey) key).getKey().equals
+                    (((FloatKey) entry.key).getKey());
+        }
         else
             st1 = ((StringKey) key).getKey().equals
                     (((StringKey) entry.key).getKey());

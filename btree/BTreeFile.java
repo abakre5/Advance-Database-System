@@ -375,9 +375,13 @@ public class BTreeFile extends IndexFile
             if (headerPage.get_keyType() != AttrType.attrInteger) {
                 throw new KeyNotMatchException(null, "");
             }
-        } else
+        } else if(key instanceof FloatKey){
+            if (headerPage.get_keyType() != AttrType.attrReal) {
+                throw new KeyNotMatchException(null, "");
+            }
+        }else {
             throw new KeyNotMatchException(null, "");
-
+        }
 
         // TWO CASES:
         // 1. headerPage.root == INVALID_PAGE:
@@ -1754,6 +1758,10 @@ public class BTreeFile extends IndexFile
             trace.flush();
         }
 
+    }
+
+    public java.lang.String getDbname(){
+        return dbname;
     }
 
 }

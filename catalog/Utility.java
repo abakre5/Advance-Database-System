@@ -240,7 +240,7 @@ public class Utility implements Catalogglobal {
 
                 case AttrType.attrReal:
                     floatVal = tuple.getFloFld(attrPos);
-                    IntegerKey k2 = new IntegerKey((int) floatVal); // no FloatKey
+                    FloatKey k2 = new FloatKey(floatVal); // no FloatKey
                     key = k2;
                     break;
 
