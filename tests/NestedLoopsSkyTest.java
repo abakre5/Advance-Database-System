@@ -4,6 +4,7 @@ import global.AttrType;
 import global.GlobalConst;
 import global.RID;
 import global.SystemDefs;
+import heap.FieldNumberOutOfBoundException;
 import heap.Heapfile;
 import heap.Tuple;
 import iterator.FileScan;
@@ -133,7 +134,7 @@ class NestedLoopsSkyDriver extends TestDriver implements GlobalConst {
         System.out.println("------------------------ TEST 1 --------------------------");
         boolean status = OK;
 
-// Add actual players list
+        // Add actual players list
         playersList = new ArrayList<>();
         int numPlayers = 8;
 
@@ -264,7 +265,6 @@ class NestedLoopsSkyDriver extends TestDriver implements GlobalConst {
             if (count >= NUM_SKYLINE_PLAYERS) {
                 System.err.println("Test1 -- OOPS! too many records");
                 status = FAIL;
-//        flag = false;
                 break;
             }
             count++;
@@ -282,7 +282,7 @@ class NestedLoopsSkyDriver extends TestDriver implements GlobalConst {
             status = FAIL;
         }
         else if (status) {
-            System.err.println("Test1 -- Sorting OK");
+            System.err.println("Test1 -- Nested Loop Skyline Test 1 OK");
         }
 
         // clean up
@@ -433,7 +433,6 @@ class NestedLoopsSkyDriver extends TestDriver implements GlobalConst {
             if (count >= NUM_SKYLINE_PLAYERS) {
                 System.err.println("Test1 -- OOPS! too many records");
                 status = FAIL;
-//        flag = false;
                 break;
             }
             count++;
@@ -451,7 +450,7 @@ class NestedLoopsSkyDriver extends TestDriver implements GlobalConst {
             status = FAIL;
         }
         else if (status) {
-            System.err.println("Test1 -- Sorting OK");
+            System.err.println("Test1 -- Nested Loop Skyline Test 2 OK");
         }
 
         // clean up
