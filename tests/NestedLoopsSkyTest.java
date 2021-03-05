@@ -18,12 +18,12 @@ import java.util.List;
 class Player {
     public int pid;
     public int goals;
-    public int assists;
+    public float assists;
 
-    public Player( int _pid, int _goals, int _assists ) {
-        pid = _pid;
-        goals = _goals;
-        assists = _assists;
+    public Player( int pid, int goals, float assists ) {
+        this.pid = pid;
+        this.goals = goals;
+        this.assists = assists;
     }
 }
 
@@ -34,7 +34,7 @@ class NestedLoopsSkyDriver extends TestDriver implements GlobalConst {
     private boolean FAIL = false;
     private static short REC_LEN1 = 32;
     private static short REC_LEN2 = 160;
-    private List playersList;
+    private ArrayList<Player> playersList;
 
     /**
      * NestedLoopsSkyDriver Constructor, inherited from TestDriver
@@ -134,22 +134,22 @@ class NestedLoopsSkyDriver extends TestDriver implements GlobalConst {
         boolean status = OK;
 
 // Add actual players list
-        playersList = new ArrayList();
+        playersList = new ArrayList<>();
         int numPlayers = 8;
 
-        playersList.add( new Player( 101, 340, 190 ) );
-        playersList.add( new Player( 102, 460, 90 ) );
-        playersList.add( new Player( 103, 210, 240 ) );
-        playersList.add( new Player( 104, 200, 130 ) );
-        playersList.add( new Player( 105, 410, 70 ) );
-        playersList.add( new Player( 106, 320, 150 ) );
-        playersList.add( new Player( 107, 500, 50 ) );
-        playersList.add( new Player( 108, 120, 310 ) );
+        playersList.add( new Player( 101, 340, 190.40f ) );
+        playersList.add( new Player( 102, 460, 90.30f ) );
+        playersList.add( new Player( 103, 210, 240.50f ) );
+        playersList.add( new Player( 104, 200, 130.70f ) );
+        playersList.add( new Player( 105, 410, 70.20f ) );
+        playersList.add( new Player( 106, 320, 150.04f ) );
+        playersList.add( new Player( 107, 500, 50.03f ) );
+        playersList.add( new Player( 108, 120, 310.5f ) );
 
         AttrType[] Ptypes = new AttrType[3];
         Ptypes[0] = new AttrType (AttrType.attrInteger);
         Ptypes[1] = new AttrType (AttrType.attrInteger);
-        Ptypes[2] = new AttrType (AttrType.attrInteger);
+        Ptypes[2] = new AttrType (AttrType.attrReal);
 
         Tuple t = new Tuple();
         try {
@@ -188,7 +188,7 @@ class NestedLoopsSkyDriver extends TestDriver implements GlobalConst {
             try {
                 t.setIntFld(1, ((Player)playersList.get(i)).pid);
                 t.setIntFld(2, ((Player)playersList.get(i)).goals);
-                t.setIntFld(3, ((Player)playersList.get(i)).assists);
+                t.setFloFld(3, ((Player)playersList.get(i)).assists);
             }
             catch (Exception e) {
                 System.err.println("*** Heapfile error in Tuple.setStrFld() ***");
@@ -300,25 +300,25 @@ class NestedLoopsSkyDriver extends TestDriver implements GlobalConst {
     }
 
     public boolean test2() {
-        System.out.println("------------------------ TEST 1 --------------------------");
+        System.out.println("------------------------ TEST 2 --------------------------");
         boolean status = OK;
 
-        playersList = new ArrayList();
+        playersList = new ArrayList<>();
         int numPlayers = 8;
 
-        playersList.add( new Player( 101, 210, 140 ) );
-        playersList.add( new Player( 102, 360, 190 ) );
-        playersList.add( new Player( 103, 410, 240 ) );
-        playersList.add( new Player( 104, 200, 130 ) );
-        playersList.add( new Player( 105, 430, 70 ) );
-        playersList.add( new Player( 106, 320, 150 ) );
-        playersList.add( new Player( 107, 500, 50 ) );
-        playersList.add( new Player( 108, 120, 310 ) );
+        playersList.add( new Player( 101, 210, 140.0f ) );
+        playersList.add( new Player( 102, 360, 190.0f ) );
+        playersList.add( new Player( 103, 410, 240.0f ) );
+        playersList.add( new Player( 104, 200, 130.0f ) );
+        playersList.add( new Player( 105, 430, 70.0f ) );
+        playersList.add( new Player( 106, 320, 150.0f ) );
+        playersList.add( new Player( 107, 500, 50.0f ) );
+        playersList.add( new Player( 108, 120, 310.0f ) );
 
         AttrType[] Ptypes = new AttrType[3];
         Ptypes[0] = new AttrType (AttrType.attrInteger);
         Ptypes[1] = new AttrType (AttrType.attrInteger);
-        Ptypes[2] = new AttrType (AttrType.attrInteger);
+        Ptypes[2] = new AttrType (AttrType.attrReal);
 
         Tuple t = new Tuple();
         try {
@@ -357,7 +357,7 @@ class NestedLoopsSkyDriver extends TestDriver implements GlobalConst {
             try {
                 t.setIntFld(1, ((Player)playersList.get(i)).pid);
                 t.setIntFld(2, ((Player)playersList.get(i)).goals);
-                t.setIntFld(3, ((Player)playersList.get(i)).assists);
+                t.setFloFld(3, ((Player)playersList.get(i)).assists);
             }
             catch (Exception e) {
                 System.err.println("*** Heapfile error in Tuple.setStrFld() ***");
@@ -464,7 +464,7 @@ class NestedLoopsSkyDriver extends TestDriver implements GlobalConst {
         }
         playersList = null;
 
-        System.out.println("------------------- TEST 1 completed ---------------------\n");
+        System.out.println("------------------- TEST 2 completed ---------------------\n");
         return status;
     }
 
