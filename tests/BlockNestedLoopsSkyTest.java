@@ -109,6 +109,11 @@ class BlockNestedLoopsSkyDriver extends TestDriver implements GlobalConst {
             _passAll = FAIL;
         }
 
+//        Running test2() to test6()
+        if (!test2()) {
+            _passAll = FAIL;
+        }
+
         return _passAll;
     }
 
@@ -118,17 +123,19 @@ class BlockNestedLoopsSkyDriver extends TestDriver implements GlobalConst {
 
         // Add actual players list
         playersList = new ArrayList();
-        int numPlayers = 8;
 
-        playersList.add(new Player(101, 340, 190));
-        playersList.add(new Player(102, 460, 90));
-        playersList.add(new Player(103, 210, 240));
-        playersList.add(new Player(104, 200, 130));
-        playersList.add(new Player(105, 410, 70));
-        playersList.add(new Player(106, 320, 150));
-        playersList.add(new Player(107, 500, 50));
-        playersList.add(new Player(108, 120, 310));
 
+        playersList.add( new Player( 101, 340, 190.40f ) );
+        playersList.add( new Player( 102, 460, 90.30f ) );
+        playersList.add( new Player( 103, 210, 240.50f ) );
+        playersList.add( new Player( 104, 200, 130.70f ) );
+        playersList.add( new Player( 105, 410, 70.20f ) );
+        playersList.add( new Player( 106, 320, 150.04f ) );
+        playersList.add( new Player( 107, 500, 50.03f ) );
+        playersList.add( new Player( 108, 120, 310.5f ) );
+
+
+        int numPlayers = playersList.size();
         AttrType[] Ptypes = new AttrType[3];
         Ptypes[0] = new AttrType(AttrType.attrInteger);
         Ptypes[1] = new AttrType(AttrType.attrInteger);
@@ -168,7 +175,7 @@ class BlockNestedLoopsSkyDriver extends TestDriver implements GlobalConst {
             try {
                 t.setIntFld(1, ((Player) playersList.get(i)).pid);
                 t.setIntFld(2, ((Player) playersList.get(i)).goals);
-                t.setIntFld(3, ((Player) playersList.get(i)).assists);
+                t.setFloFld(3, ((Player) playersList.get(i)).assists);
             } catch (Exception e) {
                 System.err.println("*** Heapfile error in Tuple.setStrFld() ***");
                 status = FAIL;
@@ -210,17 +217,16 @@ class BlockNestedLoopsSkyDriver extends TestDriver implements GlobalConst {
             Runtime.getRuntime().exit(1);
         }
 
-        int[] pref_list = new int[3];
-        pref_list[0] = 1;
-        pref_list[1] = 2;
-        pref_list[2] = 3;
+        int[] pref_list = new int[2];
+        pref_list[0] = 2;
+        pref_list[1] = 3;
 
         // Get skyline elements
         BlockNestedLoopsSky blockNestedLoopsSky = null;
         try {
-            blockNestedLoopsSky = new BlockNestedLoopsSky(Ptypes, 10, new short[0], am, "", pref_list, pref_list.length, 3);
+            blockNestedLoopsSky = new BlockNestedLoopsSky(Ptypes, 3, new short[0], am, "", pref_list, pref_list.length, 1);
         } catch (Exception e) {
-            System.err.println("*** Error preparing for nested_loop_join");
+            System.err.println("*** Error preparing for Block nested loop skyline computation");
             System.err.println("" + e);
             e.printStackTrace();
             Runtime.getRuntime().exit(1);
@@ -235,18 +241,11 @@ class BlockNestedLoopsSkyDriver extends TestDriver implements GlobalConst {
             e.printStackTrace();
         }
 
-        int NUM_SKYLINE_PLAYERS = 7;
+        int NUM_SKYLINE_PLAYERS = 5;
 
         while (t != null) {
-            /*try {
-                System.out.println(t.getIntFld(1) + " : " + t.getIntFld(2) + " : " + t.getIntFld(3));
-            } catch (IOException e) {
-                e.printStackTrace();
-            } catch (FieldNumberOutOfBoundException e) {
-                e.printStackTrace();
-            }*/
             if (count >= NUM_SKYLINE_PLAYERS) {
-                System.err.println("Test1 -- OOPS! too many records");
+                System.err.println("Test1 -- OOPS! too many records" + count);
                 System.out.println(count);
                 status = FAIL;
 //        flag = false;
@@ -265,7 +264,7 @@ class BlockNestedLoopsSkyDriver extends TestDriver implements GlobalConst {
             System.err.println("Test1 -- OOPS! too few records");
             status = FAIL;
         } else if (status) {
-            System.err.println("Test1 -- Block Nested Loop Skyline OK");
+            System.err.println("Test1 -- Block Nested Loop Skyline Test 1 OK");
         }
 
         // clean up
@@ -280,6 +279,177 @@ class BlockNestedLoopsSkyDriver extends TestDriver implements GlobalConst {
         System.out.println("------------------- TEST 1 completed ---------------------\n");
         return status;
     }
+
+
+    public boolean test2() {
+        System.out.println("------------------------ TEST 2 --------------------------");
+        boolean status = OK;
+
+        playersList = new ArrayList();
+        int numPlayers = 8;
+
+        playersList.add( new Player( 101, 210, 140 ) );
+        playersList.add( new Player( 102, 360, 190 ) );
+        playersList.add( new Player( 103, 410, 240 ) );
+        playersList.add( new Player( 104, 200, 130 ) );
+        playersList.add( new Player( 105, 430, 70 ) );
+        playersList.add( new Player( 106, 320, 150 ) );
+        playersList.add( new Player( 107, 500, 50 ) );
+        playersList.add( new Player( 108, 120, 310 ) );
+
+        AttrType[] Ptypes = new AttrType[3];
+        Ptypes[0] = new AttrType (AttrType.attrInteger);
+        Ptypes[1] = new AttrType (AttrType.attrInteger);
+        Ptypes[2] = new AttrType (AttrType.attrInteger);
+
+        Tuple t = new Tuple();
+        try {
+            t.setHdr((short) 3,Ptypes, null);
+        }
+        catch (Exception e) {
+            System.err.println("*** error in Tuple.setHdr() ***");
+            status = FAIL;
+            e.printStackTrace();
+        }
+
+        int size = t.size();
+
+        RID rid;
+        Heapfile f = null;
+        try {
+            f = new Heapfile("players2.in");
+        }
+        catch (Exception e) {
+            System.err.println("*** error in Heapfile constructor ***");
+            status = FAIL;
+            e.printStackTrace();
+        }
+
+        t = new Tuple(size);
+        try {
+            t.setHdr((short) 3, Ptypes, null);
+        }
+        catch (Exception e) {
+            System.err.println("*** error in Tuple.setHdr() ***");
+            status = FAIL;
+            e.printStackTrace();
+        }
+
+        for (int i=0; i<numPlayers; i++) {
+            try {
+                t.setIntFld(1, ((Player)playersList.get(i)).pid);
+                t.setIntFld(2, ((Player)playersList.get(i)).goals);
+                t.setFloFld(3, ((Player)playersList.get(i)).assists);
+            }
+            catch (Exception e) {
+                System.err.println("*** Heapfile error in Tuple.setStrFld() ***");
+                status = FAIL;
+                e.printStackTrace();
+            }
+
+            try {
+                rid = f.insertRecord(t.returnTupleByteArray());
+            }
+            catch (Exception e) {
+                System.err.println("*** error in Heapfile.insertRecord() ***");
+                status = FAIL;
+                e.printStackTrace();
+            }
+        }
+        if (status != OK) {
+            //bail out
+            System.err.println ("*** Error creating relation for sailors");
+            Runtime.getRuntime().exit(1);
+        }
+
+        FldSpec[] Pprojection = new FldSpec[3];
+        Pprojection[0] = new FldSpec(new RelSpec(RelSpec.outer), 1);
+        Pprojection[1] = new FldSpec(new RelSpec(RelSpec.outer), 2);
+        Pprojection[2] = new FldSpec(new RelSpec(RelSpec.outer), 3);
+
+        // Scan the players table
+        FileScan am = null;
+        try {
+            am  = new FileScan("players2.in", Ptypes, null,
+                    (short)3, (short)3,
+                    Pprojection, null);
+        }
+        catch (Exception e) {
+            status = FAIL;
+            System.err.println (""+e);
+        }
+        if (status != OK) {
+            //bail out
+            System.err.println ("*** Error setting up scan for players");
+            Runtime.getRuntime().exit(1);
+        }
+
+        int[] pref_list = new int[2];
+        pref_list[0] = 2;
+        pref_list[1] = 3;
+
+        // Get skyline elements
+        BlockNestedLoopsSky blockNestedLoopsSky = null;
+        try {
+            blockNestedLoopsSky = new BlockNestedLoopsSky(Ptypes, 3, new short[0], am, "", pref_list, pref_list.length, 3);
+        } catch (Exception e) {
+            System.err.println ("*** Error preparing for Block Nested Loop Skyline");
+            System.err.println (""+e);
+            e.printStackTrace();
+            Runtime.getRuntime().exit(1);
+        }
+
+        t = new Tuple();
+        int count = 0;
+        try {
+            t = blockNestedLoopsSky.get_next();
+        }
+        catch (Exception e) {
+            status = FAIL;
+            e.printStackTrace();
+        }
+
+        int NUM_SKYLINE_PLAYERS = 4;
+
+        while( t != null ) {
+            if (count >= NUM_SKYLINE_PLAYERS) {
+                System.err.println("Test1 -- OOPS! too many records");
+                status = FAIL;
+//        flag = false;
+                break;
+            }
+            count++;
+
+            try {
+                t = blockNestedLoopsSky.get_next();
+            } catch (Exception e) {
+                status = FAIL;
+                e.printStackTrace();
+            }
+        }
+
+        if (count < NUM_SKYLINE_PLAYERS) {
+            System.err.println("Test1 -- OOPS! too few records");
+            status = FAIL;
+        }
+        else if (status) {
+            System.err.println("Test1 -- Block Nested Loop Skyline test 2 OK");
+        }
+
+        // clean up
+        try {
+            blockNestedLoopsSky.close();
+        }
+        catch (Exception e) {
+            status = FAIL;
+            e.printStackTrace();
+        }
+        playersList = null;
+
+        System.out.println("------------------- TEST 2 completed ---------------------\n");
+        return status;
+    }
+
 
     /**
      * overrides the testName function in TestDriver

@@ -54,6 +54,40 @@ public abstract class Iterator implements Flags {
             UnknowAttrType,
             UnknownKeyTypeException,
             Exception;
+    /**
+     * abstract method, every subclass must implement it.
+     *
+     * @return the result tuple
+     * @throws IOException               I/O errors
+     * @throws JoinsException            some join exception
+     * @throws IndexException            exception from super class
+     * @throws InvalidTupleSizeException invalid tuple size
+     * @throws InvalidTypeException      tuple type not valid
+     * @throws PageNotReadException      exception from lower layer
+     * @throws TupleUtilsException       exception from using tuple utilities
+     * @throws PredEvalException         exception from PredEval class
+     * @throws SortException             sort exception
+     * @throws LowMemException           memory error
+     * @throws UnknowAttrType            attribute type unknown
+     * @throws UnknownKeyTypeException   key type unknown
+     * @throws Exception                 other exceptions
+     */
+    public TupleRIDPair get_next1()
+            throws IOException,
+            JoinsException,
+            IndexException,
+            InvalidTupleSizeException,
+            InvalidTypeException,
+            PageNotReadException,
+            TupleUtilsException,
+            PredEvalException,
+            SortException,
+            LowMemException,
+            UnknowAttrType,
+            UnknownKeyTypeException,
+            Exception {
+        return null;
+    }
 
     /**
      * @throws IOException    I/O errors

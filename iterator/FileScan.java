@@ -135,6 +135,31 @@ public class FileScan extends Iterator {
         }
     }
 
+    public TupleRIDPair get_next1()
+            throws
+            IOException,
+            InvalidTupleSizeException,
+            InvalidTypeException,
+            PredEvalException,
+            UnknowAttrType,
+            FieldNumberOutOfBoundException,
+            WrongPermat {
+        RID rid = new RID();
+        ;
+
+        while (true) {
+            if ((tuple1 = scan.getNext(rid)) == null) {
+                return null;
+            }
+
+            tuple1.setHdr(in1_len, _in1, s_sizes);
+            if (PredEval.Eval(OutputFilter, tuple1, null, _in1, null) == true) {
+                Projection.Project(tuple1, _in1, Jtuple, perm_mat, nOutFlds);
+                return new TupleRIDPair(Jtuple, rid);
+            }
+        }
+    }
+
     /**
      * implement the abstract method close() from super class Iterator
      * to finish cleaning up
