@@ -2,10 +2,8 @@ package iterator;
 
 import bufmgr.PageNotReadException;
 import global.AttrType;
-import heap.Heapfile;
-import heap.InvalidTupleSizeException;
-import heap.InvalidTypeException;
-import heap.Tuple;
+import global.RID;
+import heap.*;
 import index.IndexException;
 
 import java.io.IOException;
@@ -25,6 +23,9 @@ public class NestedLoopsSky extends Iterator {
     private int[] pref_list;
     private List<Tuple> skyline;
     private boolean first_time;
+    private String relation_name;
+    private short noOfColumns;
+    private int noOfBufferPages;
 
     public NestedLoopsSky(AttrType[] _in1,
                           int amt_of_mem,
@@ -38,57 +39,96 @@ public class NestedLoopsSky extends Iterator {
         first_time = true;
     }
 
+    public NestedLoopsSky(AttrType[] _in1,
+                          int len_in1,
+                          Iterator am1,
+                          String _relationName,
+                          int[] _pref_list,
+                          int n_pages
+    ) throws Exception {
+        in1 = _in1;
+        noOfColumns = (short) len_in1;
+        outer = am1;
+        pref_list = _pref_list;
+        relation_name = _relationName;
+        noOfBufferPages = n_pages;
+//        first_time = true;
+        setSkyline();
+    }
+
     /**
-     * Steps:
-     * (1) Create a ArrayList of the scanned tuples
-     * (2) Run 2 loops, drop elements that are not eligible for skyline
-     * (3) Return the remaining value
+     * Steps for performing getSkyline:
+     * (1) Open file mentioned by relation name
+     * (2) Have 2 scan:- inner and outer loop on file
+     * (3) get_next, Compare, if one is dominated, delete that record
      */
     private void setSkyline() throws Exception {
-        Tuple currTuple = outer.get_next();
-        List<Tuple> tuplesList = new ArrayList<>();
-        while (currTuple != null) {
-            tuplesList.add( new Tuple(currTuple) );
-            currTuple = outer.get_next();
-        }
-
-        if( tuplesList.size() == 0 ) {
-            skyline = Collections.emptyList();
-            return;
-        }
-
-        skyline = new ArrayList<>();
-
-        if( tuplesList.size() > 1 ) {
-            for( int i=0; i<tuplesList.size(); i++ ) {
-                for( int j=i+1; j<tuplesList.size(); j++ ) {
-                    if( TupleUtils.Dominates( tuplesList.get(i), in1, tuplesList.get(j), in1, (short)in1.length, null, pref_list, pref_list.length ) ) {
-                        tuplesList.remove( j );
-                        j--;
-                    } else if( TupleUtils.Dominates( tuplesList.get(j), in1, tuplesList.get(i), in1, (short)in1.length, null, pref_list, pref_list.length )) {
-                        tuplesList.remove( i );
-                        i--;
-                        break;
-                    }
-                }
+        if(!relation_name.isEmpty()) {
+            // We use outer as outer loop
+            // Creating new scan for inner loop
+            Heapfile f = null;
+            try {
+                f = new Heapfile(relation_name);
+            } catch (Exception e) {
+                System.err.println(" Could not open heapfile");
+                e.printStackTrace();
             }
-        }
 
-        skyline = tuplesList;
+            FileScan outerScan = getFileScan();
+            FileScan innerScan = getFileScan();
+
+            TupleRIDPair outerTupleRid = outerScan.get_next1();
+            while(outerTupleRid != null) {
+                TupleRIDPair innerTupleRid = innerScan.get_next1();
+                while(innerTupleRid != null) {
+                    Tuple outerTuple = outerTupleRid.getTuple();
+                    Tuple innerTuple = innerTupleRid.getTuple();
+                    RID innerRid = innerTupleRid.getRID();
+                    if( TupleUtils.Dominates( outerTuple, in1, innerTuple, in1, (short)in1.length, new short[0], pref_list, pref_list.length ) ) {
+                        try {
+                            f.deleteRecord(innerRid);
+                        } catch (Exception e) {
+                            System.err.println("*** Error deleting record \n");
+                            e.printStackTrace();
+                            break;
+                        }
+                    }
+                    innerTupleRid = innerScan.get_next1();
+                }
+                innerScan.close();
+                innerScan = getFileScan();
+                outerTupleRid = outerScan.get_next1();
+            }
+            outerScan.close();
+
+            // For now, scan and store in skyline ArrayList
+            outer = getFileScan();
+        } else {
+            System.out.println("ERROR: Relation name not specified");
+        }
+    }
+
+    private FileScan getFileScan() throws IOException, FileScanException, TupleUtilsException, InvalidRelation {
+        FileScan scan;
+
+        FldSpec[] Pprojection = new FldSpec[noOfColumns];
+        for (int i = 1; i <= noOfColumns; i++) {
+            Pprojection[i - 1] = new FldSpec(new RelSpec(RelSpec.outer), i);
+        }
+        scan = new FileScan(relation_name, in1, new short[0],
+                noOfColumns, noOfColumns, Pprojection, null);
+        return scan;
     }
 
     @Override
     public Tuple get_next() throws IOException, JoinsException, IndexException, InvalidTupleSizeException, InvalidTypeException, PageNotReadException, TupleUtilsException, PredEvalException, SortException, LowMemException, UnknowAttrType, UnknownKeyTypeException, Exception {
-        if( first_time ) {
-            first_time = false;
-            setSkyline();
+        TupleRIDPair currTupleRid = outer.get_next1();
+        if(currTupleRid == null) {
+            outer.close();
+            return null;
         }
-        if( !skyline.isEmpty() ) {
-            Tuple nextTuple = skyline.get(0);
-            skyline.remove( 0 );
-            return nextTuple;
-        }
-        return null;
+        Tuple currTuple = currTupleRid.getTuple();
+        return currTuple;
     }
 
     @Override
