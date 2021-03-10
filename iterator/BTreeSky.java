@@ -46,7 +46,8 @@ public class BTreeSky extends Iterator {
                      relation, int[] pref_list1, int[] pref_lengths_list,
              IndexFile[] index_file_list,
              int n_pages1
-    ) throws IOException,NestedLoopException {
+    ) throws IOException,NestedLoopException
+   {
         attrTypes = attrs;
         len_in = len_attr;
         str_sizes = attr_size;
@@ -71,90 +72,84 @@ public class BTreeSky extends Iterator {
     {
         // start index scan
         IndexScan[] index_list = new IndexScan[pref_list.length];
-        Tuple[]  tuple_list = new Tuple[pref_list.length];
         ArrayList<ArrayList<Tuple>> hash_sets = new ArrayList<>();
 
-        System.out.println(" Size of index_list " + index_list.length);
-        System.out.println(" Size of tuple_list " + tuple_list.length);
-
-        FldSpec[] projections = new FldSpec[3];
+        FldSpec[] projections = new FldSpec[attrTypes.length];
         RelSpec rel = new RelSpec(RelSpec.outer);
-        projections[0] = new FldSpec(rel, 1);
-        projections[1] = new FldSpec(rel, 2);
-        projections[2] = new FldSpec(rel, 3);
 
+        for(int field_count = 0;  field_count < attrTypes.length; field_count++)
+        {
+            projections[field_count] = new FldSpec(rel, field_count+1);
+        }
 
-        for(int index_count = 0; index_count < index_files.length; index_count++) {
-
+        for(int index_count = 0; index_count < index_files.length; index_count++)
+        {
             java.lang.String index_file_name = ((BTreeFile) index_files[index_count]).getDbname();
             // start index scan on index of first preference attribute
             try
             {
                 index_list[index_count] = new IndexScan(new IndexType(IndexType.B_Index), relation_name, index_file_name, attrTypes, str_sizes, 3, 3, projections, null, pref_list[index_count], false);
             } catch (Exception e) {
-                //  status = FAIL;
                 e.printStackTrace();
             }
 
-            tuple_list[index_count] = null;
             hash_sets.add(new ArrayList<Tuple>());
-            if(index_list[index_count] == null){
-                System.out.println(" Failed to create index scan");
-            }
             //debug_printIndex(index_list[index_count], pref_list[index_count]);
         }
 
-        System.out.println(" Size of hash_sets " + hash_sets.size());
-
         Tuple matched = null;
+        Tuple temp = null;
         boolean flag = false;
-        int count = 1;
         try
         {
             do
             {
-                //System.out.println("-------Iteration count-------- " + count);
                 for(int index_count=0; index_count< index_files.length; index_count++)
                 {
                     Tuple tt = (Tuple)index_list[index_count].get_next();
                     if(tt == null)
                     {
-                        tuple_list[index_count] = tt;
+                        temp = tt;
                         flag = true;
-                        // System.out.println("found null " + i);
                         break;
                     }
 
+
                     Tuple head = new Tuple(tt);
                     hash_sets.get(index_count).add(head);
-                    tuple_list[index_count] = head;
+                    temp = head;
 
                     boolean res = true;
-                    for(int j=0; j< index_list.length; j++) {
+                    for(int j=0; j < index_list.length; j++)
+                    {
                        boolean search_result = false;
                        for(Tuple tuple : hash_sets.get(j))
                        {
-                           if(TupleUtils.Equal(head, tuple, attrTypes, attrTypes.length)){
+                           if(TupleUtils.Equal(head, tuple, attrTypes, attrTypes.length))
+                           {
                                search_result = true;
                            }
                        }
                        res = res & search_result;
                     }
 
-                    if(res){
-                        System.out.println("Found a match");
+                    // if we found a tuple in all dimension, break out as there is no need to check other tuples.
+                    if(res)
+                    {
+                        System.out.println("Found a match in all dimensions");
                         matched = new Tuple(head);
                         flag = true;
                         break;
                     }
                 }
-                count++;
 
-                if(flag){
+                if(flag)
+                {
+                    // found a match in all dimension, simultaneous scan can be stopped now.
                     break;
                 }
-
-            }while(tuple_list[0]!=null);
+            }
+            while(temp!=null);
         }
         catch (Exception e)
         {
@@ -170,13 +165,12 @@ public class BTreeSky extends Iterator {
 
         for(int index_count = 0; index_count < index_files.length; index_count++)
         {
-            //System.out.println("size of hash_sets " + index_count +"\t"+ hash_sets.get(index_count).size());
-
             java.util.Iterator itr = hash_sets.get(index_count).iterator();
             while(itr.hasNext())
             {
                 Tuple out = (Tuple)itr.next();
-                if(TupleUtils.Equal(out, matched, attrTypes, attrTypes.length)){
+                if(TupleUtils.Equal(out, matched, attrTypes, attrTypes.length))
+                {
                     break;
                 }
                 System.out.println(out.getIntFld(1) + " : " + out.getIntFld(2) + " : " + out.getIntFld(3));
@@ -186,8 +180,6 @@ public class BTreeSky extends Iterator {
 
         // This is needed to keep track of index files which we will be scanning from index_files array.
         System.out.println("size of tupleArrayList "  +output.size());
-
-
         generate_skyline(output);
     }
 
@@ -199,8 +191,6 @@ public class BTreeSky extends Iterator {
         }
         return bnlskyline.get_next();
     }
-
-
 
     @Override
     public void close() throws IOException, JoinsException, SortException, IndexException {
@@ -218,30 +208,25 @@ public class BTreeSky extends Iterator {
         System.out.println( "----------Index scan----"  +field_no);
         Tuple t = null;
         int iout = 0;
-        int ival = 100; // low key
 
-        try {
+        try
+        {
             t = iscan.get_next();
         } catch (Exception e) {
 
             e.printStackTrace();
         }
 
-        while (t != null) {
-            try {
+        while (t != null)
+        {
+            try
+            {
                 iout = t.getIntFld(field_no);
                 System.out.println( "iout = " + iout);
-            } catch (Exception e) {
-
-                e.printStackTrace();
-            }
-
-            ival = iout;
-
-            try {
                 t = iscan.get_next();
-            } catch (Exception e) {
-
+            }
+            catch (Exception e)
+            {
                 e.printStackTrace();
             }
         }
@@ -249,10 +234,9 @@ public class BTreeSky extends Iterator {
 
     private void generate_skyline(List<Tuple> playersList)
     {
-
         RID rid;
         Heapfile f = null;
-        java.lang.String heap_file_name = relation_name + "_rem";
+        java.lang.String heap_file_name = relation_name + "_tmp";
         try
         {
             f = new Heapfile(heap_file_name);
@@ -270,33 +254,36 @@ public class BTreeSky extends Iterator {
             catch (Exception e)
             {
                 System.err.println("*** error in Heapfile.insertRecord() ***");
-
                 e.printStackTrace();
             }
         }
 
-        FldSpec[] projections = new FldSpec[3];
+        FldSpec[] projections = new FldSpec[attrTypes.length];
         RelSpec rel = new RelSpec(RelSpec.outer);
-        projections[0] = new FldSpec(rel, 1);
-        projections[1] = new FldSpec(rel, 2);
-        projections[2] = new FldSpec(rel, 3);
+        for(int field_count = 0;  field_count < attrTypes.length; field_count++)
+        {
+            projections[field_count] = new FldSpec(rel, field_count+1);
+        }
 
-        // Scan the players table
         FileScan am = null;
-        try {
+        try
+        {
             am = new FileScan(heap_file_name, attrTypes, str_sizes,
                     (short)attrTypes.length, (short) attrTypes.length,
                     projections, null);
-        } catch (Exception e) {
+        }
+        catch (Exception e)
+        {
             System.err.println("" + e);
         }
 
-        // Get skyline elements
-      //  BlockNestedLoopsSky blockNestedLoopsSky = null;
-        try {
-            bnlskyline = new NestedLoopsSky(attrTypes, 1000, am, pref_list);
-        } catch (Exception e) {
-            System.err.println("*** Error preparing for nested_loop_join");
+        try
+        {
+            bnlskyline = new NestedLoopsSky(attrTypes, n_buf_pgs, am, pref_list);
+        }
+        catch (Exception e)
+        {
+            System.err.println("*** Error preparing for nested_loop_join - BtreeSky.java");
             System.err.println("" + e);
             e.printStackTrace();
             Runtime.getRuntime().exit(1);
