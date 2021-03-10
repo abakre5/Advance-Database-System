@@ -414,6 +414,9 @@ public class TupleUtils {
     public static int CompareTupleWithTuplePref(Tuple t1, AttrType[] type1, Tuple t2, AttrType[] type2,
                                                 short len_in, short[] str_sizes, int[] pref_list,
                                                 int pref_list_length) throws TupleUtilsException, IOException, FieldNumberOutOfBoundException {
+        if (t1 == null || t2 == null){
+            throw new TupleUtilsException("Error: Empty tuple received.");
+        }
         if (pref_list_length < 1) {
             throw new TupleUtilsException("Number of preference attributes should be more than 0. However, provided " + pref_list_length);
         }
