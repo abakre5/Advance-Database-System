@@ -143,14 +143,14 @@ class BTreeSortedSkyDriver extends TestDriver implements GlobalConst {
 //        playersList.add( new Player( 110, 20, 10 ) );
 //        playersList.add( new Player( 111, 50, 20 ) );
 //        playersList.add( new Player( 112, 110, 30 ) );
-
-
-        playersList.add( new Player( 1.0f, 25.2f, 7.1f) );
-        playersList.add( new Player( 17.3f, 70.0f, 1.1f) );
-        playersList.add( new Player( 3.01f, 27.1f, 10.3f ) );
-        playersList.add( new Player( 25.1f, 30.0f,  3.1f) );
-        playersList.add( new Player( 2.5f, 35.5f, 2.0f ) );
-        playersList.add( new Player( 35.1f, 40.1f, 3.6f ) );
+       
+       
+        playersList.add( new Player( 1.0f, 25.2f,7.1f));
+        playersList.add( new Player(17.3f,70.0f,1.1f));
+        playersList.add( new Player(3.01f,27.1f,10.3f));
+        playersList.add( new Player(25.1f,30.0f,3.1f));
+        playersList.add( new Player(2.5f,35.5f,2.0f));
+        playersList.add( new Player(35.1f,40.1f,3.6f));
         
 
         AttrType[] Ptypes = new AttrType[3];
@@ -191,11 +191,11 @@ class BTreeSortedSkyDriver extends TestDriver implements GlobalConst {
             e.printStackTrace();
         }
 
-        for (int i=0; i<playersList.size(); i++) {
+        for (int ii=0; ii<playersList.size(); ii++) {
             try {
-                t.setFloFld(1, ((Player)playersList.get(i)).pid);
-                t.setFloFld(2, ((Player)playersList.get(i)).goals);
-                t.setFloFld(3, ((Player)playersList.get(i)).assists);
+                t.setFloFld(1, ((Player)playersList.get(ii)).pid);
+                t.setFloFld(2, ((Player)playersList.get(ii)).goals);
+                t.setFloFld(3, ((Player)playersList.get(ii)).assists);
             }
             catch (Exception e) {
                 System.err.println("*** Heapfile error in Tuple.setStrFld() ***");
@@ -315,12 +315,9 @@ class BTreeSortedSkyDriver extends TestDriver implements GlobalConst {
 
         IndexFile[] indexFiles = new IndexFile[1];
         indexFiles[0] = btf1;
-        
-
-
 
         
-        //Get skyline elements
+       //Get skyline elements
         BTreeSortedSky bTreeSortedSky = null;
         try {
             bTreeSortedSky = new BTreeSortedSky(Ptypes, 3, null, 1000, am, "playersnew.in", pref_list, null, indexFiles,  100);
@@ -342,9 +339,9 @@ class BTreeSortedSkyDriver extends TestDriver implements GlobalConst {
             e.printStackTrace();
         }
 
-        System.out.println("-----------SkylineSS for given dataset--------------");
+        //System.out.println("-----------SkylineSS for given dataset--------------");
         while( t != null ) {
-            System.out.println("setsky: PRINT");
+            //System.out.println("setsky: PRINT");
             try {
                 System.out.println(t.getFloFld(1) + " -- " + t.getFloFld(2) + " " + t.getFloFld(3));
                 t = bTreeSortedSky.get_next();
@@ -367,7 +364,7 @@ class BTreeSortedSkyDriver extends TestDriver implements GlobalConst {
             e.printStackTrace();
         }
 
-        
+    
         System.out.println("------------------- TEST 1 completed ---------------------\n");
         return status;
     }
