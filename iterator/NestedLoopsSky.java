@@ -52,7 +52,6 @@ public class NestedLoopsSky extends Iterator {
         relation_name = _relationName;
         noOfBufferPages = n_pages;
         skylineRIDList = new ArrayList<>();
-//        first_time = true;
         setSkyline();
     }
 
