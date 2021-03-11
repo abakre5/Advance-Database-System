@@ -2,12 +2,12 @@ package tests;
 
 import btree.*;
 import global.*;
-import heap.Heapfile;
+import heap.*;
 import heap.Scan;
 import heap.Tuple;
 import index.IndexScan;
 import iterator.*;
-
+import java.io.*;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
@@ -48,7 +48,7 @@ class BTreeSortedSkyDriver extends TestDriver implements GlobalConst {
         System.out.print("\n" + "Running " + testName() + " tests...." + "\n");
 
         try {
-            SystemDefs sysdef = new SystemDefs(dbpath, NUMBUF + 20, NUMBUF, "Clock");
+            SystemDefs sysdef = new SystemDefs(dbpath, NUMBUF + 2550, NUMBUF, "Clock");
         } catch (Exception e) {
             Runtime.getRuntime().exit(1);
         }
@@ -124,6 +124,237 @@ class BTreeSortedSkyDriver extends TestDriver implements GlobalConst {
     }
 
     public boolean test1() {
+        System.out.println("------------------------ TEST 1 --------------------------");
+        boolean status = OK;
+    
+        AttrType[] Ptypes = new AttrType[5];
+        Ptypes[0] = new AttrType (AttrType.attrReal);
+        Ptypes[1] = new AttrType (AttrType.attrReal);
+        Ptypes[2] = new AttrType (AttrType.attrReal);
+        Ptypes[3] = new AttrType (AttrType.attrReal);
+        Ptypes[4] = new AttrType (AttrType.attrReal);
+    
+        short[] attrSize = new short[2];
+        attrSize[0] = REC_LEN2;
+        attrSize[1] = REC_LEN1;
+        Tuple t = new Tuple();
+        try {
+            t.setHdr((short) 5,Ptypes, attrSize);
+        }
+        catch (Exception e) {
+            System.err.println("*** error in Tuple.setHdr() ***");
+            status = FAIL;
+            e.printStackTrace();
+        }
+    
+        int size = t.size();
+    
+        RID rid;
+        Heapfile f = null;
+        try {
+            f = new Heapfile("btreesorted.in");
+        }
+        catch (Exception e) {
+            System.err.println("*** error in Heapfile constructor ***");
+            status = FAIL;
+            e.printStackTrace();
+        }
+    
+        t = new Tuple(size);
+        try {
+            t.setHdr((short) 5, Ptypes, attrSize);
+        }
+        catch (Exception e) {
+            System.err.println("*** error in Tuple.setHdr() ***");
+            status = FAIL;
+            e.printStackTrace();
+        }
+    
+        try (BufferedReader br = new BufferedReader(new FileReader("data1.txt"))) {
+            String line;
+            boolean flag = false;
+            while ((line = br.readLine()) != null) {
+                if (flag) {
+                    String[] ans = line.split("\\s+");
+                    for (int i = 1;i <= ans.length;i++) {
+                        t.setFloFld(i, Float.parseFloat(ans[i - 1]));
+                    }
+                    try {
+                        rid = f.insertRecord(t.returnTupleByteArray());
+                    }
+                    catch (Exception e) {
+                        System.err.println("*** error in Heapfile.insertRecord() ***");
+                        status = FAIL;
+                        e.printStackTrace();
+                        break;
+                    }
+                }
+                flag = true;
+            }
+        } catch (FileNotFoundException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        } catch (FieldNumberOutOfBoundException e) {
+            e.printStackTrace();
+        }
+    
+        FldSpec[] Pprojection = new FldSpec[5];
+        RelSpec rel = new RelSpec(RelSpec.outer);
+        Pprojection[0] = new FldSpec(rel, 1);
+        Pprojection[1] = new FldSpec(rel, 2);
+        Pprojection[2] = new FldSpec(rel, 3);
+        Pprojection[3] = new FldSpec(rel, 4);
+        Pprojection[4] = new FldSpec(rel, 5);
+        // Scan the players table
+        FileScan am = null;
+        try {
+            am  = new FileScan("btreesorted.in", Ptypes, attrSize,
+                    (short)5, (short)5,
+                    Pprojection, null);
+        }
+        catch (Exception e) {
+            status = FAIL;
+            System.err.println (""+e);
+        }
+        if (status != OK) {
+            //bail out
+            System.err.println ("*** Error setting up scan for players");
+            Runtime.getRuntime().exit(1);
+        }
+
+
+        Scan scan = null;
+        try {
+            scan = new Scan(f);
+        } catch (Exception e) {
+            status = FAIL;
+            e.printStackTrace();
+            Runtime.getRuntime().exit(1);
+        }
+
+        int[] pref_list = new int[2];
+        pref_list[0] = 2;
+        pref_list[1] = 3;
+
+        // create the index file
+        BTreeFile btf1 = null;
+        try {
+            btf1 = new BTreeFile("BTreeIndexNew", AttrType.attrReal, REC_LEN1, 1/*delete*/);
+        } catch (Exception e) {
+            status = FAIL;
+            e.printStackTrace();
+            Runtime.getRuntime().exit(1);
+        }
+
+        System.out.println("BTreeIndex created successfully.\n");
+
+        rid = new RID();
+        Float key = null;
+      
+
+        Tuple temp = null;
+
+        try {
+            temp = scan.getNext(rid);
+        } catch (Exception e) {
+            status = FAIL;
+            e.printStackTrace();
+        }
+        Float flo = (Float)0.1f;
+        while (temp != null) {
+            t.tupleCopy(temp);
+
+            try {
+                key = t.getFloFld( pref_list[0]) + t.getFloFld( pref_list[1]) ;
+           
+            } catch (Exception e) {
+                status = FAIL;
+                e.printStackTrace();
+            }
+
+            try {
+                btf1.insert(new FloatKey(key), rid);
+            } catch (Exception e) {
+                status = FAIL;
+                e.printStackTrace();
+            }
+
+            try {
+                temp = scan.getNext(rid);
+            } catch (Exception e) {
+                status = FAIL;
+                e.printStackTrace();
+            }
+        }
+        try {
+            BT.printAllLeafPages(btf1.getHeaderPage());
+        }catch (Exception e){
+            e.printStackTrace();
+        }
+
+        IndexFile[] indexFiles = new IndexFile[1];
+        indexFiles[0] = btf1;
+
+        
+       //Get skyline elements
+        BTreeSortedSky bTreeSortedSky = null;
+        try {
+            bTreeSortedSky = new BTreeSortedSky(Ptypes, 5, null, 1000, am, "btreesorted.in", pref_list, null, indexFiles,  100);
+        } catch (Exception e) {
+            System.err.println ("*** Error preparing for btree sorted sky");
+            System.err.println (""+e);
+            e.printStackTrace();
+            Runtime.getRuntime().exit(1);
+        }
+
+        t = new Tuple();
+        int count = 0;
+        try {
+            System.out.println("setsky: calling");
+            t = bTreeSortedSky.get_next();
+        }
+        catch (Exception e) {
+            status = FAIL;
+            e.printStackTrace();
+        }
+
+        //System.out.println("-----------SkylineSS for given dataset--------------");
+        while( t != null ) {
+            //System.out.println("setsky: PRINT");
+            try {
+                System.out.println(t.getFloFld(1) + " -- " + t.getFloFld(2) + " " + t.getFloFld(3));
+                t = bTreeSortedSky.get_next();
+            } catch (Exception e) {
+                status = FAIL;
+                e.printStackTrace();
+            }
+        }
+        if(t==null) {
+            System.out.println("setsky: all null");
+        }
+        System.out.println("-----------End Skyline--------------");
+
+        //clean up
+        try {
+            bTreeSortedSky.close();
+        }
+        catch (Exception e) {
+            status = FAIL;
+            e.printStackTrace();
+        }
+
+    
+        System.out.println("------------------- TEST 1 completed ---------------------\n");
+        return status;
+    }
+
+
+
+
+
+
+    public boolean test11() {
         System.out.println("------------------------ TEST 1 --------------------------");
         boolean status = OK;
 
@@ -252,6 +483,13 @@ class BTreeSortedSkyDriver extends TestDriver implements GlobalConst {
             e.printStackTrace();
             Runtime.getRuntime().exit(1);
         }
+
+
+
+
+
+
+
 
         int[] pref_list = new int[2];
         pref_list[0] = 2;

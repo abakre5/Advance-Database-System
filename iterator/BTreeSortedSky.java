@@ -90,11 +90,13 @@ public class BTreeSortedSky extends Iterator {
         RID rid = new RID();
         KeyDataEntry KeyData = null;
 
-        FldSpec[] projections = new FldSpec[3];
+        FldSpec[] projections = new FldSpec[5];
         RelSpec rel = new RelSpec(RelSpec.outer);
         projections[0] = new FldSpec(rel, 1);
         projections[1] = new FldSpec(rel, 2);
         projections[2] = new FldSpec(rel, 3);
+        projections[3] = new FldSpec(rel, 4);
+        projections[4] = new FldSpec(rel, 5);
 
         try {
             index_scan = ((BTreeFile)index_files[0]).new_scan(null, null);
@@ -125,7 +127,7 @@ public class BTreeSortedSky extends Iterator {
             
             //Please check why do we need to do this?
             Tuple current_tuple = new Tuple(t.getTupleByteArray(), t.getOffset(),t.getLength());
-            current_tuple.setHdr((short)3, attrTypes, null);
+            current_tuple.setHdr((short)5, attrTypes, null);
 
             if(buffer_threshold == -1) {
                 buffer_threshold = (int) Math.floor(Tuple.MINIBASE_PAGESIZE * n_buf_pgs / (int)current_tuple.size());
@@ -149,7 +151,7 @@ public class BTreeSortedSky extends Iterator {
         handleDiskMembers();
         System.out.println("================ Printing Skyline =======================\n");
         for(Tuple p: skyline) {
-            System.out.println(p.getFloFld(1) + " : " + p.getFloFld(2) + " : " + p.getFloFld(3));
+            System.out.println(p.getFloFld(1) + " : " + p.getFloFld(2) + " : " + p.getFloFld(3) + " : " + p.getFloFld(4) + " : "+p.getFloFld(5));
         }
        
         System.out.println("================ End Skyline =======================\n");
