@@ -1760,10 +1760,6 @@ public class BTreeFile extends IndexFile
 
     }
 
-    public java.lang.String getDbname(){
-        return dbname;
-    }
-
 }
 
 
