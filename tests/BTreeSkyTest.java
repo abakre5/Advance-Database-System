@@ -2,13 +2,11 @@ package tests;
 
 import btree.*;
 import global.*;
-import heap.Heapfile;
-import heap.Scan;
-import heap.Tuple;
+import heap.*;
 import index.IndexScan;
 import iterator.*;
 
-import java.io.IOException;
+import java.io.*;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -48,7 +46,7 @@ class BTreeSkyDriver extends TestDriver implements GlobalConst {
         System.out.print("\n" + "Running " + testName() + " tests...." + "\n");
 
         try {
-            SystemDefs sysdef = new SystemDefs(dbpath, NUMBUF + 20, NUMBUF, "Clock");
+            SystemDefs sysdef = new SystemDefs(dbpath, NUMBUF + 1000, NUMBUF, "Clock");
         } catch (Exception e) {
             Runtime.getRuntime().exit(1);
         }
@@ -146,21 +144,29 @@ class BTreeSkyDriver extends TestDriver implements GlobalConst {
 
 
         playersList.add( new Player( 1, 25,  7) );
-        playersList.add( new Player( 3, 27, 10 ) );
+        playersList.add( new Player( 3, 27, 10) );
         playersList.add( new Player( 25, 30,  3) );
         playersList.add( new Player( 2, 35, 2 ) );
         playersList.add( new Player( 35, 40, 3 ) );
         playersList.add( new Player( 17, 70, 1) );
+//
+//        for (int  i= 0 ; i < 1000; i++){
+//            playersList.add( new Player( i, i, 1001-i) );
+//        }
 
+        AttrType[] Ptypes = new AttrType[5];
+        Ptypes[0] = new AttrType (AttrType.attrReal);
+        Ptypes[1] = new AttrType (AttrType.attrReal);
+        Ptypes[2] = new AttrType (AttrType.attrReal);
+        Ptypes[3] = new AttrType (AttrType.attrReal);
+        Ptypes[4] = new AttrType (AttrType.attrReal);
 
-        AttrType[] Ptypes = new AttrType[3];
-        Ptypes[0] = new AttrType (AttrType.attrInteger);
-        Ptypes[1] = new AttrType (AttrType.attrInteger);
-        Ptypes[2] = new AttrType (AttrType.attrInteger);
-
+        short[] attrSize = new short[2];
+        attrSize[0] = REC_LEN2;
+        attrSize[1] = REC_LEN1;
         Tuple t = new Tuple();
         try {
-            t.setHdr((short) 3,Ptypes, null);
+            t.setHdr((short) 5,Ptypes, attrSize);
         }
         catch (Exception e) {
             System.err.println("*** error in Tuple.setHdr() ***");
@@ -173,7 +179,7 @@ class BTreeSkyDriver extends TestDriver implements GlobalConst {
         RID rid;
         Heapfile f = null;
         try {
-            f = new Heapfile("players.in");
+            f = new Heapfile("btreesky.in");
         }
         catch (Exception e) {
             System.err.println("*** error in Heapfile constructor ***");
@@ -183,7 +189,7 @@ class BTreeSkyDriver extends TestDriver implements GlobalConst {
 
         t = new Tuple(size);
         try {
-            t.setHdr((short) 3, Ptypes, null);
+            t.setHdr((short) 5, Ptypes, attrSize);
         }
         catch (Exception e) {
             System.err.println("*** error in Tuple.setHdr() ***");
@@ -191,45 +197,48 @@ class BTreeSkyDriver extends TestDriver implements GlobalConst {
             e.printStackTrace();
         }
 
-        for (int i=0; i<playersList.size(); i++) {
-            try {
-                t.setIntFld(1, ((Player)playersList.get(i)).pid);
-                t.setIntFld(2, ((Player)playersList.get(i)).goals);
-                t.setIntFld(3, ((Player)playersList.get(i)).assists);
+        try (BufferedReader br = new BufferedReader(new FileReader("data3.txt")))
+        {
+            String line;
+            boolean flag = false;
+            while ((line = br.readLine()) != null) {
+                if (flag) {
+                    String[] ans = line.split("\\s+");
+                    for (int i = 1;i <= ans.length;i++) {
+                        t.setFloFld(i, Float.parseFloat(ans[i - 1]));
+                    }
+                    try {
+                        rid = f.insertRecord(t.returnTupleByteArray());
+                    }
+                    catch (Exception e) {
+                        System.err.println("*** error in Heapfile.insertRecord() ***");
+                        status = FAIL;
+                        e.printStackTrace();
+                        break;
+                    }
+                }
+                flag = true;
             }
-            catch (Exception e) {
-                System.err.println("*** Heapfile error in Tuple.setStrFld() ***");
-                status = FAIL;
-                e.printStackTrace();
-            }
-
-            try {
-                rid = f.insertRecord(t.returnTupleByteArray());
-            }
-            catch (Exception e) {
-                System.err.println("*** error in Heapfile.insertRecord() ***");
-                status = FAIL;
-                e.printStackTrace();
-            }
-
-
+        } catch (FileNotFoundException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        } catch (FieldNumberOutOfBoundException e) {
+            e.printStackTrace();
         }
-        if (status != OK) {
-            //bail out
-            System.err.println ("*** Error creating relation for sailors");
-            Runtime.getRuntime().exit(1);
-        }
 
-        FldSpec[] Pprojection = new FldSpec[3];
-        Pprojection[0] = new FldSpec(new RelSpec(RelSpec.outer), 1);
-        Pprojection[1] = new FldSpec(new RelSpec(RelSpec.outer), 2);
-        Pprojection[2] = new FldSpec(new RelSpec(RelSpec.outer), 3);
-
+        FldSpec[] Pprojection = new FldSpec[5];
+        RelSpec rel = new RelSpec(RelSpec.outer);
+        Pprojection[0] = new FldSpec(rel, 1);
+        Pprojection[1] = new FldSpec(rel, 2);
+        Pprojection[2] = new FldSpec(rel, 3);
+        Pprojection[3] = new FldSpec(rel, 4);
+        Pprojection[4] = new FldSpec(rel, 5);
         // Scan the players table
         FileScan am = null;
         try {
-            am  = new FileScan("players.in", Ptypes, null,
-                    (short)3, (short)3,
+            am  = new FileScan("btreesky.in", Ptypes, attrSize,
+                    (short)5, (short)5,
                     Pprojection, null);
         }
         catch (Exception e) {
@@ -241,6 +250,8 @@ class BTreeSkyDriver extends TestDriver implements GlobalConst {
             System.err.println ("*** Error setting up scan for players");
             Runtime.getRuntime().exit(1);
         }
+
+
 
         // create an scan on the heapfile
         Scan scan = null;
@@ -258,11 +269,11 @@ class BTreeSkyDriver extends TestDriver implements GlobalConst {
         pref_list[1] = 3;
 
         // create the index file
-        BTreeFile btf1 = null, btf2 = null, btf3 = null;
+        BTreeFile[] btf = new BTreeFile[pref_list.length];
         try {
-            btf1 = new BTreeFile("BTreeIndex", AttrType.attrInteger, REC_LEN1, 1/*delete*/);
-            btf2 = new BTreeFile("BTreeIndex2", AttrType.attrInteger, REC_LEN1, 1/*delete*/);
-            btf3 = new BTreeFile("BTreeIndex3", AttrType.attrReal, REC_LEN1, 1/*delete*/);
+            for(int  i = 0 ; i < pref_list.length; i++){
+                btf[i] = new BTreeFile("BTreeIndex" + i, AttrType.attrReal, REC_LEN1, 1/*delete*/);
+            }
         } catch (Exception e) {
             status = FAIL;
             e.printStackTrace();
@@ -272,8 +283,7 @@ class BTreeSkyDriver extends TestDriver implements GlobalConst {
         System.out.println("BTreeIndex created successfully.\n");
 
         rid = new RID();
-        Integer key1 = null, key2 = null;
-        Float key3 = null;
+        Float key = null;
 
         Tuple temp = null;
 
@@ -283,30 +293,24 @@ class BTreeSkyDriver extends TestDriver implements GlobalConst {
             status = FAIL;
             e.printStackTrace();
         }
-        Float flo = (Float)0.1f;
-        while (temp != null) {
+
+        while (temp != null)
+        {
             t.tupleCopy(temp);
-
-            try {
-                key1= t.getIntFld(2);
-                key2= t.getIntFld(3);
-                if(key3 == null){
-                    key3  = 0.2f;
-                }else{
-                    key3 += 0.1f;
+            for(int  i = 0 ; i < pref_list.length; i++) {
+                try {
+                    key = t.getFloFld(pref_list[i]);
+                } catch (Exception e) {
+                    status = FAIL;
+                    e.printStackTrace();
                 }
-            } catch (Exception e) {
-                status = FAIL;
-                e.printStackTrace();
-            }
 
-            try {
-                btf1.insert(new IntegerKey(key1), rid);
-                btf2.insert(new IntegerKey(key2), rid);
-                btf3.insert(new FloatKey(key3), rid);
-            } catch (Exception e) {
-                status = FAIL;
-                e.printStackTrace();
+                try {
+                    btf[i].insert(new FloatKey(key), rid);
+                } catch (Exception e) {
+                    status = FAIL;
+                    e.printStackTrace();
+                }
             }
 
             try {
@@ -316,23 +320,16 @@ class BTreeSkyDriver extends TestDriver implements GlobalConst {
                 e.printStackTrace();
             }
         }
-        try {
-            BT.printAllLeafPages(btf3.getHeaderPage());
-        }catch (Exception e){
-            e.printStackTrace();
-        }
 
-        IndexFile[] indexFiles = new IndexFile[2];
-        indexFiles[0] = btf1;
-        indexFiles[1] = btf2;
+        //IndexFile[] indexFiles = new IndexFile[pref_list.length];
+
 
         // Get skyline elements
         BTreeSky bTreeSky = null;
         try {
-            bTreeSky = new BTreeSky(Ptypes, 3, null, 1000, am, "players.in", pref_list, null, indexFiles,  100);
-        } catch (Exception e) {
-            System.err.println ("*** Error preparing for nested_loop_join");
-            System.err.println (""+e);
+            bTreeSky = new BTreeSky(Ptypes, Ptypes.length, null, am, "btreesky.in", pref_list, null, (IndexFile[]) btf,  5);
+        } catch (Exception e)
+        {
             e.printStackTrace();
             Runtime.getRuntime().exit(1);
         }
@@ -348,17 +345,18 @@ class BTreeSkyDriver extends TestDriver implements GlobalConst {
         }
 
         System.out.println("-----------Skyline for given dataset--------------");
+        status = true;
         while( t != null ) {
 
             try {
-                System.out.println(t.getIntFld(1) + "   " +t.getIntFld(2) +  "   " + t.getIntFld(3));
+                System.out.println(t.getFloFld(1) + "   " +t.getFloFld(2) +  "   " + t.getFloFld(3)+ "  " + t.getFloFld(4) +" "+t.getFloFld(5));
                 t = bTreeSky.get_next();
             } catch (Exception e) {
                 status = FAIL;
                 e.printStackTrace();
             }
-        }
 
+        }
         System.out.println("-----------End Skyline--------------");
 
         // clean up
