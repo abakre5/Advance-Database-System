@@ -160,6 +160,11 @@ public class DB implements GlobalConst {
             throw new FileIOException(e, "DB file I/O error");
         }
 
+        if (PageCounter.isInited() == false){
+            PageCounter.init();
+        }
+        PageCounter.readInc();
+
     }
 
     /**
@@ -188,6 +193,11 @@ public class DB implements GlobalConst {
         } catch (IOException e) {
             throw new FileIOException(e, "DB file I/O error");
         }
+
+        if (PageCounter.isInited() == false){
+            PageCounter.init();
+        }
+        PageCounter.writeInc();
 
     }
 
@@ -700,7 +710,6 @@ public class DB implements GlobalConst {
     private RandomAccessFile fp;
     private int num_pages;
     private String name;
-
 
     /**
      * Set runsize bits starting from start to value specified
