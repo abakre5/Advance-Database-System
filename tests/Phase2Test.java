@@ -297,10 +297,7 @@ class Ph2Driver extends TestDriver implements GlobalConst {
         try {
             while ((t = nls.get_next()) != null) {
                 num_skylines++;
-                int num_fields = t.noOfFlds();
-                for (int i=0; i < num_fields; ++i) {
-                    System.out.print("" + t.getFloFld(i+1) + " ");
-                }
+                printTuple(t);
             }
         } catch (Exception e) {
             status = FAIL;
@@ -362,7 +359,6 @@ class Ph2Driver extends TestDriver implements GlobalConst {
         try {
             while ((t = blockNestedLoopsSky.get_next()) != null) {
                 num_skylines++;
-                //System.out.println("skylines retrieved: " + num_skylines);
                 printTuple(t);
             }
         } catch (Exception e) {
@@ -423,7 +419,6 @@ class Ph2Driver extends TestDriver implements GlobalConst {
         try {
             while ((t = sfs.get_next()) != null) {
                 num_skylines++;
-                //System.out.println("skylines retrieved: " + num_skylines);
                 printTuple(t);
             }
         } catch (Exception e) {
@@ -485,7 +480,6 @@ class Ph2Driver extends TestDriver implements GlobalConst {
         try {
             while ((t = sfs.get_next()) != null) {
                 num_skylines++;
-                //System.out.println("skylines retrieved: " + num_skylines);
                 printTuple(t);
             }
         } catch (Exception e) {
@@ -548,7 +542,6 @@ class Ph2Driver extends TestDriver implements GlobalConst {
         try {
             while ((t = btss.get_next()) != null) {
                 num_skylines++;
-                //System.out.println("skylines retrieved: " + num_skylines);
                 printTuple(t);
             }
         } catch (Exception e) {
