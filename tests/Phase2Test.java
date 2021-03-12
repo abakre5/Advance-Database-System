@@ -297,7 +297,6 @@ class Ph2Driver extends TestDriver implements GlobalConst {
         try {
             while ((t = nls.get_next()) != null) {
                 num_skylines++;
-                System.out.println("skylines retrieved: " + num_skylines);
                 int num_fields = t.noOfFlds();
                 for (int i=0; i < num_fields; ++i) {
                     System.out.print("" + t.getFloFld(i+1) + " ");
