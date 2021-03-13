@@ -61,8 +61,10 @@ public class SortFirstSky extends Iterator {
             e.printStackTrace();
         }
         if (!isSorted) {
+            System.out.println("Data is not sorted Sorting data.");
             outer = sortData(fscan);
         } else {
+            System.out.println("Data is already sorted.");
             outer = fscan;
         }
 
@@ -92,7 +94,7 @@ public class SortFirstSky extends Iterator {
             Tuple next = outer.get_next();
             if (next != null) {
                 next = new Tuple(next);
-                int pref = TupleUtils.CompareTupleWithTuplePref(next, attrTypes, curr, attrTypes, noOfColumns, stringSizes, prefList, prefList.length);
+                int pref = TupleUtils.CompareTupleWithTuplePref(curr, attrTypes, next, attrTypes, noOfColumns, stringSizes, prefList, prefList.length);
                 if (pref == 1) {
                     return false;
                 }
@@ -145,7 +147,6 @@ public class SortFirstSky extends Iterator {
                     if (window.size() < windowSize) {
                         window.add(diskTupleToCompare);
                     } else {
-                        System.out.println("disk is being used");
                         if (temp == null) {
                             temp = getHeapFileInstance(temp_file_name);
                         }
