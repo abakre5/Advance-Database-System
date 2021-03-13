@@ -167,7 +167,9 @@ public class BT implements GlobalConst {
             if (keyType == AttrType.attrInteger) {
                 key = new IntegerKey(new Integer
                         (Convert.getIntValue(offset, from)));
-            } else if (keyType == AttrType.attrString) {
+            } else  if (keyType == AttrType.attrReal) {
+                key = new FloatKey(new Float(Convert.getFloValue(offset, from)));
+            }else if (keyType == AttrType.attrString) {
                 //System.out.println(" offset  "+ offset + "  " + length + "  "+n);
                 key = new StringKey(Convert.getStrValue(offset, from, length - n));
             } else

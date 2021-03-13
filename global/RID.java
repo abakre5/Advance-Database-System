@@ -55,6 +55,15 @@ public class RID {
         Convert.setIntValue(pageNo.pid, offset + 4, ary);
     }
 
+    @Override
+    public boolean equals(Object rid) {
+
+        if ((this.pageNo.pid == ((RID)rid).pageNo.pid)
+                && (this.slotNo == ((RID)rid).slotNo))
+            return true;
+        else
+            return false;
+    }
 
     /**
      * Compares two RID object, i.e, this to the rid
@@ -71,5 +80,17 @@ public class RID {
         else
             return false;
     }
+
+    @Override
+    public int hashCode()
+    {
+        final int prime = 31;
+        int hashcode = 1;
+        hashcode = prime * hashcode + pageNo.pid;
+        hashcode = prime * hashcode + slotNo;
+        return  hashcode;
+    }
+
+
 
 }
