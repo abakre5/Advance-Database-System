@@ -9,7 +9,6 @@ import index.IndexException;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
 
 public class SortFirstSky extends Iterator {
@@ -28,6 +27,9 @@ public class SortFirstSky extends Iterator {
     private Heapfile disk = null;
     private int windowSize;
     private int noOfDiskElements;
+    private String tempFileName = "skyFirstSkylinesTemp";
+    boolean flag = true;
+
 
 
 
@@ -50,16 +52,11 @@ public class SortFirstSky extends Iterator {
     }
 
     private void computeSortSkyline() throws Exception {
+        Heapfile disk1 = null;
         boolean isSorted = checkIfDataIsSorted();
         FileScan fscan = null;
-        FldSpec[] projList = new FldSpec[noOfColumns];
-        int i = 0;
-        while (i < noOfColumns) {
-            projList[i] = new FldSpec(new RelSpec(RelSpec.outer), i + 1);
-            i++;
-        }
         try {
-            fscan = new FileScan(relationName, attrTypes, stringSizes, noOfColumns, noOfColumns, projList, null);
+            fscan = getFileScan(relationName);
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -73,18 +70,22 @@ public class SortFirstSky extends Iterator {
 
         Tuple tuple = outer.get_next();
         if (windowSize == -1) {
-            windowSize = (int) Math.floor(Tuple.MINIBASE_PAGESIZE * noOfBufferPages / (int) tuple.size());
+//            windowSize = noOfBufferPages;
+            windowSize = (int) Math.floor(Tuple.MINIBASE_PAGESIZE / (int) tuple.size() *noOfBufferPages);
         }
-        do {
+        while (tuple != null) {
             Tuple currentTuple = new Tuple(tuple);
+            System.out.println("T" + currentTuple.getIntFld(1));
             if (isSkylineCandidate(currentTuple)) {
-                System.out.println(tuple.getIntFld(1));
-                insertIntoSkyline(currentTuple);
+                if (window.size() == windowSize) {
+                    disk1 = getHeapFileInstance(tempFileName);
+                }
+                insertIntoSkyline(disk1, currentTuple);
             }
             tuple = outer.get_next();
-        } while (tuple != null);
+        }
         skyline.addAll(window);
-        vetDiskSkylineMembers();
+        vetDiskSkylineMembers(tempFileName, 0);
     }
 
     private boolean checkIfDataIsSorted() throws Exception {
@@ -119,67 +120,67 @@ public class SortFirstSky extends Iterator {
 
 
 
-    private FileScan getFileScan() throws IOException, FileScanException, TupleUtilsException, InvalidRelation {
+    private FileScan getFileScan(String relationName) throws IOException, FileScanException, TupleUtilsException, InvalidRelation {
         FileScan scan = null;
-        String relationName = "sortFirstDisk.in";
-
-        FldSpec[] Pprojection = new FldSpec[noOfColumns];
+        FldSpec[] pProjection = new FldSpec[noOfColumns];
         for (int i = 1; i <= noOfColumns; i++) {
-            Pprojection[i - 1] = new FldSpec(new RelSpec(RelSpec.outer), i);
+            pProjection[i - 1] = new FldSpec(new RelSpec(RelSpec.outer), i);
         }
         scan = new FileScan(relationName, attrTypes, stringSizes,
-                noOfColumns, noOfColumns, Pprojection, null);
+                noOfColumns, noOfColumns, pProjection, null);
         return scan;
     }
 
 
-    private void vetDiskSkylineMembers() throws Exception {
-        if (disk != null && noOfDiskElements > 0) {
+    private void vetDiskSkylineMembers(String relationName, int i) throws Exception {
+        Heapfile temp = null;
+        String temp_file_name = tempFileName + i;
+        FileScan diskOuterScan = getFileScan(relationName);
+        TupleRIDPair tupleRIDPairOuter = diskOuterScan.get_next1();
+        if (tupleRIDPairOuter!= null) {
+            System.out.println("coming into vetted method");
             window.clear();
-            HashSet<RID> vettedTuples = new HashSet<>();
-            FileScan diskOuterScan = getFileScan();
-            TupleRIDPair tupleRIDPairOuter = diskOuterScan.get_next1();
             while (tupleRIDPairOuter != null) {
                 Tuple tupleOuter = tupleRIDPairOuter.getTuple();
                 RID ridOuter = tupleRIDPairOuter.getRID();
                 Tuple diskTupleToCompare = new Tuple(tupleOuter);
-                if (window.size() < windowSize) {
-                    if (isSkylineCandidate(diskTupleToCompare)) {
+                boolean isMemberOfSkyline = isSkylineCandidate(diskTupleToCompare);
+                if (isMemberOfSkyline) {
+                    if (window.size() < windowSize) {
                         window.add(diskTupleToCompare);
+                    } else {
+                        System.out.println("code is coming into else ================================");
+                        if (temp == null) {
+                            System.out.println("code was here ================================");
+                            temp = getHeapFileInstance(temp_file_name);
+                        }
+                        temp.insertRecord(diskTupleToCompare.returnTupleByteArray());
                     }
-                    vettedTuples.add(ridOuter);
-                } else {
-                    break;
                 }
                 tupleRIDPairOuter = diskOuterScan.get_next1();
             }
-            for (RID ridToDelete : vettedTuples) {
-                disk.deleteRecord(ridToDelete);
-                noOfDiskElements--;
-            }
             diskOuterScan.close();
+            diskOuterScan.deleteFile();
+
             skyline.addAll(window);
-            vetDiskSkylineMembers();
+            i++;
+            vetDiskSkylineMembers(temp_file_name, i);
         }
     }
-    private Heapfile getHeapFileInstance() throws IOException, HFException, HFBufMgrException, HFDiskMgrException {
-        String relationName = "sortFirstDisk.in";
+
+    private Heapfile getHeapFileInstance(String relationName) throws IOException, HFException, HFBufMgrException, HFDiskMgrException {
         return new Heapfile(relationName);
     }
 
-    private void insertIntoSkyline(Tuple currentTuple) throws IOException, HFException, HFBufMgrException, HFDiskMgrException, InvalidTupleSizeException, InvalidTypeException, SpaceNotAvailableException, InvalidSlotNumberException {
+    private void insertIntoSkyline(Heapfile heapfile, Tuple currentTuple) throws IOException, HFException, HFBufMgrException, HFDiskMgrException, InvalidTupleSizeException, InvalidTypeException, SpaceNotAvailableException, InvalidSlotNumberException, FileScanException, TupleUtilsException, InvalidRelation {
         if (window.size() < windowSize) {
             window.add(currentTuple);
         } else {
-            if (disk == null) {
-                disk = getHeapFileInstance();
-            }
-            disk.insertRecord(currentTuple.returnTupleByteArray());
-            noOfDiskElements++;
+            heapfile.insertRecord(currentTuple.returnTupleByteArray());
         }
     }
 
-    private boolean isSkylineCandidate(Tuple currTuple) throws IOException, TupleUtilsException {
+    private boolean isSkylineCandidate(Tuple currTuple) throws IOException, TupleUtilsException, FieldNumberOutOfBoundException {
         for (Tuple tupleInSkyline : window) {
             if (TupleUtils.Dominates(tupleInSkyline, attrTypes, currTuple, attrTypes, noOfColumns, stringSizes, prefList, prefListLength)) {
                 return false;
