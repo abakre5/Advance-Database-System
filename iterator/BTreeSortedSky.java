@@ -37,9 +37,7 @@ public class BTreeSortedSky extends Iterator {
     private AttrType[] attrTypes;
     private int len_in;
     private short[] str_sizes;
-    private int memory;
     private int n_buf_pgs;
-    private Iterator left_itr;
     private int[] pref_list;
     private ArrayList<Tuple> skyline = new ArrayList<Tuple>();
     private IndexFile[] index_files;
@@ -54,6 +52,7 @@ public class BTreeSortedSky extends Iterator {
     private boolean isOutFilePresent;
     
     
+    
 
    public BTreeSortedSky(AttrType[] attrs, int len_attr, short[] attr_size,
              int amt, Iterator left, java.lang.String
@@ -64,8 +63,6 @@ public class BTreeSortedSky extends Iterator {
         attrTypes = attrs;
         len_in = len_attr;
         str_sizes = attr_size;
-        memory = amt;
-        left_itr = left;
         relation_name = relation;
         pref_list = pref_list1;
         pref_lengths = pref_lengths_list;
@@ -85,6 +82,7 @@ public class BTreeSortedSky extends Iterator {
 
     private void compute_skyline() throws Exception {
         BTFileScan index_scan = new BTFileScan();
+      
         Heapfile hf = null;
         RID rid = new RID();
         KeyDataEntry KeyData = null;
@@ -99,7 +97,7 @@ public class BTreeSortedSky extends Iterator {
         } catch(Exception e) {
             e.printStackTrace();
         }
-        System.out.println("compute_skyline: index scan created");
+        //System.out.println("compute_skyline: index scan created");
 
         try {
             System.out.println("Relation: "+ relation_name);
@@ -151,15 +149,15 @@ public class BTreeSortedSky extends Iterator {
             addtoSkyline(skyline_list);
         }
         handleDiskMembers();
-        System.out.println("================ Printing Skyline =======================\n");
-        FileScan scan = getSkylineFileScan();
-        Tuple p = scan.get_next();
-        while(p!=null) {
-            System.out.println(p.getFloFld(1) + " : " + p.getFloFld(2) + " : " + p.getFloFld(3) + " : " + p.getFloFld(4) + " : "+p.getFloFld(5));
-            p = scan.get_next();
-        }
+        // System.out.println("================ Printing Skyline =======================\n");
+        // FileScan scan = getSkylineFileScan();
+        // Tuple p = scan.get_next();
+        // while(p!=null) {
+        //     System.out.println(p.getFloFld(1) + " : " + p.getFloFld(2) + " : " + p.getFloFld(3) + " : " + p.getFloFld(4) + " : "+p.getFloFld(5));
+        //     p = scan.get_next();
+        // }
        
-        System.out.println("================ End Skyline =======================\n");
+        //System.out.println("================ End Skyline =======================\n");
     }
 
     
@@ -192,7 +190,7 @@ public class BTreeSortedSky extends Iterator {
         if(skyline_list.size() < buffer_threshold) {
             skyline_list.add(curr_tuple);
         } else {
-            System.out.println("Buffer Threshold crossed");
+            //System.out.println("Buffer Threshold crossed");
             if(disk == null) {
                 disk = getHeapFileInstance();
             }
@@ -287,13 +285,20 @@ public class BTreeSortedSky extends Iterator {
             first_time = false;
             compute_skyline();
         }
-        if( !skyline.isEmpty() ) {
-            Tuple nextTuple = skyline.get(0);
-            skyline.remove(0);
-           // System.out.println("out get next2");
-            return nextTuple;
+        if(isOutFilePresent && first_time == false) {
+            FileScan get_next_scan = getSkylineFileScan();
+            TupleRIDPair pair = get_next_scan.get_next1();
+            if(pair!=null) {
+                get_next_scan.close();
+                outHeapfile.deleteRecord(pair.getRID());
+                return pair.getTuple();
+            }
+            else {
+                return null;
+            }
+
         }
-        System.out.println("out get next");
+        
         return null;
     }
 
