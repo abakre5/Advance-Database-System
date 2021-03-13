@@ -35,3 +35,4 @@ public interface GlobalConst {
 
     public static final int INVALID_PAGE = -1;
 }
+

@@ -164,7 +164,21 @@ public class IndexScan extends Iterator {
                     } catch (Exception e) {
                         throw new IndexException(e, "IndexScan.java: Heapfile error");
                     }
-                } else if (_types[_fldNum - 1].attrType == AttrType.attrString) {
+                }else if(_types[_fldNum - 1].attrType == AttrType.attrReal) {
+                    attrType[0] = new AttrType(AttrType.attrReal);
+                    try {
+                        Jtuple.setHdr((short) 1, attrType, s_sizes);
+                    } catch (Exception e) {
+                        throw new IndexException(e, "IndexScan.java: Heapfile error");
+                    }
+
+                    try {
+                        Jtuple.setFloFld(1, ((FloatKey) nextentry.key).getKey().floatValue());
+                    } catch (Exception e) {
+                        throw new IndexException(e, "IndexScan.java: Heapfile error");
+                    }
+                }
+                else if (_types[_fldNum - 1].attrType == AttrType.attrString) {
 
                     attrType[0] = new AttrType(AttrType.attrString);
                     // calculate string size of _fldNum

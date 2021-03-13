@@ -558,7 +558,7 @@ public class IndexCatalog extends Heapfile
                 key = new IntegerKey(intKey);
             } else if (attrRec.attrType.attrType == AttrType.attrReal) {
                 floatKey = tuple.getFloFld(attrRec.attrPos);
-                key = new IntegerKey((int) floatKey);
+                key = new FloatKey(floatKey);
             } else if (attrRec.attrType.attrType == AttrType.attrString) {
                 charKey = new String(tuple.getStrFld(attrRec.attrPos));
                 key = new StringKey(charKey);

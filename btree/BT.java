@@ -55,7 +55,17 @@ public class BT implements GlobalConst {
 
             return (((IntegerKey) key1).getKey()).intValue()
                     - (((IntegerKey) key2).getKey()).intValue();
-        } else if ((key1 instanceof StringKey) && (key2 instanceof StringKey)) {
+        }else if ((key1 instanceof FloatKey) && (key2 instanceof FloatKey)) {
+                float diff = (((FloatKey) key1).getKey()).floatValue()
+                        - (((FloatKey) key2).getKey()).floatValue();
+                if(diff < 0){
+                    return -1;
+                } else if(diff > 0){
+                    return 1;
+                }
+            return 0 ;
+        }
+        else if ((key1 instanceof StringKey) && (key2 instanceof StringKey)) {
             return ((StringKey) key1).getKey().compareTo(((StringKey) key2).getKey());
         } else {
             throw new KeyNotMatchException(null, "key types do not match");
@@ -81,8 +91,12 @@ public class BT implements GlobalConst {
             DataOutputStream outstr = new DataOutputStream(out);
             outstr.writeUTF(((StringKey) key).getKey());
             return outstr.size();
-        } else if (key instanceof IntegerKey)
+        } else if (key instanceof IntegerKey) {
             return 4;
+        }
+        else if (key instanceof FloatKey){
+            return 4;
+        }
         else throw new KeyNotMatchException(null, "key types do not match");
     }
 
@@ -165,9 +179,10 @@ public class BT implements GlobalConst {
             } else throw new NodeNotMatchException(null, "node types do not match");
 
             if (keyType == AttrType.attrInteger) {
-                key = new IntegerKey(new Integer
-                        (Convert.getIntValue(offset, from)));
-            } else if (keyType == AttrType.attrString) {
+                key = new IntegerKey(new Integer(Convert.getIntValue(offset, from)));
+            }else  if (keyType == AttrType.attrReal) {
+                key = new FloatKey(new Float(Convert.getFloValue(offset, from)));
+            }else if (keyType == AttrType.attrString) {
                 //System.out.println(" offset  "+ offset + "  " + length + "  "+n);
                 key = new StringKey(Convert.getStrValue(offset, from, length - n));
             } else
@@ -209,7 +224,11 @@ public class BT implements GlobalConst {
             if (entry.key instanceof IntegerKey) {
                 Convert.setIntValue(((IntegerKey) entry.key).getKey().intValue(),
                         0, data);
-            } else if (entry.key instanceof StringKey) {
+            } else if (entry.key instanceof FloatKey) {
+                Convert.setFloValue(((FloatKey) entry.key).getKey().floatValue(),
+                        0, data);
+            }
+            else if (entry.key instanceof StringKey) {
                 Convert.setStrValue(((StringKey) entry.key).getKey(),
                         0, data);
             } else throw new KeyNotMatchException(null, "key types do not match");
@@ -272,6 +291,10 @@ public class BT implements GlobalConst {
                 if (keyType == AttrType.attrInteger)
                     System.out.println(i + " (key, pageId):   (" +
                             (IntegerKey) entry.key + ",  " + (IndexData) entry.data + " )");
+                if (keyType == AttrType.attrReal) {
+                    System.out.println(i + " (key, pageId):   (" +
+                            (FloatKey) entry.key + ",  " + (IndexData) entry.data + " )");
+                }
                 if (keyType == AttrType.attrString)
                     System.out.println(i + " (key, pageId):   (" +
                             (StringKey) entry.key + ",  " + (IndexData) entry.data + " )");
@@ -296,6 +319,9 @@ public class BT implements GlobalConst {
                 if (keyType == AttrType.attrInteger)
                     System.out.println(i + " (key, [pageNo, slotNo]):   (" +
                             (IntegerKey) entry.key + ",  " + (LeafData) entry.data + " )");
+                if (keyType == AttrType.attrReal)
+                    System.out.println(i + " (key, [pageNo, slotNo]):   (" +
+                            (FloatKey) entry.key + ",  " + (LeafData) entry.data + " )");
                 if (keyType == AttrType.attrString)
                     System.out.println(i + " (key, [pageNo, slotNo]):   (" +
                             (StringKey) entry.key + ",  " + (LeafData) entry.data);
