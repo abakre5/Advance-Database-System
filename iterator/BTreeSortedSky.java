@@ -50,6 +50,8 @@ public class BTreeSortedSky extends Iterator {
     private int noOfDiskElements;
     private short noOfColumns;
     private boolean isOutFilePresent;
+    private FileScan get_next_scan = null;
+    private boolean first_next = true;
     
     
     
@@ -82,6 +84,7 @@ public class BTreeSortedSky extends Iterator {
 
     private void compute_skyline() throws Exception {
         BTFileScan index_scan = new BTFileScan();
+      
       
         Heapfile hf = null;
         RID rid = new RID();
@@ -126,10 +129,14 @@ public class BTreeSortedSky extends Iterator {
             if(buffer_threshold == -1) {
                 buffer_threshold = (int) Math.floor(Tuple.MINIBASE_PAGESIZE * n_buf_pgs / (int)current_tuple.size());
                 System.out.println("Threshold of Buffer: " + buffer_threshold);
+                System.out.println("Minibase page size : " + Tuple.MINIBASE_PAGESIZE);
+                System.out.println("n_buf_pgs : " + n_buf_pgs);
+                System.out.println("Tuple size: " + current_tuple.size());
+
             }
             
             outHeapfile = getSkylineFileInstance();
-
+        
             if(current_tuple!=null) {
                // System.out.println("Size of tuple : "+ current_tuple.getFloFld(2));
             }
@@ -179,6 +186,7 @@ public class BTreeSortedSky extends Iterator {
                 }
                 tupleInSkyline = scan.get_next();
             }
+            scan.close();
         }
         //System.out.println("Return True");
         return true;
@@ -286,17 +294,12 @@ public class BTreeSortedSky extends Iterator {
             compute_skyline();
         }
         if(isOutFilePresent && first_time == false) {
-            FileScan get_next_scan = getSkylineFileScan();
-            TupleRIDPair pair = get_next_scan.get_next1();
-            if(pair!=null) {
-                get_next_scan.close();
-                outHeapfile.deleteRecord(pair.getRID());
-                return pair.getTuple();
+            if (first_next) {
+                get_next_scan = getSkylineFileScan();
+                first_next = false;
             }
-            else {
-                return null;
-            }
-
+            Tuple tuple = get_next_scan.get_next();
+            return tuple;
         }
         
         return null;
@@ -310,7 +313,7 @@ public class BTreeSortedSky extends Iterator {
             try {
          //       outer.close();
             }catch (Exception e) {
-                throw new JoinsException(e, "NestedLoopsJoin.java: error in closing iterator.");
+                throw new JoinsException(e, "BTreeSortedSky.java: error in closing iterator.");
             }
             closeFlag = true;
         }
