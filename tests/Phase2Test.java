@@ -3,6 +3,7 @@ package tests;
 import java.io.*;
 import java.util.*;
 import java.lang.*;
+import java.time.*;
 
 import chainexception.ChainException;
 import diskmgr.Page;
@@ -47,7 +48,7 @@ class Ph2Driver extends TestDriver implements GlobalConst {
         System.out.print("\n" + "Running " + testName() + " tests...." + "\n");
 
         try {
-            SystemDefs sysdef = new SystemDefs(dbpath, NUMBUF + 20, NUMBUF, "Clock");
+            SystemDefs sysdef = new SystemDefs(dbpath, MINIBASE_DB_SIZE, NUMBUF, "Clock");
         } catch (Exception e) {
             Runtime.getRuntime().exit(1);
         }
@@ -201,6 +202,8 @@ class Ph2Driver extends TestDriver implements GlobalConst {
 
         boolean _passAll = OK;
 
+        Instant start = Instant.now();
+
         switch (args.skylineMethod) {
             case "nested":
                 _passAll = nestedSkylineTest();
@@ -222,6 +225,12 @@ class Ph2Driver extends TestDriver implements GlobalConst {
                             && bTreeSkylineTest() /* && bTreeSortedSkylineTest() */;
                 break;
 
+        }
+
+        if (_passAll) {
+            Instant finish = Instant.now();
+            long timeElapsed = Duration.between(start, finish).toMillis();
+            System.out.printf("Time Elapsed: %.3fs\n", (float)timeElapsed/1000, timeElapsed);
         }
 
         //Running test1() to test6()
@@ -303,7 +312,7 @@ class Ph2Driver extends TestDriver implements GlobalConst {
             status = FAIL;
             e.printStackTrace();
         }
-        System.out.println("Number of skylines: " + num_skylines);
+        System.out.println("\nNumber of skylines: " + num_skylines);
 
         // clean up
         try {
