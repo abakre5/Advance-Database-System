@@ -291,6 +291,8 @@ class Ph2Driver extends TestDriver implements GlobalConst {
             e.printStackTrace();
         }
         System.out.println("\nNumber of skylines: " + num_skylines);
+        System.out.println("\nNumber of pages read: " + PageCounter.getReadCounter());
+        System.out.println("Number of pages written: " + PageCounter.getWriteCounter());
 
         // clean up
         try {
@@ -356,6 +358,8 @@ class Ph2Driver extends TestDriver implements GlobalConst {
             e.printStackTrace();
         }
         System.out.println("\nNumber of skylines: " + num_skylines);
+        System.out.println("\nNumber of pages read: " + PageCounter.getReadCounter());
+        System.out.println("Number of pages written: " + PageCounter.getWriteCounter());
 
         // clean up
         try {
@@ -418,6 +422,8 @@ class Ph2Driver extends TestDriver implements GlobalConst {
             e.printStackTrace();
         }
         System.out.println("\nNumber of skylines: " + num_skylines);
+        System.out.println("\nNumber of pages read: " + PageCounter.getReadCounter());
+        System.out.println("Number of pages written: " + PageCounter.getWriteCounter());
 
         // clean up
         try {
@@ -536,6 +542,8 @@ class Ph2Driver extends TestDriver implements GlobalConst {
             e.printStackTrace();
         }
         System.out.println("\nNumber of skylines: " + num_skylines);
+        System.out.println("\nNumber of pages read: " + PageCounter.getReadCounter());
+        System.out.println("Number of pages written: " + PageCounter.getWriteCounter());
 
         // clean up
         try {
@@ -650,6 +658,8 @@ class Ph2Driver extends TestDriver implements GlobalConst {
             e.printStackTrace();
         }
         System.out.println("\nNumber of skylines: " + num_skylines);
+        System.out.println("\nNumber of pages read: " + PageCounter.getReadCounter());
+        System.out.println("Number of pages written: " + PageCounter.getWriteCounter());
 
         // clean up
         try {
@@ -763,8 +773,6 @@ public class Phase2Test {
             System.out.println("Error encountered during Dominates tests:\n");
             Runtime.getRuntime().exit(1);
         }
-        System.out.println("Number of pages read: " + PageCounter.getReadCounter());
-        System.out.println("Number of pages written: " + PageCounter.getWriteCounter());
 
         Runtime.getRuntime().exit(0);
     }
