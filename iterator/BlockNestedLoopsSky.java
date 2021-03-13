@@ -1,7 +1,6 @@
 package iterator;
 
 import global.AttrType;
-import global.RID;
 import heap.*;
 import index.IndexException;
 
@@ -52,7 +51,7 @@ public class BlockNestedLoopsSky extends Iterator {
             Tuple currentTuple = new Tuple(tuple);
             boolean isMemberOfSkyline = compareTupleWithWindowForDominance(currentTuple);
             if (isMemberOfSkyline) {
-                if (window.size() < windowSize) {
+                if (window.size() == windowSize && disk1 == null) {
                     disk1 = getHeapFileInstance(tempFileName);
                 }
                 insertIntoSkyline(disk1, currentTuple);
@@ -60,7 +59,9 @@ public class BlockNestedLoopsSky extends Iterator {
             tuple = outer.get_next();
         } while (tuple != null);
         skyline.addAll(window);
-        vetDiskSkylineMembers(tempFileName, 0);
+        if (disk1 != null) {
+            vetDiskSkylineMembers(tempFileName, 0);
+        }
     }
 
     private boolean compareTupleWithWindowForDominance(Tuple itrTuple) throws IOException, TupleUtilsException {
@@ -96,20 +97,18 @@ public class BlockNestedLoopsSky extends Iterator {
         FileScan diskOuterScan = getFileScan(relationName);
         TupleRIDPair tupleRIDPairOuter = diskOuterScan.get_next1();
         if (tupleRIDPairOuter!= null) {
-            System.out.println("coming into vetted method");
             window.clear();
+            boolean flag = true;
             while (tupleRIDPairOuter != null) {
                 Tuple tupleOuter = tupleRIDPairOuter.getTuple();
-                RID ridOuter = tupleRIDPairOuter.getRID();
                 Tuple diskTupleToCompare = new Tuple(tupleOuter);
                 boolean isMemberOfSkyline = compareTupleWithWindowForDominance(diskTupleToCompare);
                 if (isMemberOfSkyline) {
-                    if (window.size() < windowSize) {
-                        window.add(diskTupleToCompare);
+                    if (window.size() < windowSize && flag) {
+                           window.add(diskTupleToCompare);
                     } else {
-                        System.out.println("code is coming into else ================================");
                         if (temp == null) {
-                            System.out.println("code was here ================================");
+                            flag = false;
                             temp = getHeapFileInstance(temp_file_name);
                         }
                         temp.insertRecord(diskTupleToCompare.returnTupleByteArray());
@@ -119,10 +118,11 @@ public class BlockNestedLoopsSky extends Iterator {
             }
             diskOuterScan.close();
             diskOuterScan.deleteFile();
-
             skyline.addAll(window);
             i++;
-            vetDiskSkylineMembers(temp_file_name, i);
+            if (temp != null) {
+                vetDiskSkylineMembers(temp_file_name, i);
+            }
         }
     }
 

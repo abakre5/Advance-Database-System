@@ -61,21 +61,18 @@ public class SortFirstSky extends Iterator {
             e.printStackTrace();
         }
         if (!isSorted) {
-            System.out.println("Data is not sorted sorting data now.");
             outer = sortData(fscan);
         } else {
-            System.out.println("Data is sorted directly computing skyline.");
             outer = fscan;
         }
 
         Tuple tuple = outer.get_next();
         if (windowSize == -1) {
-//            windowSize = noOfBufferPages;
+//           windowSize = noOfBufferPages;
             windowSize = (int) Math.floor(Tuple.MINIBASE_PAGESIZE / (int) tuple.size() *noOfBufferPages);
         }
         while (tuple != null) {
             Tuple currentTuple = new Tuple(tuple);
-            System.out.println("T" + currentTuple.getIntFld(1));
             if (isSkylineCandidate(currentTuple)) {
                 if (window.size() == windowSize) {
                     disk1 = getHeapFileInstance(tempFileName);
@@ -108,7 +105,7 @@ public class SortFirstSky extends Iterator {
     private Iterator sortData(FileScan fscan) throws Exception {
         SortPref sort = null;
         try {
-            sort = new SortPref(attrTypes, noOfColumns, stringSizes, fscan, new TupleOrder(TupleOrder.Descending), prefList, prefList.length, noOfBufferPages);
+            sort = new SortPref(attrTypes, noOfColumns, stringSizes, fscan, new TupleOrder(TupleOrder.Ascending), prefList, prefList.length, noOfBufferPages);
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -138,7 +135,6 @@ public class SortFirstSky extends Iterator {
         FileScan diskOuterScan = getFileScan(relationName);
         TupleRIDPair tupleRIDPairOuter = diskOuterScan.get_next1();
         if (tupleRIDPairOuter!= null) {
-            System.out.println("coming into vetted method");
             window.clear();
             while (tupleRIDPairOuter != null) {
                 Tuple tupleOuter = tupleRIDPairOuter.getTuple();
@@ -149,9 +145,8 @@ public class SortFirstSky extends Iterator {
                     if (window.size() < windowSize) {
                         window.add(diskTupleToCompare);
                     } else {
-                        System.out.println("code is coming into else ================================");
+                        System.out.println("disk is being used");
                         if (temp == null) {
-                            System.out.println("code was here ================================");
                             temp = getHeapFileInstance(temp_file_name);
                         }
                         temp.insertRecord(diskTupleToCompare.returnTupleByteArray());
