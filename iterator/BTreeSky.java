@@ -29,7 +29,7 @@ public class BTreeSky extends Iterator {
     private java.lang.String relation_name;
     private boolean first_time;
     private java.util.Iterator skyline_iterator;
-    private NestedLoopsSky bnlskyline;
+    private BlockNestedLoopsSky bnlskyline;
 
    public BTreeSky(AttrType[] attrs, int len_attr, short[] attr_size,
             Iterator left, java.lang.String
@@ -441,7 +441,7 @@ public class BTreeSky extends Iterator {
 
         try
         {
-            bnlskyline = new NestedLoopsSky(attrTypes, n_buf_pgs, am, pref_list);
+            bnlskyline = new BlockNestedLoopsSky(attrTypes, attrTypes.length, str_sizes, am, temp_file, pref_list, pref_list.length, n_buf_pgs);
         }
         catch (Exception e)
         {
@@ -452,8 +452,5 @@ public class BTreeSky extends Iterator {
         }
 
     }
-
-
-
 }
 
