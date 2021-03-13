@@ -7,6 +7,7 @@ import java.time.*;
 
 import btree.BTreeFile;
 import btree.FloatKey;
+import btree.IndexFile;
 import chainexception.ChainException;
 import diskmgr.Page;
 import diskmgr.PageCounter;
@@ -221,11 +222,11 @@ class Ph2Driver extends TestDriver implements GlobalConst {
                 _passAll = bTreeSkylineTest();
                 break;
             case "btreesort":
-                //_passAll = bTreeSortedSkylineTest();
+                _passAll = bTreeSortedSkylineTest();
                 break;
             case "all":
                 _passAll = nestedSkylineTest() && blockNestedSkylineTest() && sortFirstSkylineTest()
-                            && bTreeSkylineTest() /* && bTreeSortedSkylineTest() */;
+                            && bTreeSkylineTest()  && bTreeSortedSkylineTest();
                 break;
 
         }
@@ -236,31 +237,6 @@ class Ph2Driver extends TestDriver implements GlobalConst {
             System.out.printf("Time Elapsed: %.3fs\n", (float)timeElapsed/1000, timeElapsed);
         }
 
-        //Running test1() to test6()
-        /*
-        if (!test1()) {
-            _passAll = FAIL;
-        }
-
-        if (!test2()) {
-            _passAll = FAIL;
-        }
-
-        if (!test3()) {
-            _passAll = FAIL;
-        }
-        /*
-        if (!test4()) {
-            _passAll = FAIL;
-        }
-        if (!test5()) {
-            _passAll = FAIL;
-        }
-        if (!test6()) {
-            _passAll = FAIL;
-        }
-        */
-
         return _passAll;
     }
 
@@ -268,11 +244,7 @@ class Ph2Driver extends TestDriver implements GlobalConst {
     public boolean nestedSkylineTest() {
         boolean status = OK;
 
-        /*
-        int[] pref_list = new int[2];
-        pref_list[0] = 2;
-        pref_list[1] = 3;
-         */
+        System.out.println("\nFinding skylines using NestedLoopSky iterator...\n");
 
         FldSpec[] proj_list = new FldSpec[numAttribs];
         for (int i=0; i<numAttribs; ++i) {
@@ -291,6 +263,9 @@ class Ph2Driver extends TestDriver implements GlobalConst {
             e.printStackTrace();
             Runtime.getRuntime().exit(1);
         }
+
+        /* initialize PageCounter to track Page reads/writes */
+        PageCounter.init();
 
         NestedLoopsSky nls = null;
         try {
@@ -353,6 +328,9 @@ class Ph2Driver extends TestDriver implements GlobalConst {
             System.err.println ("Failed to create file scan: " + e);
         }
 
+        /* initialize PageCounter to track Page reads/writes */
+        PageCounter.init();
+
         BlockNestedLoopsSky blockNestedLoopsSky = null;
         try {
             blockNestedLoopsSky = new BlockNestedLoopsSky(attrType, attrType.length,
@@ -413,6 +391,9 @@ class Ph2Driver extends TestDriver implements GlobalConst {
             System.err.println ("Failed to create file scan: " + e);
         }
 
+        /* initialize PageCounter to track Page reads/writes */
+        PageCounter.init();
+
         SortFirstSky sfs = null;
         try {
             sfs = new SortFirstSky(attrType, attrType.length, new short[0],
@@ -426,7 +407,6 @@ class Ph2Driver extends TestDriver implements GlobalConst {
 
         Tuple t;
         int num_skylines = 0;
-        System.out.println("Preferred Attributes: " + Arrays.toString(pref_list));
         System.out.println("Skylines:");
         try {
             while ((t = sfs.get_next()) != null) {
@@ -452,7 +432,7 @@ class Ph2Driver extends TestDriver implements GlobalConst {
 
     /* BTreeSky operator test */
     public boolean bTreeSkylineTest() {
-        System.out.println("\nBTreeSky operator ...\n");
+        System.out.println("\nFinding skylines using BTreeSky operator...\n");
         boolean status = OK;
 
 
@@ -530,6 +510,8 @@ class Ph2Driver extends TestDriver implements GlobalConst {
             e.printStackTrace();
         }
 
+        /* initialize PageCounter to track Page reads/writes */
+        PageCounter.init();
 
         BTreeSky bts = null;
         try {
@@ -567,13 +549,10 @@ class Ph2Driver extends TestDriver implements GlobalConst {
     }
 
     /* BTreeSortedSky operator test */
-    /*
     public boolean bTreeSortedSkylineTest() {
-        System.out.println("\ntest3(): BTreeSortedSky ...\n");
+        System.out.println("\nFinding skylines using BTreeSortedSky operator ...\n");
         boolean status = OK;
-        int[] pref_list = new int[2];
-        pref_list[0] = 2;
-        pref_list[1] = 3;
+
 
         FldSpec[] proj_list = new FldSpec[numAttribs];
         for (int i=0; i<numAttribs; ++i) {
@@ -591,10 +570,67 @@ class Ph2Driver extends TestDriver implements GlobalConst {
             System.err.println ("Failed to create file scan: " + e);
         }
 
+        // create an scan on the heapfile
+        Scan heapfile_scan = null;
+
+        try {
+            heapfile_scan = new Scan(dbHeapFile);
+        } catch (Exception e) {
+            status = FAIL;
+            e.printStackTrace();
+            Runtime.getRuntime().exit(1);
+        }
+
+        // create the index file
+        BTreeFile btf = null;
+        try {
+            btf = new BTreeFile("BTreeIndexNew", AttrType.attrReal, 4, 1/*delete*/);
+        } catch (Exception e) {
+            status = FAIL;
+            e.printStackTrace();
+            Runtime.getRuntime().exit(1);
+        }
+
+        System.out.println("BTreeIndex created on each pref attributes...\n");
+
+        RID rid = new RID();
+        Float key = null;
+
+        Tuple temp;
+        Tuple t;
+
+        try {
+            while ((temp = heapfile_scan.getNext(rid)) != null) {
+
+                temp.setHdr((short)numAttribs, attrType, null);
+                key = 0f;
+                for (int  i = 0 ; i < args.pref_attribs.length; i++) {
+                    try {
+                        key += temp.getFloFld(args.pref_attribs[i]);
+                    } catch (Exception e) {
+                        status = FAIL;
+                        e.printStackTrace();
+                        Runtime.getRuntime().exit(1);
+                    }
+                }
+                btf.insert(new FloatKey(key), rid);
+            }
+        } catch (Exception e) {
+            status = FAIL;
+            e.printStackTrace();
+        }
+
+        IndexFile[] indexFiles = new IndexFile[1];
+        indexFiles[0] = btf;
+
+        /* initialize PageCounter to track Page reads/writes */
+        PageCounter.init();
+
+        /* create BTreeSortedSky iterator */
         BTreeSortedSky btss = null;
         try {
-            btss = new BTreeSortedSky(attrType, attrType.length, new short[0],
-                    scan, dbfilename, args.pref_attribs, args.pref_attribs.length, args.n_pages);
+            btss = new BTreeSortedSky(attrType, attrType.length, null, 1000, scan,
+                    dbfilename, args.pref_attribs, null, indexFiles, args.n_pages);
         } catch (Exception e) {
             System.err.println("*** Error preparing for BTreeSortedSky skyline computation");
             System.err.println("" + e);
@@ -602,9 +638,7 @@ class Ph2Driver extends TestDriver implements GlobalConst {
             Runtime.getRuntime().exit(1);
         }
 
-        Tuple t;
         int num_skylines = 0;
-        System.out.println("Preferred Attributes: " + Arrays.toString(pref_list));
         System.out.println("Skylines:");
         try {
             while ((t = btss.get_next()) != null) {
@@ -627,7 +661,6 @@ class Ph2Driver extends TestDriver implements GlobalConst {
 
         return status;
     }
-    */
 
     private void printTuple(Tuple t) throws Exception {
         int num_fields = t.noOfFlds();
