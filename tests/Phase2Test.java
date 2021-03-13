@@ -5,6 +5,8 @@ import java.util.*;
 import java.lang.*;
 import java.time.*;
 
+import btree.BTreeFile;
+import btree.FloatKey;
 import chainexception.ChainException;
 import diskmgr.Page;
 import diskmgr.PageCounter;
@@ -28,6 +30,7 @@ class Ph2Driver extends TestDriver implements GlobalConst {
     private String dbfilename = "data.in";
     private String datafile;
     private int numAttribs;
+    private Heapfile dbHeapFile;
     AttrType[] attrType;
     private Args args;
 
@@ -142,7 +145,7 @@ class Ph2Driver extends TestDriver implements GlobalConst {
             RID rid;
             Heapfile f = null;
             try {
-                f = new Heapfile(dbfilename);
+                dbHeapFile = new Heapfile(dbfilename);
             }
             catch (Exception e) {
                 System.err.println("*** error in Heapfile constructor ***");
@@ -171,14 +174,14 @@ class Ph2Driver extends TestDriver implements GlobalConst {
                         t.setFloFld(i+1, Float.parseFloat(attrStr[i]));
                     }
                     catch (Exception e) {
-                        System.err.println("*** Heapfile error in Tuple.setStrFld() ***");
+                        System.err.println("*** Heapfile error in Tuple.setFloFld() ***");
                         status = FAIL;
                         e.printStackTrace();
                     }
                 }
                 /* insert tuple into heapfile */
                 try {
-                    rid = f.insertRecord(t.returnTupleByteArray());
+                    rid = dbHeapFile.insertRecord(t.returnTupleByteArray());
                 }
                 catch (Exception e) {
                     System.err.println("*** error in Heapfile.insertRecord() ***");
@@ -449,11 +452,9 @@ class Ph2Driver extends TestDriver implements GlobalConst {
 
     /* BTreeSky operator test */
     public boolean bTreeSkylineTest() {
-        System.out.println("\ntest3(): BTreeSky ...\n");
+        System.out.println("\nBTreeSky operator ...\n");
         boolean status = OK;
-        int[] pref_list = new int[2];
-        pref_list[0] = 2;
-        pref_list[1] = 3;
+
 
         FldSpec[] proj_list = new FldSpec[numAttribs];
         for (int i=0; i<numAttribs; ++i) {
@@ -471,23 +472,80 @@ class Ph2Driver extends TestDriver implements GlobalConst {
             System.err.println ("Failed to create file scan: " + e);
         }
 
-        SortFirstSky sfs = null;
+        // create an scan on the heapfile
+        Scan heapfile_scan = null;
+
         try {
-            sfs = new SortFirstSky(attrType, attrType.length, new short[0],
-                    scan, dbfilename, args.pref_attribs, args.pref_attribs.length, args.n_pages);
+            heapfile_scan = new Scan(dbHeapFile);
         } catch (Exception e) {
-            System.err.println("*** Error preparing for SortFirstSky skyline computation");
+            status = FAIL;
+            e.printStackTrace();
+            Runtime.getRuntime().exit(1);
+        }
+
+        // create the index file
+        BTreeFile[] btf = new BTreeFile[args.pref_attribs.length];
+        try {
+            for(int  i = 0 ; i < args.pref_attribs.length; i++){
+                btf[i] = new BTreeFile("BTreeIndex" + i, AttrType.attrReal, 4, 1/*delete*/);
+            }
+        } catch (Exception e) {
+            status = FAIL;
+            e.printStackTrace();
+            Runtime.getRuntime().exit(1);
+        }
+
+        System.out.println("BTreeIndex created on each pref attributes...\n");
+
+        RID rid = new RID();
+        Float key = null;
+
+        Tuple temp;
+        Tuple t;
+
+        try {
+            while ((temp = heapfile_scan.getNext(rid)) != null) {
+
+                temp.setHdr((short)numAttribs, attrType, null);
+
+                for (int  i = 0 ; i < args.pref_attribs.length; i++) {
+                    try {
+                        key = temp.getFloFld(args.pref_attribs[i]);
+                    } catch (Exception e) {
+                        status = FAIL;
+                        e.printStackTrace();
+                        Runtime.getRuntime().exit(1);
+                    }
+
+                    try {
+                        btf[i].insert(new FloatKey(key), rid);
+                    } catch (Exception e) {
+                        status = FAIL;
+                        e.printStackTrace();
+                    }
+                }
+            }
+        } catch (Exception e) {
+            status = FAIL;
+            e.printStackTrace();
+        }
+
+
+        BTreeSky bts = null;
+        try {
+            bts = new BTreeSky(attrType, attrType.length, null, scan,
+                    dbfilename, args.pref_attribs, null, btf, args.n_pages);
+        } catch (Exception e) {
+            System.err.println("*** Error preparing for BTreeSky skyline computation");
             System.err.println("" + e);
             e.printStackTrace();
             Runtime.getRuntime().exit(1);
         }
 
-        Tuple t;
         int num_skylines = 0;
-        System.out.println("Preferred Attributes: " + Arrays.toString(pref_list));
         System.out.println("Skylines:");
         try {
-            while ((t = sfs.get_next()) != null) {
+            while ((t = bts.get_next()) != null) {
                 num_skylines++;
                 printTuple(t);
             }
@@ -499,7 +557,7 @@ class Ph2Driver extends TestDriver implements GlobalConst {
 
         // clean up
         try {
-            sfs.close();
+            bts.close();
         } catch (Exception e) {
             status = FAIL;
             e.printStackTrace();
@@ -538,7 +596,7 @@ class Ph2Driver extends TestDriver implements GlobalConst {
             btss = new BTreeSortedSky(attrType, attrType.length, new short[0],
                     scan, dbfilename, args.pref_attribs, args.pref_attribs.length, args.n_pages);
         } catch (Exception e) {
-            System.err.println("*** Error preparing for SortFirstSky skyline computation");
+            System.err.println("*** Error preparing for BTreeSortedSky skyline computation");
             System.err.println("" + e);
             e.printStackTrace();
             Runtime.getRuntime().exit(1);
