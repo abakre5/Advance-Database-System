@@ -241,7 +241,8 @@ class NestedLoopsSkyDriver extends TestDriver implements GlobalConst {
         // Get skyline elements
         NestedLoopsSky nls = null;
         try {
-            nls = new NestedLoopsSky(Ptypes, Ptypes.length, am, "players.in", pref_list, 10);
+//            nls = new NestedLoopsSky(Ptypes, Ptypes.length, am, "players.in", pref_list, 10);
+            nls = new NestedLoopsSky(Ptypes, Ptypes.length, new short[0], am, "players.in", pref_list, pref_list.length, 10);
         } catch (Exception e) {
             System.err.println ("*** Error preparing for nested_loop_join");
             System.err.println (""+e);
@@ -409,7 +410,7 @@ class NestedLoopsSkyDriver extends TestDriver implements GlobalConst {
         // Get skyline elements
         NestedLoopsSky nls = null;
         try {
-            nls = new NestedLoopsSky(Ptypes, Ptypes.length, am, "players2.in", pref_list, 10);
+            nls = new NestedLoopsSky(Ptypes, Ptypes.length, new short[0], am, "players2.in", pref_list, pref_list.length, 10);
         } catch (Exception e) {
             System.err.println ("*** Error preparing for nested_loop_join");
             System.err.println (""+e);

@@ -289,7 +289,7 @@ public class BTreeSortedSky extends Iterator {
       //  BlockNestedLoopsSky blockNestedLoopsSky = null;
         try {
             System.out.println("Skyline computation");
-            bnlskyline = new NestedLoopsSky(attrTypes, 1000, am, pref_list);
+            bnlskyline = new NestedLoopsSky(attrTypes, attrTypes.length, new short[0], am, heap_file_name, pref_list, pref_list.length, 1000);
         } catch (Exception e) {
             System.err.println("*** Error preparing for nested_loop_join");
             System.err.println("" + e);

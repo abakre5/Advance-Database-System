@@ -226,7 +226,7 @@ class Ph2Driver extends TestDriver implements GlobalConst {
                 break;
             case "all":
                 _passAll = nestedSkylineTest() && blockNestedSkylineTest() && sortFirstSkylineTest()
-                            && bTreeSkylineTest()  && bTreeSortedSkylineTest();
+                        && bTreeSkylineTest()  && bTreeSortedSkylineTest();
                 break;
 
         }
@@ -269,8 +269,8 @@ class Ph2Driver extends TestDriver implements GlobalConst {
 
         NestedLoopsSky nls = null;
         try {
-            nls = new NestedLoopsSky(attrType, attrType.length, scan,
-                    dbfilename, args.pref_attribs, args.n_pages);
+            nls = nls = new NestedLoopsSky(attrType, attrType.length, new short[0], scan,
+                    dbfilename, args.pref_attribs, args.pref_attribs.length, args.n_pages);
 
         } catch (Exception e) {
             System.err.println ("*** Error preparing for nested_loop_join");
@@ -773,6 +773,8 @@ public class Phase2Test {
             System.out.println("Error encountered during Dominates tests:\n");
             Runtime.getRuntime().exit(1);
         }
+
+
 
         Runtime.getRuntime().exit(0);
     }
