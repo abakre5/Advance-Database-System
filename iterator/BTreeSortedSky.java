@@ -46,13 +46,12 @@ public class BTreeSortedSky extends Iterator {
     private int[] pref_lengths;
     private java.lang.String relation_name;
     private boolean first_time;
-    private java.util.Iterator skyline_iterator;
-    private NestedLoopsSky bnlskyline;
     private ArrayList<Tuple> skyline_list = new ArrayList<Tuple>();
     private int buffer_threshold;
-    private Heapfile disk = null;
+    private Heapfile disk = null, outHeapfile = null;
     private int noOfDiskElements;
     private short noOfColumns;
+    private boolean isOutFilePresent;
     
     
 
@@ -121,7 +120,7 @@ public class BTreeSortedSky extends Iterator {
             } else {
                 break;
             }
-            System.out.println("Key :" + KeyData.key + "Data: "+ KeyData.data);
+            //System.out.println("Key :" + KeyData.key + "Data: "+ KeyData.data);
             
             Tuple t = hf.getRecord(rid);
             
@@ -131,10 +130,13 @@ public class BTreeSortedSky extends Iterator {
 
             if(buffer_threshold == -1) {
                 buffer_threshold = (int) Math.floor(Tuple.MINIBASE_PAGESIZE * n_buf_pgs / (int)current_tuple.size());
+                System.out.println("Threshold of Buffer: " + buffer_threshold);
             }
             
+            outHeapfile = getSkylineFileInstance();
+
             if(current_tuple!=null) {
-                System.out.println("Size of tuple : "+ current_tuple.getFloFld(2));
+               // System.out.println("Size of tuple : "+ current_tuple.getFloFld(2));
             }
             
             if (is_skyline_candidate(current_tuple)) {
@@ -147,11 +149,17 @@ public class BTreeSortedSky extends Iterator {
         } catch (Exception e){
             e.printStackTrace();
         }
-        skyline.addAll(skyline_list);
+        //skyline.addAll(skyline_list);
+        if(!skyline_list.isEmpty()) {
+            addtoSkyline(skyline_list);
+        }
         handleDiskMembers();
         System.out.println("================ Printing Skyline =======================\n");
-        for(Tuple p: skyline) {
+        FileScan scan = getSkylineFileScan();
+        Tuple p = scan.get_next();
+        while(p!=null) {
             System.out.println(p.getFloFld(1) + " : " + p.getFloFld(2) + " : " + p.getFloFld(3) + " : " + p.getFloFld(4) + " : "+p.getFloFld(5));
+            p = scan.get_next();
         }
        
         System.out.println("================ End Skyline =======================\n");
@@ -159,13 +167,25 @@ public class BTreeSortedSky extends Iterator {
 
     
 
-    private boolean is_skyline_candidate(Tuple curr_tuple) throws IOException, TupleUtilsException {
+    private boolean is_skyline_candidate(Tuple curr_tuple) throws Exception,IOException, TupleUtilsException, FileScanException, InvalidRelation {
         for (Tuple tupleInSkyline : skyline_list) {
             if (TupleUtils.Dominates(tupleInSkyline, attrTypes, curr_tuple, attrTypes, (short)attrTypes.length, str_sizes, pref_list, pref_list.length)) {
                 return false;
             }
         }
-        System.out.println("Return True");
+
+        if (isOutFilePresent) {
+            FileScan scan = getSkylineFileScan();
+            Tuple tupleInSkyline = scan.get_next();
+            while(tupleInSkyline!=null) {
+
+                if (TupleUtils.Dominates(tupleInSkyline, attrTypes, curr_tuple, attrTypes, (short)attrTypes.length, str_sizes, pref_list, pref_list.length)) {
+                    return false;
+                }
+                tupleInSkyline = scan.get_next();
+            }
+        }
+        //System.out.println("Return True");
         return true;
     }
 
@@ -175,12 +195,16 @@ public class BTreeSortedSky extends Iterator {
         if(skyline_list.size() < buffer_threshold) {
             skyline_list.add(curr_tuple);
         } else {
+            System.out.println("Buffer Threshold crossed");
             if(disk == null) {
                 disk = getHeapFileInstance();
             }
             disk.insertRecord(curr_tuple.getTupleByteArray());
             noOfDiskElements++;
+            System.out.println("Number of disk of elements "+ noOfDiskElements);  
+
         }
+
     }
 
     private Heapfile getHeapFileInstance() throws IOException, HFException, HFBufMgrException, HFDiskMgrException {
@@ -200,10 +224,26 @@ public class BTreeSortedSky extends Iterator {
         return scan;
     }
 
+    private Heapfile getSkylineFileInstance() throws IOException, HFException, HFBufMgrException, HFDiskMgrException {
+        String relationName = "Skyline.out";
+        return new Heapfile(relationName);
+    }
+    private FileScan getSkylineFileScan() throws IOException, FileScanException, TupleUtilsException, InvalidRelation {
+        FileScan scan = null;
+        String relationName = "Skyline.out";
+
+        FldSpec[] Pprojection = new FldSpec[noOfColumns];
+        for (int i = 1; i <= noOfColumns; i++) {
+            Pprojection[i - 1] = new FldSpec(new RelSpec(RelSpec.outer), i);
+        }
+        scan = new FileScan(relationName, attrTypes, str_sizes,
+                noOfColumns, noOfColumns, Pprojection, null);
+        return scan;
+    }
 
     private void handleDiskMembers() throws Exception {
-        System.out.println("handleDiskMembers called..");
         if (disk != null && noOfDiskElements > 0) {
+            System.out.println("handleDiskMembers called..");
             skyline_list.clear();
             HashSet<RID> vettedTuples = new HashSet<>();
             FileScan diskOuterScan = getFileScan();
@@ -212,6 +252,7 @@ public class BTreeSortedSky extends Iterator {
                 Tuple tupleOuter = tupleRIDPairOuter.getTuple();
                 RID ridOuter = tupleRIDPairOuter.getRID();
                 Tuple diskTupleToCompare = new Tuple(tupleOuter);
+
                 if (skyline_list.size() < buffer_threshold) {
                     if (is_skyline_candidate(diskTupleToCompare)) {
                         skyline_list.add(diskTupleToCompare);
@@ -227,85 +268,26 @@ public class BTreeSortedSky extends Iterator {
                 noOfDiskElements--;
             }
             diskOuterScan.close();
-            skyline.addAll(skyline_list);
+            
+            //skyline.addAll(skyline_list);
+            if (!skyline_list.isEmpty()) {
+                addtoSkyline(skyline_list);
+            }
             handleDiskMembers();
         }
     }
 
-    private void generate_skyline(List<Tuple> playersList)
-    {
-        System.out.println(playersList);
-
-        RID rid;
-        Heapfile f = null;
-        java.lang.String heap_file_name = relation_name + "_newww";
-        try
-        {
-            f = new Heapfile("heap_file_name");
-        } catch (Exception e) {
-            System.err.println("*** error in Heapfile constructor ***");
-            e.printStackTrace();
+    private void addtoSkyline(ArrayList<Tuple> skylines) throws Exception {
+        isOutFilePresent = true;
+        for (Tuple tupleInSkyline : skylines) {
+            outHeapfile.insertRecord(tupleInSkyline.getTupleByteArray());
         }
-
-
-        for (int i = 0; i <  playersList.size(); i++)
-        {
-            try
-            {
-                Tuple test1 = playersList.get(i);
-                System.out.println("*** Tuple len ***" + test1.getFloFld(1) + test1.getFloFld(2) + test1.getFloFld(2) );
-              
-                byte[] test = playersList.get(i).returnTupleByteArray();
-                System.out.println("*** Tuple len ***" + test.length);
-
-                rid = f.insertRecord(playersList.get(i).returnTupleByteArray());
-            }
-            catch (Exception e)
-            {
-                System.err.println("*** error in Heapfile.insertRecord() ***");
-
-                e.printStackTrace();
-                Runtime.getRuntime().exit(1);
-            }
-        }
-
-        FldSpec[] projections = new FldSpec[3];
-        RelSpec rel = new RelSpec(RelSpec.outer);
-        projections[0] = new FldSpec(rel, 1);
-        projections[1] = new FldSpec(rel, 2);
-        projections[2] = new FldSpec(rel, 3);
-
-        // Scan the players table
-        FileScan am = null;
-        try {
-            am = new FileScan(heap_file_name, attrTypes, str_sizes,
-                    (short)attrTypes.length, (short) attrTypes.length,
-                    projections, null);
-        } catch (Exception e) {
-            System.err.println("" + e);
-        }
-
-        // Get skyline elements
-      //  BlockNestedLoopsSky blockNestedLoopsSky = null;
-        try {
-            System.out.println("Skyline computation");
-            bnlskyline = new NestedLoopsSky(attrTypes, 1000, am, pref_list);
-        } catch (Exception e) {
-            System.err.println("*** Error preparing for nested_loop_join");
-            System.err.println("" + e);
-            e.printStackTrace();
-            Runtime.getRuntime().exit(1);
-        }
-
     }
-
-
 
     @Override
     public Tuple get_next() throws IOException, JoinsException, IndexException, InvalidTupleSizeException, InvalidTypeException, PageNotReadException, TupleUtilsException, PredEvalException, SortException, LowMemException, UnknowAttrType, UnknownKeyTypeException, Exception {
         if( first_time ) {
             first_time = false;
-            System.out.println("innn get next");
             compute_skyline();
         }
         if( !skyline.isEmpty() ) {
@@ -364,7 +346,4 @@ public class BTreeSortedSky extends Iterator {
             }
         }
     }
-
-
-
 }
