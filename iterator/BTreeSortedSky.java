@@ -89,13 +89,10 @@ public class BTreeSortedSky extends Iterator {
         RID rid = new RID();
         KeyDataEntry KeyData = null;
 
-        FldSpec[] projections = new FldSpec[5];
-        RelSpec rel = new RelSpec(RelSpec.outer);
-        projections[0] = new FldSpec(rel, 1);
-        projections[1] = new FldSpec(rel, 2);
-        projections[2] = new FldSpec(rel, 3);
-        projections[3] = new FldSpec(rel, 4);
-        projections[4] = new FldSpec(rel, 5);
+        FldSpec[] Pprojection = new FldSpec[noOfColumns];
+        for (int i = 1; i <= noOfColumns; i++) {
+            Pprojection[i - 1] = new FldSpec(new RelSpec(RelSpec.outer), i);
+        }
 
         try {
             index_scan = ((BTreeFile)index_files[0]).new_scan(null, null);
