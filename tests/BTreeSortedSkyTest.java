@@ -127,19 +127,19 @@ class BTreeSortedSkyDriver extends TestDriver implements GlobalConst {
         System.out.println("------------------------ TEST 1 --------------------------");
         boolean status = OK;
     
-        AttrType[] Ptypes = new AttrType[5];
+        AttrType[] Ptypes = new AttrType[2];
         Ptypes[0] = new AttrType (AttrType.attrReal);
         Ptypes[1] = new AttrType (AttrType.attrReal);
-        Ptypes[2] = new AttrType (AttrType.attrReal);
-        Ptypes[3] = new AttrType (AttrType.attrReal);
-        Ptypes[4] = new AttrType (AttrType.attrReal);
+        // Ptypes[2] = new AttrType (AttrType.attrReal);
+        // Ptypes[3] = new AttrType (AttrType.attrReal);
+        // Ptypes[4] = new AttrType (AttrType.attrReal);
     
         short[] attrSize = new short[2];
         attrSize[0] = REC_LEN2;
         attrSize[1] = REC_LEN1;
         Tuple t = new Tuple();
         try {
-            t.setHdr((short) 5,Ptypes, attrSize);
+            t.setHdr((short) 2,Ptypes, attrSize);
         }
         catch (Exception e) {
             System.err.println("*** error in Tuple.setHdr() ***");
@@ -162,7 +162,7 @@ class BTreeSortedSkyDriver extends TestDriver implements GlobalConst {
     
         t = new Tuple(size);
         try {
-            t.setHdr((short) 5, Ptypes, attrSize);
+            t.setHdr((short) 2, Ptypes, attrSize);
         }
         catch (Exception e) {
             System.err.println("*** error in Tuple.setHdr() ***");
@@ -170,7 +170,7 @@ class BTreeSortedSkyDriver extends TestDriver implements GlobalConst {
             e.printStackTrace();
         }
     
-        try (BufferedReader br = new BufferedReader(new FileReader("data1.txt"))) {
+        try (BufferedReader br = new BufferedReader(new FileReader("data_large_skyline.txt"))) {
             String line;
             boolean flag = false;
             while ((line = br.readLine()) != null) {
@@ -199,18 +199,18 @@ class BTreeSortedSkyDriver extends TestDriver implements GlobalConst {
             e.printStackTrace();
         }
     
-        FldSpec[] Pprojection = new FldSpec[5];
+        FldSpec[] Pprojection = new FldSpec[2];
         RelSpec rel = new RelSpec(RelSpec.outer);
         Pprojection[0] = new FldSpec(rel, 1);
         Pprojection[1] = new FldSpec(rel, 2);
-        Pprojection[2] = new FldSpec(rel, 3);
-        Pprojection[3] = new FldSpec(rel, 4);
-        Pprojection[4] = new FldSpec(rel, 5);
+        // Pprojection[2] = new FldSpec(rel, 3);
+        // Pprojection[3] = new FldSpec(rel, 4);
+        // Pprojection[4] = new FldSpec(rel, 5);
         // Scan the players table
         FileScan am = null;
         try {
             am  = new FileScan("btreesorted.in", Ptypes, attrSize,
-                    (short)5, (short)5,
+                    (short)2, (short)2,
                     Pprojection, null);
         }
         catch (Exception e) {
@@ -233,14 +233,14 @@ class BTreeSortedSkyDriver extends TestDriver implements GlobalConst {
             Runtime.getRuntime().exit(1);
         }
 
-        int[] pref_list = new int[2];
-        pref_list[0] = 2;
-        pref_list[1] = 3;
+        int[] pref_list = new int[1];
+        pref_list[0] = 1;
+      //  pref_list[1] = 3;
 
         // create the index file
         BTreeFile btf1 = null;
         try {
-            btf1 = new BTreeFile("BTreeIndexNew", AttrType.attrReal, REC_LEN1, 1/*delete*/);
+            btf1 = new BTreeFile("BTreeIndexNew", AttrType.attrReal, 4, 1/*delete*/);
         } catch (Exception e) {
             status = FAIL;
             e.printStackTrace();
@@ -266,7 +266,8 @@ class BTreeSortedSkyDriver extends TestDriver implements GlobalConst {
             t.tupleCopy(temp);
 
             try {
-                key = t.getFloFld( pref_list[0]) + t.getFloFld( pref_list[1]) ;
+                //key = t.getFloFld( pref_list[0]) + t.getFloFld( pref_list[1]) ;
+                key = t.getFloFld( pref_list[0]);
            
             } catch (Exception e) {
                 status = FAIL;
@@ -300,7 +301,7 @@ class BTreeSortedSkyDriver extends TestDriver implements GlobalConst {
        //Get skyline elements
         BTreeSortedSky bTreeSortedSky = null;
         try {
-            bTreeSortedSky = new BTreeSortedSky(Ptypes, 5, null, 1000, am, "btreesorted.in", pref_list, null, indexFiles, 2);
+            bTreeSortedSky = new BTreeSortedSky(Ptypes, Ptypes.length, null, 1000, am, "btreesorted.in", pref_list, null, indexFiles, 5);
         } catch (Exception e) {
             System.err.println ("*** Error preparing for btree sorted sky");
             System.err.println (""+e);
@@ -309,7 +310,6 @@ class BTreeSortedSkyDriver extends TestDriver implements GlobalConst {
         }
 
         t = new Tuple();
-        int count = 0;
         try {
             System.out.println("setsky: calling");
             t = bTreeSortedSky.get_next();
@@ -319,21 +319,22 @@ class BTreeSortedSkyDriver extends TestDriver implements GlobalConst {
             e.printStackTrace();
         }
 
-        //System.out.println("-----------SkylineSS for given dataset--------------");
+        System.out.println("-----------Skyline for given dataset--------------");
         while( t != null ) {
-            //System.out.println("setsky: PRINT");
+           
             try {
-                System.out.println(t.getFloFld(1) + " -- " + t.getFloFld(2) + " " + t.getFloFld(3));
+                //System.out.println(t.getFloFld(1) + " -- " + t.getFloFld(2) + " " + t.getFloFld(3) + " " +  t.getFloFld(4) + " "+ t.getFloFld(5));
+                System.out.println(t.getFloFld(1) + " -- " + t.getFloFld(2));
                 t = bTreeSortedSky.get_next();
             } catch (Exception e) {
                 status = FAIL;
                 e.printStackTrace();
             }
         }
-        if(t==null) {
-            System.out.println("setsky: all null");
-        }
-        System.out.println("-----------End Skyline--------------");
+        // if(t==null) {
+        //     System.out.println("setsky: all null");
+        // }
+        System.out.println("-------------End Skyline------------------");
 
         //clean up
         try {

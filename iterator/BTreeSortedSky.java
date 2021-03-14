@@ -3,13 +3,10 @@ package iterator;
 import btree.BTFileScan;
 import btree.BTreeFile;
 import btree.IndexFile;
-import btree.IndexFileScan;
 import btree.KeyDataEntry;
 import btree.LeafData;
 import bufmgr.PageNotReadException;
-import global.AttrOperator;
 import global.AttrType;
-import global.IndexType;
 import global.RID;
 import heap.HFBufMgrException;
 import heap.HFDiskMgrException;
@@ -22,14 +19,11 @@ import heap.SpaceNotAvailableException;
 import heap.Tuple;
 import index.IndexException;
 import index.IndexScan;
-import index.IndexUtils;
 
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.*;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.List;
+
 
 
 
@@ -124,7 +118,7 @@ public class BTreeSortedSky extends Iterator {
             
             //Please check why do we need to do this?
             Tuple current_tuple = new Tuple(t.getTupleByteArray(), t.getOffset(),t.getLength());
-            current_tuple.setHdr((short)5, attrTypes, null);
+            current_tuple.setHdr((short)len_in, attrTypes, null);
 
             if(buffer_threshold == -1) {
                 buffer_threshold = (int) Math.floor(Tuple.MINIBASE_PAGESIZE * n_buf_pgs / (int)current_tuple.size());
@@ -136,13 +130,8 @@ public class BTreeSortedSky extends Iterator {
             }
             
             outHeapfile = getSkylineFileInstance();
-        
-            if(current_tuple!=null) {
-               // System.out.println("Size of tuple : "+ current_tuple.getFloFld(2));
-            }
-            
+
             if (is_skyline_candidate(current_tuple)) {
-                //skyline_list.add(new Tuple(currentTuple));
                 insert_skyline(current_tuple);
             }
 
@@ -151,20 +140,11 @@ public class BTreeSortedSky extends Iterator {
         } catch (Exception e){
             e.printStackTrace();
         }
-        //skyline.addAll(skyline_list);
+
         if(!skyline_list.isEmpty()) {
             addtoSkyline(skyline_list);
         }
         handleDiskMembers();
-        // System.out.println("================ Printing Skyline =======================\n");
-        // FileScan scan = getSkylineFileScan();
-        // Tuple p = scan.get_next();
-        // while(p!=null) {
-        //     System.out.println(p.getFloFld(1) + " : " + p.getFloFld(2) + " : " + p.getFloFld(3) + " : " + p.getFloFld(4) + " : "+p.getFloFld(5));
-        //     p = scan.get_next();
-        // }
-       
-        //System.out.println("================ End Skyline =======================\n");
     }
 
     
@@ -188,7 +168,6 @@ public class BTreeSortedSky extends Iterator {
             }
             scan.close();
         }
-        //System.out.println("Return True");
         return true;
     }
 
