@@ -189,6 +189,7 @@ public class NestedLoopsSky extends Iterator {
         if (!closeFlag) {
             try {
                 outer.close();
+                skyFile.deleteFile();
             }catch (Exception e) {
                 throw new JoinsException(e, "NestedLoopsJoin.java: error in closing iterator.");
             }
