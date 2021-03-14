@@ -139,7 +139,7 @@ class BlockNestedLoopsSkyDriver extends TestDriver implements GlobalConst {
         AttrType[] Ptypes = new AttrType[3];
         Ptypes[0] = new AttrType(AttrType.attrInteger);
         Ptypes[1] = new AttrType(AttrType.attrInteger);
-        Ptypes[2] = new AttrType(AttrType.attrInteger);
+        Ptypes[2] = new AttrType(AttrType.attrReal);
 
         Tuple t = new Tuple();
         try {

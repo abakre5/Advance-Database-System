@@ -259,6 +259,7 @@ public class BTreeSortedSky extends Iterator {
         }
     }
 
+  
     private void addtoSkyline(ArrayList<Tuple> skylines) throws Exception {
         isOutFilePresent = true;
         for (Tuple tupleInSkyline : skylines) {

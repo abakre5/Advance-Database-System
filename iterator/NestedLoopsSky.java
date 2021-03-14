@@ -7,10 +7,7 @@ import heap.*;
 import index.IndexException;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.List;
+import java.util.*;
 
 /**
  * Created on 2/21/2021
@@ -20,42 +17,35 @@ public class NestedLoopsSky extends Iterator {
     private AttrType[] in1;
     private int n_buf_pgs;
     private Iterator outer;
-    private int[] pref_list;
+    private int[] prefList;
     private List<Tuple> skyline;
     private boolean first_time;
-    private String relation_name;
+    private String relationName;
     private short noOfColumns;
     private int noOfBufferPages;
     private List<RID> skylineRIDList;
     private Heapfile skyFile;
+    private short[] strSizes;
+    private int prefListLength;
 
-    public NestedLoopsSky(AttrType[] _in1,
-                          int amt_of_mem,
-                          Iterator am1,
-                          int[] _pref_list
-    ) throws IOException,NestedLoopException {
-        in1 = _in1;
-        n_buf_pgs = amt_of_mem;
-        outer = am1;
-        pref_list = _pref_list;
-        first_time = true;
-    }
-
-    public NestedLoopsSky(AttrType[] _in1,
+    public NestedLoopsSky(AttrType[] in1,
                           int len_in1,
+                          short[] t1_str_sizes,
                           Iterator am1,
-                          String _relationName,
-                          int[] _pref_list,
+                          java.lang.String relationName,
+                          int[] pref_list,
+                          int pref_list_length,
                           int n_pages
     ) throws Exception {
-        in1 = _in1;
-        noOfColumns = (short) len_in1;
-        outer = am1;
-        pref_list = _pref_list;
-        relation_name = _relationName;
-        noOfBufferPages = n_pages;
-        skylineRIDList = new ArrayList<>();
-//        first_time = true;
+        this.in1 = in1;
+        this.noOfColumns = (short) len_in1;
+        this.strSizes = t1_str_sizes;
+        this.outer = am1;
+        this.relationName = relationName;
+        this.prefList = pref_list;
+        this.prefListLength = pref_list_length;
+        this.noOfBufferPages = n_pages;
+        this.skylineRIDList = new ArrayList<>();
         setSkyline();
     }
 
@@ -66,7 +56,7 @@ public class NestedLoopsSky extends Iterator {
      * (3) get_next, Compare, if one is dominated, delete that record
      */
     private void setSkyline() throws Exception {
-        if(!relation_name.isEmpty()) {
+        if(!relationName.isEmpty()) {
             try {
                 skyFile = new Heapfile("skynls.in");
             } catch (Exception e) {
@@ -75,7 +65,7 @@ public class NestedLoopsSky extends Iterator {
             }
 
             RID rid = new RID();
-            FileScan ogScan = getFileScan(relation_name);
+            FileScan ogScan = getFileScan(relationName);
             Tuple t = null;
             try {
                 t = ogScan.get_next();
@@ -98,16 +88,29 @@ public class NestedLoopsSky extends Iterator {
             FileScan outerScan = getFileScan("skynls.in");
             FileScan innerScan = getFileScan("skynls.in");
 
+            // IMP: direct deletion causes InvalidSlotNumberException error
+            // Solution: Keep deleted RIDs in array
+            Set<RID> deletedRIDSet = new HashSet<>();
+
             TupleRIDPair outerTupleRid = outerScan.get_next1();
-            while(outerTupleRid != null) {
+            do {
+                RID outerRid = outerTupleRid.getRID();
+                if( containsRid(deletedRIDSet, outerRid) ) {
+                    outerTupleRid = outerScan.get_next1();
+                    continue;
+                }
                 TupleRIDPair innerTupleRid = innerScan.get_next1();
-                while(innerTupleRid != null) {
+                do {
                     Tuple outerTuple = outerTupleRid.getTuple();
                     Tuple innerTuple = innerTupleRid.getTuple();
                     RID innerRid = innerTupleRid.getRID();
-                    if( TupleUtils.Dominates( outerTuple, in1, innerTuple, in1, (short)in1.length, new short[0], pref_list, pref_list.length ) ) {
+                    if( containsRid(deletedRIDSet, innerRid) ) {
+                        innerTupleRid = innerScan.get_next1();
+                        continue;
+                    }
+                    if( TupleUtils.Dominates( outerTuple, in1, innerTuple, in1, (short)in1.length, new short[0], prefList, prefListLength ) ) {
                         try {
-                            skyFile.deleteRecord(innerRid);
+                            deletedRIDSet.add(innerRid);
                         } catch (Exception e) {
                             System.err.println("*** Error deleting record \n");
                             e.printStackTrace();
@@ -115,18 +118,33 @@ public class NestedLoopsSky extends Iterator {
                         }
                     }
                     innerTupleRid = innerScan.get_next1();
-                }
+                } while(innerTupleRid != null);
                 innerScan.close();
                 innerScan = getFileScan("skynls.in");
                 outerTupleRid = outerScan.get_next1();
-            }
+            } while(outerTupleRid != null);
             outerScan.close();
+
+            // None of the records were deleted yet.
+            // Now delete the records; only skyline will remain
+            for(RID deletedRID : deletedRIDSet) {
+                skyFile.deleteRecord(deletedRID);
+            }
 
             // Scan and store in skyline heap file
             outer = getFileScan("skynls.in");
         } else {
             System.out.println("ERROR: Relation name not specified");
         }
+    }
+
+    private boolean containsRid(Set<RID> ridSet, RID currRid) {
+        for( RID rid : ridSet ) {
+            if ( currRid.equals(rid) ) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private FileScan getFileScan(String relation) throws IOException, FileScanException, TupleUtilsException, InvalidRelation {
@@ -145,10 +163,11 @@ public class NestedLoopsSky extends Iterator {
     public Tuple get_next() throws IOException, JoinsException, IndexException, InvalidTupleSizeException, InvalidTypeException, PageNotReadException, TupleUtilsException, PredEvalException, SortException, LowMemException, UnknowAttrType, UnknownKeyTypeException, Exception {
         TupleRIDPair currTupleRid = outer.get_next1();
         if(currTupleRid == null) {
-            // Deleting records in temp heap file
+            // Deleting records in temp heap file after scan is completed
             for(RID skyRid : skylineRIDList) {
                 skyFile.deleteRecord(skyRid);
             }
+            skylineRIDList = Collections.EMPTY_LIST;
             outer.close();
             return null;
         }

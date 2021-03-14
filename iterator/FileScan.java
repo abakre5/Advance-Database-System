@@ -160,6 +160,10 @@ public class FileScan extends Iterator {
         }
     }
 
+    public void deleteFile() throws HFDiskMgrException, InvalidTupleSizeException, IOException, InvalidSlotNumberException, FileAlreadyDeletedException, HFBufMgrException {
+        f.deleteFile();
+    }
+
     /**
      * implement the abstract method close() from super class Iterator
      * to finish cleaning up

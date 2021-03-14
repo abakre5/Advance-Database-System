@@ -1,14 +1,11 @@
 package iterator;
 
-import bufmgr.PageNotReadException;
 import global.AttrType;
-import global.RID;
 import heap.*;
 import index.IndexException;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
 
 public class BlockNestedLoopsSky extends Iterator {
@@ -22,9 +19,10 @@ public class BlockNestedLoopsSky extends Iterator {
     private final List<Tuple> skyline;
     private final short[] stringSizes;
     private ArrayList<Tuple> window;
-    private Heapfile disk = null;
-    private int noOfDiskElements;
     private int windowSize;
+    private String tempFileName;
+    boolean flag = true;
+
 
     public BlockNestedLoopsSky(AttrType[] in1, int len_in1, short[] t1_str_sizes, Iterator am1, String relationName,
                                int[] pref_list, int pref_list_length, int n_pages) throws Exception {
@@ -38,26 +36,32 @@ public class BlockNestedLoopsSky extends Iterator {
 
         this.window = new ArrayList<>();
         this.skyline = new ArrayList<>();
-        this.noOfDiskElements = 0;
         this.windowSize = -1;
+        this.tempFileName = "temp_file";
         computeBlockNestedSkyline();
     }
 
     private void computeBlockNestedSkyline() throws Exception {
         Tuple tuple = outer.get_next();
+        Heapfile disk1 = null;
         if (windowSize == -1) {
-            windowSize = (int) Math.floor(Tuple.MINIBASE_PAGESIZE * noOfBufferPages / (int) tuple.size());
+            windowSize = (int) Math.floor(Tuple.MINIBASE_PAGESIZE / (int) tuple.size() * noOfBufferPages );
         }
         do {
             Tuple currentTuple = new Tuple(tuple);
             boolean isMemberOfSkyline = compareTupleWithWindowForDominance(currentTuple);
             if (isMemberOfSkyline) {
-                insertIntoSkyline(currentTuple);
+                if (window.size() == windowSize && disk1 == null) {
+                    disk1 = getHeapFileInstance(tempFileName);
+                }
+                insertIntoSkyline(disk1, currentTuple);
             }
             tuple = outer.get_next();
         } while (tuple != null);
         skyline.addAll(window);
-        vetDiskSkylineMembers();
+        if (disk1 != null) {
+            vetDiskSkylineMembers(tempFileName, 0);
+        }
     }
 
     private boolean compareTupleWithWindowForDominance(Tuple itrTuple) throws IOException, TupleUtilsException {
@@ -75,57 +79,55 @@ public class BlockNestedLoopsSky extends Iterator {
         return isDominating;
     }
 
-    private Heapfile getHeapFileInstance() throws IOException, HFException, HFBufMgrException, HFDiskMgrException {
-        String relationName = "disk.in";
-        return new Heapfile(relationName);
+    private Heapfile getHeapFileInstance(String fileName) throws IOException, HFException, HFBufMgrException, HFDiskMgrException {
+        return new Heapfile(fileName);
     }
 
-    private void insertIntoSkyline(Tuple currentTuple) throws IOException, HFException, HFBufMgrException, HFDiskMgrException, InvalidTupleSizeException, InvalidTypeException, SpaceNotAvailableException, InvalidSlotNumberException {
+    private void insertIntoSkyline(Heapfile heapfile, Tuple currentTuple) throws IOException, HFException, HFBufMgrException, HFDiskMgrException, InvalidTupleSizeException, InvalidTypeException, SpaceNotAvailableException, InvalidSlotNumberException, FileScanException, TupleUtilsException, InvalidRelation {
         if (window.size() < windowSize) {
             window.add(currentTuple);
         } else {
-            if (disk == null) {
-                disk = getHeapFileInstance();
-            }
-            disk.insertRecord(currentTuple.returnTupleByteArray());
-            noOfDiskElements++;
+            heapfile.insertRecord(currentTuple.returnTupleByteArray());
         }
     }
 
-    private void vetDiskSkylineMembers() throws Exception {
-        if (disk != null && noOfDiskElements > 0) {
+    private void vetDiskSkylineMembers(String relationName, int i) throws Exception {
+        Heapfile temp = null;
+        String temp_file_name = tempFileName + i;
+        FileScan diskOuterScan = getFileScan(relationName);
+        TupleRIDPair tupleRIDPairOuter = diskOuterScan.get_next1();
+        if (tupleRIDPairOuter!= null) {
             window.clear();
-            HashSet<RID> nonDominatingTuples = new HashSet<>();
-            FileScan diskOuterScan = getFileScan();
-            TupleRIDPair tupleRIDPairOuter = diskOuterScan.get_next1();
+            boolean flag = true;
             while (tupleRIDPairOuter != null) {
                 Tuple tupleOuter = tupleRIDPairOuter.getTuple();
-                RID ridOuter = tupleRIDPairOuter.getRID();
                 Tuple diskTupleToCompare = new Tuple(tupleOuter);
-                if (window.size() < windowSize) {
-                    boolean isMemberOfSkyline = compareTupleWithWindowForDominance(diskTupleToCompare);
-                    if (isMemberOfSkyline) {
-                        window.add(diskTupleToCompare);
+                boolean isMemberOfSkyline = compareTupleWithWindowForDominance(diskTupleToCompare);
+                if (isMemberOfSkyline) {
+                    if (window.size() < windowSize && flag) {
+                           window.add(diskTupleToCompare);
+                    } else {
+                        if (temp == null) {
+                            flag = false;
+                            temp = getHeapFileInstance(temp_file_name);
+                        }
+                        temp.insertRecord(diskTupleToCompare.returnTupleByteArray());
                     }
-                    nonDominatingTuples.add(ridOuter);
-                } else {
-                    break;
                 }
                 tupleRIDPairOuter = diskOuterScan.get_next1();
             }
-            for (RID ridToDelete : nonDominatingTuples) {
-                disk.deleteRecord(ridToDelete);
-                noOfDiskElements--;
-            }
             diskOuterScan.close();
+            diskOuterScan.deleteFile();
             skyline.addAll(window);
-            vetDiskSkylineMembers();
+            i++;
+            if (temp != null) {
+                vetDiskSkylineMembers(temp_file_name, i);
+            }
         }
     }
 
-    private FileScan getFileScan() throws IOException, FileScanException, TupleUtilsException, InvalidRelation {
+    private FileScan getFileScan(String relationName) throws IOException, FileScanException, TupleUtilsException, InvalidRelation {
         FileScan scan = null;
-        String relationName = "disk.in";
 
         FldSpec[] Pprojection = new FldSpec[noOfColumns];
         for (int i = 1; i <= noOfColumns; i++) {
@@ -136,17 +138,8 @@ public class BlockNestedLoopsSky extends Iterator {
         return scan;
     }
 
-    private boolean checkDiskSkylineMemberIsDominating(Tuple diskTuple) throws Exception {
-        for (Tuple currentTuple : skyline) {
-            if (TupleUtils.Dominates(currentTuple, attrTypes, diskTuple, attrTypes, noOfColumns, stringSizes, prefList, prefListLength)) {
-                return false;
-            }
-        }
-        return true;
-    }
-
     @Override
-    public Tuple get_next() throws IOException, JoinsException, IndexException, InvalidTupleSizeException, InvalidTypeException, PageNotReadException, TupleUtilsException, PredEvalException, SortException, LowMemException, UnknowAttrType, UnknownKeyTypeException, Exception {
+    public Tuple get_next(){
         if (!skyline.isEmpty()) {
             Tuple nextTuple = skyline.get(0);
             skyline.remove(0);
