@@ -272,7 +272,7 @@ class Ph2Driver extends TestDriver implements GlobalConst {
 
         NestedLoopsSky nls = null;
         try {
-            nls = nls = new NestedLoopsSky(attrType, attrType.length, new short[0], scan,
+            nls = new NestedLoopsSky(attrType, attrType.length, new short[0], scan,
                     dbfilename, args.pref_attribs, args.pref_attribs.length, args.n_pages);
 
         } catch (Exception e) {
@@ -295,8 +295,6 @@ class Ph2Driver extends TestDriver implements GlobalConst {
             e.printStackTrace();
         }
         System.out.println("\nNumber of skylines: " + num_skylines);
-        System.out.println("\nNumber of pages read: " + PageCounter.getReadCounter());
-        System.out.println("Number of pages written: " + PageCounter.getWriteCounter());
 
         printReadAndWrites();
         // clean up
@@ -365,8 +363,6 @@ class Ph2Driver extends TestDriver implements GlobalConst {
             e.printStackTrace();
         }
         System.out.println("\nNumber of skylines: " + num_skylines);
-        System.out.println("\nNumber of pages read: " + PageCounter.getReadCounter());
-        System.out.println("Number of pages written: " + PageCounter.getWriteCounter());
 
         printReadAndWrites();
         // clean up
@@ -378,11 +374,6 @@ class Ph2Driver extends TestDriver implements GlobalConst {
         }
 
         return status;
-    }
-
-    private void printReadAndWrites() {
-        System.out.println("Number of pages read: " + PageCounter.getReadCounter());
-        System.out.println("Number of pages written: " + PageCounter.getWriteCounter());
     }
 
     public boolean sortFirstSkylineTest() {
@@ -440,8 +431,6 @@ class Ph2Driver extends TestDriver implements GlobalConst {
             e.printStackTrace();
         }
         System.out.println("\nNumber of skylines: " + num_skylines);
-        System.out.println("\nNumber of pages read: " + PageCounter.getReadCounter());
-        System.out.println("Number of pages written: " + PageCounter.getWriteCounter());
 
         printReadAndWrites();
         // clean up
@@ -701,6 +690,11 @@ class Ph2Driver extends TestDriver implements GlobalConst {
         System.out.println("");
     }
 
+    private void printReadAndWrites() {
+        System.out.println("Number of pages read: " + PageCounter.getReadCounter());
+        System.out.println("Number of pages written: " + PageCounter.getWriteCounter());
+    }
+
     /**
      * overrides the testName function in TestDriver
      *
@@ -794,8 +788,6 @@ public class Phase2Test {
             System.out.println("Error encountered during Dominates tests:\n");
             Runtime.getRuntime().exit(1);
         }
-
-
 
         Runtime.getRuntime().exit(0);
     }

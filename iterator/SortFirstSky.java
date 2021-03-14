@@ -61,7 +61,7 @@ public class SortFirstSky extends Iterator {
             e.printStackTrace();
         }
         if (!isSorted) {
-            System.out.println("Data is not sorted Sorting data.");
+            System.out.println("Data is not sorted ... Sorting data ...");
             outer = sortData(fscan);
         } else {
             System.out.println("Data is already sorted.");
