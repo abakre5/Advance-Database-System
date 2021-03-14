@@ -57,14 +57,6 @@ public class NestedLoopsSky extends Iterator {
      */
     private void setSkyline() throws Exception {
         if(!relationName.isEmpty()) {
-            // IMP: allow the skyline operation only if sufficient pages are available
-            int ridsPerPage = Tuple.MINIBASE_PAGESIZE/24;    /* 24 is the size of RID */
-            int minPagesNeeded = (int) Math.ceil(skyFile.getRecCnt() / ridsPerPage) + 4;
-            if( noOfBufferPages < minPagesNeeded ) {
-                System.out.println("Insufficient number of pages:- minimum "+minPagesNeeded+" pages needed");
-                return;
-            }
-
             try {
                 skyFile = new Heapfile("skynls.in");
             } catch (Exception e) {
@@ -91,6 +83,14 @@ public class NestedLoopsSky extends Iterator {
                 t = ogScan.get_next();
             }
             ogScan.close();
+
+            // IMP: allow the skyline operation only if sufficient pages are available
+            int ridsPerPage = Tuple.MINIBASE_PAGESIZE/24;    /* 24 is the size of RID */
+            int minPagesNeeded = (int) Math.ceil(skyFile.getRecCnt() / ridsPerPage) + 4;
+            if( noOfBufferPages < minPagesNeeded ) {
+                System.out.println("Insufficient number of pages:- minimum "+minPagesNeeded+" pages needed");
+                return;
+            }
 
             // Creating new scans for inner and outer loops
             FileScan outerScan = getFileScan("skynls.in");
