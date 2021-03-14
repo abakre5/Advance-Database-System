@@ -526,8 +526,6 @@ class Ph2Driver extends TestDriver implements GlobalConst {
             e.printStackTrace();
         }
 
-        /* initialize PageCounter to track Page reads/writes */
-        PageCounter.init();
 
         BTreeSky bts = null;
         try {
@@ -568,7 +566,8 @@ class Ph2Driver extends TestDriver implements GlobalConst {
 
     /* BTreeSortedSky operator test */
     public boolean bTreeSortedSkylineTest() {
-        System.out.println("\nFinding skylines using BTreeSortedSky operator ...\n");
+        System.out.println("---------------------------------------------------------------------------------------------------------\n");
+        System.out.println("Finding skylines using BTreeSortedSky operator...\n");
         boolean status = OK;
 
 
@@ -577,6 +576,8 @@ class Ph2Driver extends TestDriver implements GlobalConst {
             proj_list[i] = new FldSpec(new RelSpec(RelSpec.outer), i+1);
         }
 
+        /* initialize PageCounter to track Page reads/writes */
+        PageCounter.init();
         // create a scan
         FileScan scan = null;
         try {
@@ -641,9 +642,6 @@ class Ph2Driver extends TestDriver implements GlobalConst {
         IndexFile[] indexFiles = new IndexFile[1];
         indexFiles[0] = btf;
 
-        /* initialize PageCounter to track Page reads/writes */
-        PageCounter.init();
-
         /* create BTreeSortedSky iterator */
         BTreeSortedSky btss = null;
         try {
@@ -657,6 +655,7 @@ class Ph2Driver extends TestDriver implements GlobalConst {
         }
 
         int num_skylines = 0;
+        System.out.println("\nSkyline computation completed using Sort First Skyline operator ...\nFollowing is the result");
         System.out.println("Skylines:");
         try {
             while ((t = btss.get_next()) != null) {
@@ -668,8 +667,7 @@ class Ph2Driver extends TestDriver implements GlobalConst {
             e.printStackTrace();
         }
         System.out.println("\nNumber of skylines: " + num_skylines);
-        System.out.println("\nNumber of pages read: " + PageCounter.getReadCounter());
-        System.out.println("Number of pages written: " + PageCounter.getWriteCounter());
+        printReadAndWrites();
 
         // clean up
         try {
@@ -773,6 +771,10 @@ public class Phase2Test {
         if (pa == null) {
             usage();
             Runtime.getRuntime().exit(1);
+        }
+        if (pa.n_pages < 1) {
+            System.err.println("n_pages attribute should be greater than 0.");
+            return;
         }
         System.err.println("datafile: " + pa.datafile);
         System.err.println("skyline: " + pa.skylineMethod);
