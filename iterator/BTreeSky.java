@@ -7,7 +7,6 @@ import heap.*;
 import index.IndexException;
 import index.IndexScan;
 import index.IndexUtils;
-
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.*;
@@ -19,24 +18,22 @@ public class BTreeSky extends Iterator {
     private AttrType[] attrTypes;
     private int len_in;
     private short[] str_sizes;
-    private int memory;
     private int n_buf_pgs;
     private Iterator left_itr;
     private int[] pref_list;
-    private List<Tuple> skyline;
     private IndexFile[] index_files;
     private int[] pref_lengths;
     private java.lang.String relation_name;
     private boolean first_time;
-    private java.util.Iterator skyline_iterator;
     private BlockNestedLoopsSky bnlskyline;
+
 
    public BTreeSky(AttrType[] attrs, int len_attr, short[] attr_size,
             Iterator left, java.lang.String
                      relation, int[] pref_list1, int[] pref_lengths_list,
              IndexFile[] index_file_list,
              int n_pages
-    ) throws IOException,NestedLoopException
+    ) throws IOException
    {
         attrTypes = attrs;
         len_in = len_attr;
@@ -48,15 +45,19 @@ public class BTreeSky extends Iterator {
         index_files = index_file_list;
         n_buf_pgs = n_pages;
         first_time = true;
-
     }
 
 /*
     Steps:
+    Initialize containers
     1. start index scans on simultaneously on every index file
-    2. Keep storing scanned elements in array list
-    3. stop when tuple is found in all of the lists.
-    4. Generate skyline by calling skyline algorithm
+    2. Keep storing rids of scanned tuples in each dimension in separate hash set
+       and heap file(if memory exceeded)
+    3. stop when tuple is found in all of the dimensions. All records coming after matched tuple
+       can be safely ignored as it will be dominated by matched tuple.
+    4. Scan through hashset and heap files till matched tuple and store the rids in one file
+    5. Fetch actual tuples from disk and write them in separate file
+    6. Generate skyline by calling BlockNested algorithm
  */
     private void compute_skyline() throws Exception
     {
@@ -64,11 +65,13 @@ public class BTreeSky extends Iterator {
         IndexFileScan[] index_list = new BTFileScan[pref_list.length];
         ArrayList<LinkedHashSet<RID>> hash_sets = new ArrayList<>();
         Heapfile[] heap_files = new Heapfile[pref_list.length];
-        // tuple for storing rids heapfile
+
+        // tuple for storing rids in heap file
         AttrType[] attrs = new AttrType[2];
         attrs[0] = new AttrType (AttrType.attrInteger);
         attrs[1] = new AttrType (AttrType.attrInteger);
 
+        //Initialize collections-  Create scans and heap files for each pref attribute
         for(int index_count = 0; index_count < index_files.length; index_count++)
         {
             try
@@ -81,17 +84,18 @@ public class BTreeSky extends Iterator {
                 e.printStackTrace();
             }
             hash_sets.add(new LinkedHashSet<RID>());
-            //debug_printIndex(index_list[index_count], pref_list[index_count]);
         }
 
-        RID sample_rid = new RID();
-        int rid_buffer_size = (int)Math.floor(GlobalConst.MINIBASE_PAGESIZE * n_buf_pgs /  22);
+        // Reference to RID object will take 4 and 8 bytes on 32 bit and 64 bit system.
+        // Considering 8 bytes for RID object + 4 bytes for slotno(int)
+        // + 8 bytes for PageID object + 4 bytes for pageno(int)
+        int rid_size = 24;
+        int rid_buffer_size = (int)Math.floor((GlobalConst.MINIBASE_PAGESIZE/rid_size) * n_buf_pgs);
         int rid_per_dim = rid_buffer_size / pref_list.length;
-        //ObjectSizeFetcher.getObjectSize(sample_rid) );
-        System.out.println("Allowed rid per dim  " + rid_per_dim);
 
+        //Get Tuple wrapper which will be used to insert rids in heap file.
         Tuple rid_tuple = getWrapperForRID();
-        RID matched = null;
+        RID matched = new RID();
         KeyDataEntry temp = null;
         boolean bstop_search = false;
         boolean is_buffer_full = false;
@@ -114,32 +118,33 @@ public class BTreeSky extends Iterator {
                     rid_tuple.setIntFld(1, rid.pageNo.pid);
                     rid_tuple.setIntFld(2, rid.slotNo);
 
+                    // If enough space in memory, then add to hashset else write the record on disk
                     if(hash_sets.get(index_count).size() < rid_per_dim)
                     {
-                        //System.out.println("Inserting in mem");
                         hash_sets.get(index_count).add(rid);
                     }
                     else {
-                       // System.out.println("Inserting on disk");
                         is_buffer_full = true;
                         heap_files[index_count].insertRecord(rid_tuple.getTupleByteArray());
                     }
 
+                    //temp will be used to keep track if we reached end of scan.
                     temp = next_entry;
 
+                    //Check rid of of current entry in all dimensions.
                     boolean bfound = true;
-                    for(int j=0; j < index_list.length; j++)
+                    for(int dimension = 0; dimension < index_list.length; dimension++)
                     {
                         // As we have just inserted in this dimension, no need to check
-                        if( j == index_count)
+                        if( dimension == index_count)
                         {
                             continue;
                         }
 
-                       boolean search_result = hash_sets.get(j).contains(rid);
+                       boolean search_result = hash_sets.get(dimension).contains(rid);
                        if(!search_result && is_buffer_full)
                        {
-                           search_result |= checkInHeapFile(heap_files[j] , rid, attrs);
+                           search_result |= checkInHeapFile(heap_files[dimension] , rid, attrs);
                        }
                        bfound = bfound & search_result;
                     }
@@ -147,8 +152,8 @@ public class BTreeSky extends Iterator {
                     // if we found a tuple in all dimension, break out as there is no need to check other tuples.
                     if(bfound)
                     {
-                        System.out.println("Found a match in all dimensions");
-                        matched = rid;
+                        matched.pageNo.pid = rid.pageNo.pid;
+                        matched.slotNo = rid.slotNo;
                         bstop_search = true;
                         break;
                     }
@@ -161,10 +166,13 @@ public class BTreeSky extends Iterator {
             e.printStackTrace();
         }
 
+        //Get rids of tuples from hash set and heap files of each dimension in a heap file.
         Heapfile hf  = getSkylineCanidates(hash_sets, attrs, is_buffer_full, matched, heap_files);
+
         generate_skyline(hf);
     }
 
+    //Creates a Heapfile object with given name
     private Heapfile getHeapFileInstance(java.lang.String heapfileName)
     {
         Heapfile hf = null;
@@ -179,11 +187,15 @@ public class BTreeSky extends Iterator {
         return hf;
     }
 
+    //This function scans through hash sets and heap files in which rids are stored
+    //for each dimension. it fetches record from passed rids and stores them in temporary file
+    //temporary file is passed to blocknested for skyline computation.
     private Heapfile getSkylineCanidates(ArrayList<LinkedHashSet<RID>> hash_sets, AttrType[] attrs, boolean is_buffer_full, RID matched, Heapfile[] heap_files)  throws Exception
     {
         Heapfile hf = getHeapFileInstance("pruned_rids.in");
         Tuple rid_tuple = getWrapperForRID();
 
+        //Insert matched record first
         rid_tuple.setIntFld(1, matched.pageNo.pid);
         rid_tuple.setIntFld(2, matched.slotNo);
         hf.insertRecord(rid_tuple.getTupleByteArray());
@@ -191,21 +203,27 @@ public class BTreeSky extends Iterator {
         boolean found_in_mem = false;
         for(int set_count = 0; set_count < hash_sets.size(); set_count++)
         {
-            //System.out.println("Set size : " +  hash_sets.get(set_count).size());
             found_in_mem = false;
             java.util.Iterator itr = hash_sets.get(set_count).iterator();
             while(itr.hasNext())
             {
                 RID out = (RID)itr.next();
-                if(matched.equals(out))
+                if(matched.pageNo.pid == out.pageNo.pid && matched.slotNo == out.slotNo)
                 {
+                    //No need to scan further as next tuples(whose rids are stored in hashset)
+                    // will be dominated by matched tuple(with 'matched' rid)
                     found_in_mem = true;
                     break;
                 }
                 //System.out.println(out.pageNo + " : " + out.slotNo);
                 rid_tuple.setIntFld(1, out.pageNo.pid);
                 rid_tuple.setIntFld(2, out.slotNo);
-                hf.insertRecord(rid_tuple.getTupleByteArray());
+
+                //Read the existing file and check if this rid has been inserted previously
+                if(!checkInHeapFile(hf, out, attrs))
+                {
+                    hf.insertRecord(rid_tuple.getTupleByteArray());
+                }
             }
 
             // if we found the record in memory, no need to look into tuples
@@ -221,7 +239,8 @@ public class BTreeSky extends Iterator {
                     try
                     {
                         r = (Tuple) scan.getNext(scan_rid);
-                        if (r != null) {
+                        if (r != null)
+                        {
                             rid_tuple = new Tuple(r.getTupleByteArray(), r.getOffset(), r.getLength());
                             rid_tuple.setHdr((short) 2, attrs, null);
 
@@ -237,20 +256,33 @@ public class BTreeSky extends Iterator {
                         e.printStackTrace();
                     }
 
-                    if(!found_match && rid_tuple != null)
+                    if(!found_match && r!= null)
                     {
-                        hf.insertRecord(rid_tuple.getTupleByteArray());
+                        RID rt = new RID();
+                        rt.pageNo.pid = rid_tuple.getIntFld(1);
+                        rt.slotNo = rid_tuple.getIntFld(2);
+
+                        //Read the existing file and check if this rid has been inserted previously
+                        if(!checkInHeapFile(hf, rt, attrs))
+                        {
+                            hf.insertRecord(rid_tuple.getTupleByteArray());
+                        }
                     }
 
                 } while(rid_tuple!= null && !found_match);
+
+                scan.closescan();
             }
+
+            //As rids in this are inserted, we can safely clear this set
             hash_sets.get(set_count).clear();
         }
 
         return  hf;
     }
 
-    private Tuple getWrapperForRID(){
+    private Tuple getWrapperForRID()
+    {
 
         // tuple for storing rids heapfile
         AttrType[] Ptypes = new AttrType[2];
@@ -280,6 +312,8 @@ public class BTreeSky extends Iterator {
 
     }
 
+    //This is utility function for checking if provided rid has been inserted in
+    //given heap file as tuple.
     private boolean checkInHeapFile(Heapfile hf, RID matched, AttrType[] attrs)
     {
         Tuple rid_tuple = null;
@@ -321,9 +355,13 @@ public class BTreeSky extends Iterator {
 
         }while(r!= null && !found_match);
 
+        scan.closescan();
+
         return found_match;
     }
 
+    //This returns a skyline element. skyline is computed when this iterator is called
+    //for first time.
     @Override
     public Tuple get_next() throws IOException, JoinsException, IndexException, InvalidTupleSizeException, InvalidTypeException, PageNotReadException, TupleUtilsException, PredEvalException, SortException, LowMemException, UnknowAttrType, UnknownKeyTypeException, Exception {
         if( first_time ) {
@@ -334,12 +372,13 @@ public class BTreeSky extends Iterator {
     }
 
     @Override
-    public void close() throws IOException, JoinsException, SortException, IndexException {
+    public void close() throws IOException {
         if (!closeFlag) {
             try {
-         //       outer.close();
+                bnlskyline.close();
+
             }catch (Exception e) {
-                throw new JoinsException(e, "NestedLoopsJoin.java: error in closing iterator.");
+                e.printStackTrace();
             }
             closeFlag = true;
         }
@@ -373,6 +412,9 @@ public class BTreeSky extends Iterator {
         }
     }
 
+    //RIDs of tuples remaining after pruning are given to this function in a file
+    //It fetches tuple from main heap file and stores them in separate temp file
+    //temp file is given to blocknested for skyline computation
     private void generate_skyline(Heapfile prunedElements)
     {
         Heapfile record_file = getHeapFileInstance(relation_name);
@@ -405,11 +447,11 @@ public class BTreeSky extends Iterator {
 
                     if( rid_tuple != null)
                     {
+                        //Fetch tuple with rid from main heap file and store it in separate file
                         rid.pageNo.pid = rid_tuple.getIntFld(1);
                         rid.slotNo = rid_tuple.getIntFld(2);
                         Tuple tuple = (Tuple) record_file.getRecord(rid);
                         candidate_file.insertRecord(tuple.getTupleByteArray());
-;
                     }
                 }
             }
@@ -439,16 +481,14 @@ public class BTreeSky extends Iterator {
             System.err.println("" + e);
         }
 
+        //Call block nested skyline iterator on remaining elements.
         try
         {
             bnlskyline = new BlockNestedLoopsSky(attrTypes, attrTypes.length, str_sizes, am, temp_file, pref_list, pref_list.length, n_buf_pgs);
         }
         catch (Exception e)
         {
-            System.err.println("*** Error preparing for nested_loop_join - BtreeSky.java");
-            System.err.println("" + e);
             e.printStackTrace();
-            Runtime.getRuntime().exit(1);
         }
 
     }
