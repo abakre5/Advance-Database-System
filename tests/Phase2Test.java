@@ -192,7 +192,7 @@ class Ph2Driver extends TestDriver implements GlobalConst {
 
                 ++num_tuples;
             }
-            System.err.println("Number of tuples added to DB: " + num_tuples);
+            System.err.println("Number of tuples added to DB: " + num_tuples + "\n");
         }
         catch (IOException e) {
             status = FAIL;
@@ -242,6 +242,8 @@ class Ph2Driver extends TestDriver implements GlobalConst {
 
     /* Tests NestedLoopSky() skyline computation */
     public boolean nestedSkylineTest() {
+        System.out.println("---------------------------------------------------------------------------------------------------------\n");
+        System.out.println("Finding skylines using Nested Loops Skyline operator...\n");
         boolean status = OK;
 
         System.out.println("\nFinding skylines using NestedLoopSky iterator...\n");
@@ -253,6 +255,7 @@ class Ph2Driver extends TestDriver implements GlobalConst {
 
         // create a scan
         FileScan scan = null;
+        PageCounter.init();
         try {
             scan  = new FileScan(dbfilename, attrType, null,
                     (short)numAttribs, (short)numAttribs, proj_list, null);
@@ -279,6 +282,7 @@ class Ph2Driver extends TestDriver implements GlobalConst {
             Runtime.getRuntime().exit(1);
         }
 
+        System.out.println("\nSkyline computation completed using Nested Loops Skyline operator ...\nFollowing is the result");
         Tuple t;
         int num_skylines = 0;
         try {
@@ -294,6 +298,7 @@ class Ph2Driver extends TestDriver implements GlobalConst {
         System.out.println("\nNumber of pages read: " + PageCounter.getReadCounter());
         System.out.println("Number of pages written: " + PageCounter.getWriteCounter());
 
+        printReadAndWrites();
         // clean up
         try {
             nls.close();
@@ -308,7 +313,8 @@ class Ph2Driver extends TestDriver implements GlobalConst {
 
     /* BlockNestedLoopsSky test */
     public boolean blockNestedSkylineTest() {
-        System.out.println("\nFinding skylines using BlockNestedLoopsSky operator...\n");
+        System.out.println("---------------------------------------------------------------------------------------------------------\n");
+        System.out.println("Finding skylines using BlockNestedLoopsSky operator...\n");
         boolean status = OK;
         int[] pref_list = new int[2];
         pref_list[0] = 2;
@@ -318,9 +324,9 @@ class Ph2Driver extends TestDriver implements GlobalConst {
         for (int i=0; i<numAttribs; ++i) {
             proj_list[i] = new FldSpec(new RelSpec(RelSpec.outer), i+1);
         }
-
         // create a scan
         FileScan scan = null;
+        PageCounter.init();
         try {
             scan  = new FileScan(dbfilename, attrType, null,
                     (short)numAttribs, (short)numAttribs, proj_list, null);
@@ -345,6 +351,7 @@ class Ph2Driver extends TestDriver implements GlobalConst {
         }
 
         Tuple t;
+        System.out.println("\nSkyline computation completed using Block Nested Loops Skyline operator ...\nFollowing is the result");
         int num_skylines = 0;
         //System.out.println("Preferred Attributes: " + Arrays.toString(args.pref_attribs));
         System.out.println("Skylines:");
@@ -361,6 +368,7 @@ class Ph2Driver extends TestDriver implements GlobalConst {
         System.out.println("\nNumber of pages read: " + PageCounter.getReadCounter());
         System.out.println("Number of pages written: " + PageCounter.getWriteCounter());
 
+        printReadAndWrites();
         // clean up
         try {
             blockNestedLoopsSky.close();
@@ -372,8 +380,14 @@ class Ph2Driver extends TestDriver implements GlobalConst {
         return status;
     }
 
+    private void printReadAndWrites() {
+        System.out.println("Number of pages read: " + PageCounter.getReadCounter());
+        System.out.println("Number of pages written: " + PageCounter.getWriteCounter());
+    }
+
     public boolean sortFirstSkylineTest() {
-        System.out.println("\nFinding skylines using SortFirstSky operator...\n");
+        System.out.println("---------------------------------------------------------------------------------------------------------\n");
+        System.out.println("Finding skylines using SortFirstSky operator...\n");
         boolean status = OK;
         int[] pref_list = new int[2];
         pref_list[0] = 2;
@@ -386,6 +400,7 @@ class Ph2Driver extends TestDriver implements GlobalConst {
 
         // create a scan
         FileScan scan = null;
+        PageCounter.init();
         try {
             scan  = new FileScan(dbfilename, attrType, null,
                     (short)numAttribs, (short)numAttribs, proj_list, null);
@@ -409,8 +424,11 @@ class Ph2Driver extends TestDriver implements GlobalConst {
             Runtime.getRuntime().exit(1);
         }
 
+
+        System.out.println("\nSkyline computation completed using Sort First Skyline operator ...\nFollowing is the result");
         Tuple t;
         int num_skylines = 0;
+        //System.out.println("Preferred Attributes: " + Arrays.toString(pref_list));
         System.out.println("Skylines:");
         try {
             while ((t = sfs.get_next()) != null) {
@@ -425,6 +443,7 @@ class Ph2Driver extends TestDriver implements GlobalConst {
         System.out.println("\nNumber of pages read: " + PageCounter.getReadCounter());
         System.out.println("Number of pages written: " + PageCounter.getWriteCounter());
 
+        printReadAndWrites();
         // clean up
         try {
             sfs.close();
@@ -438,7 +457,8 @@ class Ph2Driver extends TestDriver implements GlobalConst {
 
     /* BTreeSky operator test */
     public boolean bTreeSkylineTest() {
-        System.out.println("\nFinding skylines using BTreeSky operator...\n");
+        System.out.println("---------------------------------------------------------------------------------------------------------\n");
+        System.out.println("Finding skylines using BTreeSky operator...\n");
         boolean status = OK;
 
 
@@ -449,6 +469,7 @@ class Ph2Driver extends TestDriver implements GlobalConst {
 
         // create a scan
         FileScan scan = null;
+        PageCounter.init();
         try {
             scan  = new FileScan(dbfilename, attrType, null,
                     (short)numAttribs, (short)numAttribs, proj_list, null);
@@ -530,6 +551,7 @@ class Ph2Driver extends TestDriver implements GlobalConst {
             Runtime.getRuntime().exit(1);
         }
 
+        System.out.println("\nSkyline computation completed using BTree Skyline operator ...\nFollowing is the result");
         int num_skylines = 0;
         System.out.println("Skylines:");
         try {
@@ -542,8 +564,7 @@ class Ph2Driver extends TestDriver implements GlobalConst {
             e.printStackTrace();
         }
         System.out.println("\nNumber of skylines: " + num_skylines);
-        System.out.println("\nNumber of pages read: " + PageCounter.getReadCounter());
-        System.out.println("Number of pages written: " + PageCounter.getWriteCounter());
+        printReadAndWrites();
 
         // clean up
         try {

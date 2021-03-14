@@ -159,10 +159,6 @@ public class DB implements GlobalConst {
         } catch (IOException e) {
             throw new FileIOException(e, "DB file I/O error");
         }
-
-        if (PageCounter.isInited() == false){
-            PageCounter.init();
-        }
         PageCounter.readInc();
 
     }
@@ -192,10 +188,6 @@ public class DB implements GlobalConst {
             fp.write(apage.getpage());
         } catch (IOException e) {
             throw new FileIOException(e, "DB file I/O error");
-        }
-
-        if (PageCounter.isInited() == false){
-            PageCounter.init();
         }
         PageCounter.writeInc();
 
