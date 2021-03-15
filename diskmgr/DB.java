@@ -950,11 +950,12 @@ class DBHeaderPage implements PageUsedBytes, GlobalConst {
      * @return file name
      * @throws IOException I/O errors
      */
-    public String getFileEntry(PageId pageNo, int entryNo)
-            throws IOException {
-
+    public String getFileEntry(PageId pageNo, int entryNo) throws IOException {
         int position = START_FILE_ENTRIES + entryNo * SIZE_OF_FILE_ENTRY;
         pageNo.pid = Convert.getIntValue(position, data);
+        if (pageNo.pid == INVALID_PAGE) {
+            return "arbitraryPageName";
+        }
         return (Convert.getStrValue(position + 4, data, MAX_NAME + 2));
     }
 

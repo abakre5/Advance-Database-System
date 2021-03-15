@@ -26,7 +26,10 @@ import java.util.*;
 
 
 
-
+/**
+ * @author : Shubham Hemant Chakrawar
+ *
+ */
 public class BTreeSortedSky extends Iterator {
     private AttrType[] attrTypes;
     private int len_in;
@@ -47,9 +50,6 @@ public class BTreeSortedSky extends Iterator {
     private FileScan get_next_scan = null;
     private boolean first_next = true;
     
-    
-    
-
    public BTreeSortedSky(AttrType[] attrs, int len_attr, short[] attr_size,
              int amt, Iterator left, java.lang.String
                      relation, int[] pref_list1, int[] pref_lengths_list,
@@ -71,15 +71,24 @@ public class BTreeSortedSky extends Iterator {
         
     }
 
-/*
-    Steps:
-   
+ /*   Steps:
+    Initialize containers
+    1. start index scan on the index file.
+    2. Fetch record for the retrived RID.
+    3. Add the first record to skyline list, as it is always going to be the skyline.
+    4. Compare record belonging to i+1 index entry with "i" th. If i dominates i+1, scrap i+1 tuple.
+        Otherwise add it to the skyline_list. If skyline_list has crossed buffer threshold size, then
+        add this incoming tuple to the btreesortedDisk.in file and flush the skyline_list to output file
+        as skyline_list is always going to contain confirmed skyline points.
+        This file will store all the probable skyline candidates which are yet to be compared with each other.
+    5. Process this disk file to compare these tuples with each other. Discard the ones which are dominated by the 
+        other tuples. 
+    6. Everytime skyline_list gets full, flush it to the output file of confirmed skyline points.
  */
 
     private void compute_skyline() throws Exception {
+
         BTFileScan index_scan = new BTFileScan();
-      
-      
         Heapfile hf = null;
         RID rid = new RID();
         KeyDataEntry KeyData = null;
@@ -89,13 +98,14 @@ public class BTreeSortedSky extends Iterator {
             Pprojection[i - 1] = new FldSpec(new RelSpec(RelSpec.outer), i);
         }
 
+        // start index scan
         try {
             index_scan = ((BTreeFile)index_files[0]).new_scan(null, null);
         } catch(Exception e) {
             e.printStackTrace();
         }
-        //System.out.println("compute_skyline: index scan created");
 
+        //open input heapfile.
         try {
             System.out.println("Relation: "+ relation_name);
             hf = new Heapfile(relation_name);
@@ -112,23 +122,24 @@ public class BTreeSortedSky extends Iterator {
             } else {
                 break;
             }
-            //System.out.println("Key :" + KeyData.key + "Data: "+ KeyData.data);
             
+            //Fetch the record from heapfile using rid obtained from the index.
             Tuple t = hf.getRecord(rid);
             
-            //Please check why do we need to do this?
             Tuple current_tuple = new Tuple(t.getTupleByteArray(), t.getOffset(),t.getLength());
             current_tuple.setHdr((short)len_in, attrTypes, null);
+
+            //Buffer threshold = Number of tuples that can be accomodated in memory window called skyline_list.
+            //This number is arrived at using n_pages attributes and minibase page size.
 
             if(buffer_threshold == -1) {
                 buffer_threshold = (int) Math.floor(Tuple.MINIBASE_PAGESIZE * n_buf_pgs / (int)current_tuple.size());
                 System.out.println("Threshold of Buffer: " + buffer_threshold);
                 System.out.println("Minibase page size : " + Tuple.MINIBASE_PAGESIZE);
-                System.out.println("n_buf_pgs : " + n_buf_pgs);
-                System.out.println("Tuple size: " + current_tuple.size());
 
             }
-            
+
+            //This file contains output skyline elements.
             outHeapfile = getSkylineFileInstance();
 
             if (is_skyline_candidate(current_tuple)) {
@@ -141,10 +152,11 @@ public class BTreeSortedSky extends Iterator {
             e.printStackTrace();
         }
 
+        //flush the window to output heap file.
         if(!skyline_list.isEmpty()) {
             addtoSkyline(skyline_list);
         }
-        handleDiskMembers();
+        handleDiskMembers(); 
     }
 
     
@@ -171,13 +183,14 @@ public class BTreeSortedSky extends Iterator {
         return true;
     }
 
+    //If skyline_list window is full(>buffer_threshold), it means more records can not be accomodated.
+    //Pass the incoming records to the diskfile.
     private void insert_skyline(Tuple curr_tuple) throws IOException,InvalidTupleSizeException, 
                                                 HFBufMgrException, HFException, SpaceNotAvailableException,InvalidTypeException,
                                                 InvalidSlotNumberException,HFDiskMgrException { 
         if(skyline_list.size() < buffer_threshold) {
             skyline_list.add(curr_tuple);
         } else {
-            //System.out.println("Buffer Threshold crossed");
             if(disk == null) {
                 disk = getHeapFileInstance();
             }
@@ -190,12 +203,12 @@ public class BTreeSortedSky extends Iterator {
     }
 
     private Heapfile getHeapFileInstance() throws IOException, HFException, HFBufMgrException, HFDiskMgrException {
-        String relationName = "sortFirstDisk.in";
+        String relationName = "btreesortedDisk.in";
         return new Heapfile(relationName);
     }
     private FileScan getFileScan() throws IOException, FileScanException, TupleUtilsException, InvalidRelation {
         FileScan scan = null;
-        String relationName = "sortFirstDisk.in";
+        String relationName = "btreesortedDisk.in";
 
         FldSpec[] Pprojection = new FldSpec[noOfColumns];
         for (int i = 1; i <= noOfColumns; i++) {
@@ -222,6 +235,15 @@ public class BTreeSortedSky extends Iterator {
                 noOfColumns, noOfColumns, Pprojection, null);
         return scan;
     }
+
+    /*
+        - Function to handle probable skyline candidate tuples stored in disk file (They were redirected here when window was full).
+        - This tuples were yet to be compared with each other.
+        - Tuples which are examined in the process are deleted from the disk. So that they aren't compared in the next pass.
+        - This process operates in a recursive manner unless and untill all the elements from the disk are vetted.
+
+    */
+
 
     private void handleDiskMembers() throws Exception {
         if (disk != null && noOfDiskElements > 0) {
@@ -260,6 +282,7 @@ public class BTreeSortedSky extends Iterator {
     }
 
   
+    //Adds skyline list to the output file.
     private void addtoSkyline(ArrayList<Tuple> skylines) throws Exception {
         isOutFilePresent = true;
         for (Tuple tupleInSkyline : skylines) {
@@ -273,12 +296,18 @@ public class BTreeSortedSky extends Iterator {
             first_time = false;
             compute_skyline();
         }
+
+        //This will fetch the skyline records from the output file and keep returning it to the test driver.
         if(isOutFilePresent && first_time == false) {
             if (first_next) {
                 get_next_scan = getSkylineFileScan();
                 first_next = false;
             }
             Tuple tuple = get_next_scan.get_next();
+            if(tuple==null) {
+                disk.deleteFile();
+                System.out.println("Disk file deleted");
+            }
             return tuple;
         }
         

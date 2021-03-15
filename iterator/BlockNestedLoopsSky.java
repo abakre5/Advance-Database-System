@@ -1,5 +1,6 @@
 package iterator;
 
+import diskmgr.PageCounter;
 import global.AttrType;
 import heap.*;
 import index.IndexException;
@@ -21,7 +22,6 @@ public class BlockNestedLoopsSky extends Iterator {
     private ArrayList<Tuple> window;
     private int windowSize;
     private String tempFileName;
-    boolean flag = true;
 
 
     public BlockNestedLoopsSky(AttrType[] in1, int len_in1, short[] t1_str_sizes, Iterator am1, String relationName,
