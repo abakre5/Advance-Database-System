@@ -34,15 +34,15 @@ public class NestedLoopsSky extends Iterator {
      * Class constructor, take information about the tuples, and set up
      * the NestedLoopsSkyline algorithm
      *
-     * @param in1
-     * @param len_in1
-     * @param t1_str_sizes
-     * @param am1
-     * @param relationName
-     * @param pref_list
-     * @param pref_list_length
-     * @param n_pages
-     * @throws Exception
+     * @param in1               array containing attribute types of the relation
+     * @param len_in1           number of columns in the relation
+     * @param t1_str_sizes      array of sizes of string attributes
+     * @param am1               an iterator for accessing the tuples
+     * @param relationName      name of the heap file
+     * @param pref_list         list of preference attributes
+     * @param pref_list_length  number of preference attributes
+     * @param n_pages           amount of memory (in pages) available for sorting
+     * @throws Exception        exception from this class
      */
     public NestedLoopsSky(AttrType[] in1,
                           int len_in1,
@@ -67,7 +67,14 @@ public class NestedLoopsSky extends Iterator {
         setSkyline();
     }
 
-
+    /**
+     * Computes the skyline of given relation based on given preference attributes
+     * This method performs 2 scans - inner and outer - on the heap file; compares the tuples retrieved
+     * from the scan; if a tuple is dominated by other, it is added to set of deleted tuples
+     * Then, the tuples from the set are deleted from heapfile
+     *
+     * @throws Exception    exception from this class
+     */
     private void setSkyline() throws Exception {
         if(!relationName.isEmpty()) {
             Heapfile origFile = new Heapfile(relationName);
@@ -156,6 +163,14 @@ public class NestedLoopsSky extends Iterator {
         }
     }
 
+    /**
+     * Checks if RID is present in given Set; the original HashSet 'contains' method
+     * does not work properly
+     *
+     * @param ridSet    Set of RID elements
+     * @param currRid   RID to be checked in the ridSet
+     * @return          true if ridSet contains the currRid, false otherwise
+     */
     private boolean containsRid(Set<RID> ridSet, RID currRid) {
         for( RID rid : ridSet ) {
             if ( currRid.equals(rid) ) {
@@ -165,6 +180,15 @@ public class NestedLoopsSky extends Iterator {
         return false;
     }
 
+    /**
+     * Creates a FileScan on the given relation
+     * @param relation              Name of the relation
+     * @return                      FileScan on the given relation
+     * @throws IOException          exception from this class
+     * @throws FileScanException    exception from this class
+     * @throws TupleUtilsException  exception from this class
+     * @throws InvalidRelation      exception from this class
+     */
     private FileScan getFileScan(String relation) throws IOException, FileScanException, TupleUtilsException, InvalidRelation {
         FileScan scan;
 
@@ -177,6 +201,24 @@ public class NestedLoopsSky extends Iterator {
         return scan;
     }
 
+    /**
+     * Gets the next tuple in the skyline heap file
+     *
+     * @return                              tuple in skyline
+     * @throws IOException                  exception from this class
+     * @throws JoinsException               exception from this class
+     * @throws IndexException               exception from this class
+     * @throws InvalidTupleSizeException    exception from this class
+     * @throws InvalidTypeException         exception from this class
+     * @throws PageNotReadException         exception from this class
+     * @throws TupleUtilsException          exception from this class
+     * @throws PredEvalException            exception from this class
+     * @throws SortException                exception from this class
+     * @throws LowMemException              exception from this class
+     * @throws UnknowAttrType               exception from this class
+     * @throws UnknownKeyTypeException      exception from this class
+     * @throws Exception                    exception from this class
+     */
     @Override
     public Tuple get_next() throws IOException, JoinsException, IndexException, InvalidTupleSizeException, InvalidTypeException, PageNotReadException, TupleUtilsException, PredEvalException, SortException, LowMemException, UnknowAttrType, UnknownKeyTypeException, Exception {
         if( skylineItr != null ) {
@@ -197,6 +239,15 @@ public class NestedLoopsSky extends Iterator {
         return null;
     }
 
+    /**
+     * Cleaning up, including releasing buffer pages from the buffer pool
+     * and removing temporary files from the database.
+     *
+     * @throws IOException      exception from this class
+     * @throws JoinsException   exception from this class
+     * @throws SortException    exception from this class
+     * @throws IndexException   exception from this class
+     */
     @Override
     public void close() throws IOException, JoinsException, SortException, IndexException {
         if (!closeFlag) {
