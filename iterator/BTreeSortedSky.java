@@ -237,7 +237,7 @@ public class BTreeSortedSky extends Iterator {
             }
             disk.insertRecord(curr_tuple.getTupleByteArray());
             noOfDiskElements++;
-            System.out.println("Number of disk of elements "+ noOfDiskElements);  
+            //System.out.println("Number of disk of elements "+ noOfDiskElements);  
 
         }
 

@@ -654,7 +654,7 @@ class Ph2Driver extends TestDriver implements GlobalConst {
         }
 
         int num_skylines = 0;
-        System.out.println("\nSkyline computation completed using Sort First Skyline operator ...\nFollowing is the result");
+        System.out.println("\nSkyline computation completed using BTree sorted Skyline operator ...\nFollowing is the result");
         System.out.println("Skylines:");
         try {
             while ((t = btss.get_next()) != null) {
