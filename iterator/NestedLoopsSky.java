@@ -84,6 +84,14 @@ public class NestedLoopsSky extends Iterator {
             }
             ogScan.close();
 
+            // IMP: allow the skyline operation only if sufficient pages are available
+            int ridsPerPage = Tuple.MINIBASE_PAGESIZE/24;    /* 24 is the size of RID */
+            int minPagesNeeded = (int) Math.ceil(skyFile.getRecCnt() / ridsPerPage) + 4;
+            if( noOfBufferPages < minPagesNeeded ) {
+                System.out.println("Insufficient number of pages:- minimum "+minPagesNeeded+" pages needed");
+                return;
+            }
+
             // Creating new scans for inner and outer loops
             FileScan outerScan = getFileScan("skynls.in");
             FileScan innerScan = getFileScan("skynls.in");
@@ -168,7 +176,6 @@ public class NestedLoopsSky extends Iterator {
                 skyFile.deleteRecord(skyRid);
             }
             skylineRIDList = Collections.EMPTY_LIST;
-            outer.close();
             return null;
         }
         Tuple currTuple = currTupleRid.getTuple();
@@ -182,6 +189,7 @@ public class NestedLoopsSky extends Iterator {
         if (!closeFlag) {
             try {
                 outer.close();
+                skyFile.deleteFile();
             }catch (Exception e) {
                 throw new JoinsException(e, "NestedLoopsJoin.java: error in closing iterator.");
             }
