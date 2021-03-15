@@ -304,10 +304,7 @@ public class BTreeSortedSky extends Iterator {
                 first_next = false;
             }
             Tuple tuple = get_next_scan.get_next();
-            if(tuple==null) {
-                disk.deleteFile();
-                System.out.println("Disk file deleted");
-            }
+         
             return tuple;
         }
         
