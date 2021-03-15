@@ -50,6 +50,25 @@ public class BTreeSortedSky extends Iterator {
     private FileScan get_next_scan = null;
     private boolean first_next = true;
     
+ 
+/**
+     * BTreeSortedSky iterator uses combined BTree index to compute skylines.
+     * Combined index is built using a sum() monotonic function on skyline attributes.  
+     * 
+     * @param attrs : Array containing attribute types of the relation
+     * @param len_attr : Number of columns in the relation
+     * @param attr_size :  Array of sizes of string attributes
+     * @param amt : Amount of memory.
+     * @param left : An iterator for accessing the tuples
+     * @param relation : A name of the heap file
+     * @param pref_list1 : A list of preference attributes
+     * @param pref_lengths_list : A list number of preference attributes.
+     * @param index_file_list : Compound index file on all preference attributes
+     * @param n_pages1 :  Number of pages available for iterator
+     * @throws IOException
+     * @throws NestedLoopException
+*/
+
    public BTreeSortedSky(AttrType[] attrs, int len_attr, short[] attr_size,
              int amt, Iterator left, java.lang.String
                      relation, int[] pref_list1, int[] pref_lengths_list,
@@ -71,8 +90,8 @@ public class BTreeSortedSky extends Iterator {
         
     }
 
- /*   Steps:
-    Initialize containers
+/**
+    Steps
     1. start index scan on the index file.
     2. Fetch record for the retrived RID.
     3. Add the first record to skyline list, as it is always going to be the skyline.
@@ -84,8 +103,9 @@ public class BTreeSortedSky extends Iterator {
     5. Process this disk file to compare these tuples with each other. Discard the ones which are dominated by the 
         other tuples. 
     6. Everytime skyline_list gets full, flush it to the output file of confirmed skyline points.
- */
 
+ * @throws Exception
+ */ 
     private void compute_skyline() throws Exception {
 
         BTFileScan index_scan = new BTFileScan();
@@ -160,7 +180,16 @@ public class BTreeSortedSky extends Iterator {
     }
 
     
-
+    /**
+     * 
+     * @param curr_tuple 
+     * @return True if Current tuple is not dominated by any tuple in window.
+     * @throws Exception
+     * @throws IOException
+     * @throws TupleUtilsException
+     * @throws FileScanException
+     * @throws InvalidRelation
+     */
     private boolean is_skyline_candidate(Tuple curr_tuple) throws Exception,IOException, TupleUtilsException, FileScanException, InvalidRelation {
         for (Tuple tupleInSkyline : skyline_list) {
             if (TupleUtils.Dominates(tupleInSkyline, attrTypes, curr_tuple, attrTypes, (short)attrTypes.length, str_sizes, pref_list, pref_list.length)) {
@@ -183,8 +212,20 @@ public class BTreeSortedSky extends Iterator {
         return true;
     }
 
-    //If skyline_list window is full(>buffer_threshold), it means more records can not be accomodated.
-    //Pass the incoming records to the diskfile.
+   
+    /**
+     *  If skyline_list window is full(>buffer_threshold), it means more records can not be accomodated.
+     *  Pass the incoming records to the diskfile.
+     * @param curr_tuple
+     * @throws IOException
+     * @throws InvalidTupleSizeException
+     * @throws HFBufMgrException
+     * @throws HFException
+     * @throws SpaceNotAvailableException
+     * @throws InvalidTypeException
+     * @throws InvalidSlotNumberException
+     * @throws HFDiskMgrException
+     */
     private void insert_skyline(Tuple curr_tuple) throws IOException,InvalidTupleSizeException, 
                                                 HFBufMgrException, HFException, SpaceNotAvailableException,InvalidTypeException,
                                                 InvalidSlotNumberException,HFDiskMgrException { 
@@ -202,10 +243,27 @@ public class BTreeSortedSky extends Iterator {
 
     }
 
+    /**
+     * getHeapFileInstance
+     * @return
+     * @throws IOException
+     * @throws HFException
+     * @throws HFBufMgrException
+     * @throws HFDiskMgrException
+     */
     private Heapfile getHeapFileInstance() throws IOException, HFException, HFBufMgrException, HFDiskMgrException {
         String relationName = "btreesortedDisk.in";
         return new Heapfile(relationName);
     }
+
+    /**
+     * getFileScan
+     * @return
+     * @throws IOException
+     * @throws FileScanException
+     * @throws TupleUtilsException
+     * @throws InvalidRelation
+     */
     private FileScan getFileScan() throws IOException, FileScanException, TupleUtilsException, InvalidRelation {
         FileScan scan = null;
         String relationName = "btreesortedDisk.in";
@@ -219,10 +277,27 @@ public class BTreeSortedSky extends Iterator {
         return scan;
     }
 
+    /**
+     * getSkylineFileInstance
+     * @return
+     * @throws IOException
+     * @throws HFException
+     * @throws HFBufMgrException
+     * @throws HFDiskMgrException
+     */
     private Heapfile getSkylineFileInstance() throws IOException, HFException, HFBufMgrException, HFDiskMgrException {
         String relationName = "Skyline.out";
         return new Heapfile(relationName);
     }
+
+    /**
+     * getSkylineFileScan
+     * @return
+     * @throws IOException
+     * @throws FileScanException
+     * @throws TupleUtilsException
+     * @throws InvalidRelation
+     */
     private FileScan getSkylineFileScan() throws IOException, FileScanException, TupleUtilsException, InvalidRelation {
         FileScan scan = null;
         String relationName = "Skyline.out";
@@ -237,14 +312,20 @@ public class BTreeSortedSky extends Iterator {
     }
 
     /*
-        - Function to handle probable skyline candidate tuples stored in disk file (They were redirected here when window was full).
-        - This tuples were yet to be compared with each other.
-        - Tuples which are examined in the process are deleted from the disk. So that they aren't compared in the next pass.
-        - This process operates in a recursive manner unless and untill all the elements from the disk are vetted.
+        
 
     */
 
-
+    /**
+     *  Function to handle probable skyline candidate tuples stored in disk file 
+        (They were redirected here when window was full).
+        This tuples were yet to be compared with each other.
+        Tuples which are examined in the process are deleted from the disk. 
+        So that they aren't compared in the next pass.
+        This process operates in a recursive manner unless and untill all the elements 
+        from the disk are vetted.
+     * @throws Exception
+     */
     private void handleDiskMembers() throws Exception {
         if (disk != null && noOfDiskElements > 0) {
             System.out.println("handleDiskMembers called..");
@@ -289,7 +370,7 @@ public class BTreeSortedSky extends Iterator {
             outHeapfile.insertRecord(tupleInSkyline.getTupleByteArray());
         }
     }
-
+    
     @Override
     public Tuple get_next() throws IOException, JoinsException, IndexException, InvalidTupleSizeException, InvalidTypeException, PageNotReadException, TupleUtilsException, PredEvalException, SortException, LowMemException, UnknowAttrType, UnknownKeyTypeException, Exception {
         if( first_time ) {
