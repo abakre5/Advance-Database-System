@@ -881,6 +881,7 @@ public class Heapfile implements Filetype, GlobalConst {
             // the current directory page.
 
             nextDirPageId = currentDirPage.getNextPage();
+            unpinPage(currentDirPageId, true);
             freePage(currentDirPageId);
 
             currentDirPageId.pid = nextDirPageId.pid;

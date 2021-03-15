@@ -34,6 +34,8 @@ class Ph2Driver extends TestDriver implements GlobalConst {
     private Heapfile dbHeapFile;
     AttrType[] attrType;
     private Args args;
+    private int initialReads = 0;
+    private int initialWrites = 0;
 
     /**
      * BMDriver Constructor, inherited from TestDriver
@@ -41,6 +43,8 @@ class Ph2Driver extends TestDriver implements GlobalConst {
     public Ph2Driver(Args _args) {
         super("phase2test");
         args = _args;
+        initialReads = 0;
+        initialWrites = 0;
     }
 
     /**
@@ -123,6 +127,7 @@ class Ph2Driver extends TestDriver implements GlobalConst {
 
         try (BufferedReader br = new BufferedReader(new FileReader(args.datafile))) {
             String line;
+            PageCounter.init();
             line = br.readLine();
             numAttribs = Integer.parseInt(line.trim());
             //System.out.println("Number of data attributes: " + numAttribs);
@@ -192,7 +197,10 @@ class Ph2Driver extends TestDriver implements GlobalConst {
 
                 ++num_tuples;
             }
-            System.err.println("Number of tuples added to DB: " + num_tuples + "\n");
+            initialReads = PageCounter.getReadCounter();
+            initialWrites = PageCounter.getWriteCounter();
+            System.out.println(initialReads + " " + initialWrites);
+            System.out.println("Number of tuples added to DB: " + num_tuples + "\n");
         }
         catch (IOException e) {
             status = FAIL;
@@ -267,9 +275,6 @@ class Ph2Driver extends TestDriver implements GlobalConst {
             Runtime.getRuntime().exit(1);
         }
 
-        /* initialize PageCounter to track Page reads/writes */
-        PageCounter.init();
-
         NestedLoopsSky nls = null;
         try {
             nls = new NestedLoopsSky(attrType, attrType.length, new short[0], scan,
@@ -334,9 +339,6 @@ class Ph2Driver extends TestDriver implements GlobalConst {
             System.err.println ("Failed to create file scan: " + e);
         }
 
-        /* initialize PageCounter to track Page reads/writes */
-        PageCounter.init();
-
         BlockNestedLoopsSky blockNestedLoopsSky = null;
         try {
             blockNestedLoopsSky = new BlockNestedLoopsSky(attrType, attrType.length,
@@ -400,9 +402,6 @@ class Ph2Driver extends TestDriver implements GlobalConst {
             status = FAIL;
             System.err.println ("Failed to create file scan: " + e);
         }
-
-        /* initialize PageCounter to track Page reads/writes */
-        PageCounter.init();
 
         SortFirstSky sfs = null;
         try {

@@ -70,8 +70,7 @@ public class SortFirstSky extends Iterator {
 
         Tuple tuple = outer.get_next();
         if (windowSize == -1) {
-//           windowSize = noOfBufferPages;
-            windowSize = (int) Math.floor(Tuple.MINIBASE_PAGESIZE / (int) tuple.size() *noOfBufferPages);
+           windowSize = (int) Math.floor(Tuple.MINIBASE_PAGESIZE / (int) tuple.size() *noOfBufferPages);
         }
         while (tuple != null) {
             Tuple currentTuple = new Tuple(tuple);
