@@ -27,7 +27,6 @@ public class BTreeSky extends Iterator {
     private boolean first_time;
     private BlockNestedLoopsSky bnlskyline;
 
-
    public BTreeSky(AttrType[] attrs, int len_attr, short[] attr_size,
             Iterator left, java.lang.String
                      relation, int[] pref_list1, int[] pref_lengths_list,
@@ -59,6 +58,7 @@ public class BTreeSky extends Iterator {
     5. Fetch actual tuples from disk and write them in separate file
     6. Generate skyline by calling BlockNested algorithm
  */
+
     private void compute_skyline() throws Exception
     {
         // start index scan
@@ -168,6 +168,18 @@ public class BTreeSky extends Iterator {
 
         //Get rids of tuples from hash set and heap files of each dimension in a heap file.
         Heapfile hf  = getSkylineCanidates(hash_sets, attrs, is_buffer_full, matched, heap_files);
+
+        try
+        {
+            for (int file_count = 0; file_count < heap_files.length; file_count++) {
+
+                heap_files[file_count].deleteFile();
+            }
+        }
+        catch (Exception e)
+        {
+            e.printStackTrace();
+        }
 
         generate_skyline(hf);
     }
@@ -462,6 +474,13 @@ public class BTreeSky extends Iterator {
 
         }while(r!= null);
 
+        try {
+            scan.closescan();
+            prunedElements.deleteFile();
+        }catch (Exception e){
+            e.printStackTrace();
+        }
+
         FldSpec[] projections = new FldSpec[attrTypes.length];
         RelSpec rel = new RelSpec(RelSpec.outer);
         for(int field_count = 0;  field_count < attrTypes.length; field_count++)
@@ -490,7 +509,6 @@ public class BTreeSky extends Iterator {
         {
             e.printStackTrace();
         }
-
     }
 }
 

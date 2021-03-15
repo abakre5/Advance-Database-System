@@ -8,6 +8,8 @@ import java.io.*;
 import java.lang.*;
 
 /**
+ * Updating Author @Abhishek Bakare and @Manthan Agrawal
+ *
  * some useful method when processing Tuple
  */
 public class TupleUtils {
@@ -332,15 +334,17 @@ public class TupleUtils {
 
 
     /**
-     * @param t1
+     * Check whether Tuple 1 dominates Tuple 2 on the basis of MIN SKYLINE concept.
+     *
+     * @param t1               Tuple 1
      * @param type1            this is the list of types of attributes in the relation
-     * @param t2
+     * @param t2               Tuple 2
      * @param type2            this is the list of types of attributes in the relation
      * @param len_in           this is the number of attributes in the relation
      * @param str_sizes        this is the list of string lengths for this attributes that are string type
      * @param pref_list        an array containing indexes of the preference attributes
      * @param pref_list_length number of preference attributes
-     * @return
+     * @return                 true if t1 dominates t2 else false.
      */
     public static boolean Dominates(Tuple t1, AttrType[] type1, Tuple t2, AttrType[] type2, short len_in, short[] str_sizes,
                                     int[] pref_list, int pref_list_length) throws IOException, TupleUtilsException {
@@ -360,6 +364,15 @@ public class TupleUtils {
         return true;
     }
 
+    /**
+     * Compare int value
+     * @param t1                    Tuple 1
+     * @param t2                    Tuple 2
+     * @param attrIndex             Attribute Index
+     * @return                      if attribute value of t1 is greater then t2
+     * @throws IOException
+     * @throws TupleUtilsException
+     */
     private static boolean intComparator(Tuple t1, Tuple t2, int attrIndex) throws IOException, TupleUtilsException {
         try {
             int t1AttrValue = t1.getIntFld(attrIndex);
@@ -373,6 +386,15 @@ public class TupleUtils {
         return false;
     }
 
+    /**
+     * Compare float value
+     * @param t1                    Tuple 1
+     * @param t2                    Tuple 2
+     * @param attrIndex             Attribute Index
+     * @return                      if attribute value of t1 is greater then t2
+     * @throws IOException
+     * @throws TupleUtilsException
+     */
     private static boolean floatComparator(Tuple t1, Tuple t2, int attrIndex) throws IOException, TupleUtilsException {
         try {
             float t1AttrValue = t1.getFloFld(attrIndex);
@@ -401,15 +423,21 @@ public class TupleUtils {
     }
 
     /**
-     * @param t1
-     * @param type1
-     * @param t2
-     * @param type2
+     * Compare two tuple t1 and t2 on the basis of sum of preference attribute values.
+     *
+     * @param t1                Tuple 1
+     * @param type1             Attribute Type of Tuple 1
+     * @param t2                Tuple 2
+     * @param type2             Attribute Type of Tuple 2
      * @param len_in
      * @param str_sizes
-     * @param pref_list
-     * @param pref_list_length
-     * @return
+     * @param pref_list         Preference List Attribute
+     * @param pref_list_length  Preference List Length
+     * @return  sumOfAttrInTuple1 == sumOfAttrInTuple2: 0 || sumOfAttrInTuple1 > sumOfAttrInTuple1: 1 || -1
+     *
+     * @throws TupleUtilsException  exception from this class
+     * @throws IOException          some I/O fault
+     * @throws FieldNumberOutOfBoundException Field number out of bound
      */
     public static int CompareTupleWithTuplePref(Tuple t1, AttrType[] type1, Tuple t2, AttrType[] type2,
                                                 short len_in, short[] str_sizes, int[] pref_list,
@@ -443,10 +471,19 @@ public class TupleUtils {
 
     }
 
-    public static void SetValuePref(Tuple lastElem, Tuple tuple, AttrType[] sortFldType) throws TupleUtilsException, UnknowAttrType {
+    /**
+     * set up a tuples for the elements in list of attributes
+     * @param lastElem             the tuple to be set
+     * @param tuple                the given tuple
+     * @param attrTypeArray        attribute type array
+     * @throws UnknowAttrType      don't know the attribute type
+     * @throws IOException         some I/O fault
+     * @throws TupleUtilsException exception from this class
+     */
+    public static void SetValuePref(Tuple lastElem, Tuple tuple, AttrType[] attrTypeArray) throws TupleUtilsException, UnknowAttrType {
 
-        for (int i = 0;i < sortFldType.length;i++) {
-            int type = sortFldType[i].attrType;
+        for (int i = 0;i < attrTypeArray.length;i++) {
+            int type = attrTypeArray[i].attrType;
             switch (type) {
                 case AttrType.attrInteger:
                     try {
