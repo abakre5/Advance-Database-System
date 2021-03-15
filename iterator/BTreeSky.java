@@ -27,6 +27,19 @@ public class BTreeSky extends Iterator {
     private boolean first_time;
     private BlockNestedLoopsSky bnlskyline;
 
+    /**
+     * Constructor for BtreeSky
+     * @param attrs -  array containing attribute types of the relation
+     * @param len_attr - number of columns in the relation
+     * @param attr_size - array of sizes of string attributes
+     * @param left - an iterator for accessing the tuples
+     * @param relation - name of the heap file
+     * @param pref_list1 -  list of preference attributes
+     * @param pref_lengths_list - number of preference attributes
+     * @param index_file_list - array of index files on preference attributes
+     * @param n_pages - amount of memory (in pages) available for sorting
+     * @throws IOException
+     */
    public BTreeSky(AttrType[] attrs, int len_attr, short[] attr_size,
             Iterator left, java.lang.String
                      relation, int[] pref_list1, int[] pref_lengths_list,
@@ -46,19 +59,20 @@ public class BTreeSky extends Iterator {
         first_time = true;
     }
 
-/*
-    Steps:
-    Initialize containers
-    1. start index scans on simultaneously on every index file
-    2. Keep storing rids of scanned tuples in each dimension in separate hash set
-       and heap file(if memory exceeded)
-    3. stop when tuple is found in all of the dimensions. All records coming after matched tuple
-       can be safely ignored as it will be dominated by matched tuple.
-    4. Scan through hashset and heap files till matched tuple and store the rids in one file
-    5. Fetch actual tuples from disk and write them in separate file
-    6. Generate skyline by calling BlockNested algorithm
- */
 
+    /**
+     * Steps:
+     * Initialize containers
+     * 1. start index scans on simultaneously on every index file
+     * 2. Keep storing rids of scanned tuples in each dimension in separate hash set
+     *    and heap file(if memory exceeded)
+     * 3. stop when tuple is found in all of the dimensions. All records coming after matched tuple
+     *    can be safely ignored as it will be dominated by matched tuple.
+     * 4. Scan through hashset and heap files till matched tuple and store the rids in one file
+     * 5. Fetch actual tuples from disk and write them in separate file
+     * 6. Generate skyline by calling BlockNested algorithm
+     * @throws Exception
+     */
     private void compute_skyline() throws Exception
     {
         // start index scan
@@ -184,7 +198,13 @@ public class BTreeSky extends Iterator {
         generate_skyline(hf);
     }
 
-    //Creates a Heapfile object with given name
+
+
+    /**
+     *  Creates a Heapfile object with given name
+     * @param heapfileName - name of heap file
+     * @return
+     */
     private Heapfile getHeapFileInstance(java.lang.String heapfileName)
     {
         Heapfile hf = null;
@@ -199,9 +219,20 @@ public class BTreeSky extends Iterator {
         return hf;
     }
 
-    //This function scans through hash sets and heap files in which rids are stored
-    //for each dimension. it fetches record from passed rids and stores them in temporary file
-    //temporary file is passed to blocknested for skyline computation.
+
+
+    /**
+     * This function scans through hash sets and heap files in which rids are stored
+     * for each dimension. it fetches record from passed rids and stores them in temporary file
+     * temporary file is passed to blocknested for skyline computation.
+     * @param hash_sets - Array of hash sets containing rids of records
+     * @param attrs - array containing attribute types of the relation
+     * @param is_buffer_full - boolean specifying if
+     * @param matched - RID object which has been found in all dimensions
+     * @param heap_files - array of heap files which contains rids.
+     * @return it return a heap file.
+     * @throws Exception
+     */
     private Heapfile getSkylineCanidates(ArrayList<LinkedHashSet<RID>> hash_sets, AttrType[] attrs, boolean is_buffer_full, RID matched, Heapfile[] heap_files)  throws Exception
     {
         Heapfile hf = getHeapFileInstance("pruned_rids.in");
@@ -293,6 +324,10 @@ public class BTreeSky extends Iterator {
         return  hf;
     }
 
+    /**
+     * This method returns a tuple which can be used to store rids.
+     * @return
+     */
     private Tuple getWrapperForRID()
     {
 
@@ -324,8 +359,16 @@ public class BTreeSky extends Iterator {
 
     }
 
-    //This is utility function for checking if provided rid has been inserted in
-    //given heap file as tuple.
+
+
+    /**
+     * This is utility function for checking if provided rid has been inserted in
+     * given heap file as tuple.
+     * @param hf - heap file to be checked
+     * @param matched - RID object
+     * @param attrs - attribute types
+     * @return result of search as boolean
+     */
     private boolean checkInHeapFile(Heapfile hf, RID matched, AttrType[] attrs)
     {
         Tuple rid_tuple = null;
@@ -372,8 +415,26 @@ public class BTreeSky extends Iterator {
         return found_match;
     }
 
-    //This returns a skyline element. skyline is computed when this iterator is called
-    //for first time.
+
+
+    /**
+     *     This returns a skyline element. skyline is computed when this iterator is called
+     *     for first time.
+     * @return
+     * @throws IOException
+     * @throws JoinsException
+     * @throws IndexException
+     * @throws InvalidTupleSizeException
+     * @throws InvalidTypeException
+     * @throws PageNotReadException
+     * @throws TupleUtilsException
+     * @throws PredEvalException
+     * @throws SortException
+     * @throws LowMemException
+     * @throws UnknowAttrType
+     * @throws UnknownKeyTypeException
+     * @throws Exception
+     */
     @Override
     public Tuple get_next() throws IOException, JoinsException, IndexException, InvalidTupleSizeException, InvalidTypeException, PageNotReadException, TupleUtilsException, PredEvalException, SortException, LowMemException, UnknowAttrType, UnknownKeyTypeException, Exception {
         if( first_time ) {
@@ -383,6 +444,10 @@ public class BTreeSky extends Iterator {
         return bnlskyline.get_next();
     }
 
+    /**
+     * performs cleanup
+     * @throws IOException
+     */
     @Override
     public void close() throws IOException {
         if (!closeFlag) {
@@ -427,6 +492,11 @@ public class BTreeSky extends Iterator {
     //RIDs of tuples remaining after pruning are given to this function in a file
     //It fetches tuple from main heap file and stores them in separate temp file
     //temp file is given to blocknested for skyline computation
+
+    /**
+     *
+     * @param prunedElements -  heap file containing
+     */
     private void generate_skyline(Heapfile prunedElements)
     {
         Heapfile record_file = getHeapFileInstance(relation_name);
