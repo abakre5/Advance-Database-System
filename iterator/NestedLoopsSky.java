@@ -2,6 +2,7 @@ package iterator;
 
 import bufmgr.PageNotReadException;
 import global.AttrType;
+import global.GlobalConst;
 import global.RID;
 import heap.*;
 import index.IndexException;
@@ -11,12 +12,13 @@ import java.util.*;
 
 /**
  * Created on 2/21/2021
- * @author Rahul
+ * @author Rahul Gore
  */
 public class NestedLoopsSky extends Iterator {
     private AttrType[] in1;
     private int n_buf_pgs;
     private Iterator outer;
+    private Iterator skylineItr;
     private int[] prefList;
     private List<Tuple> skyline;
     private boolean first_time;
@@ -28,6 +30,20 @@ public class NestedLoopsSky extends Iterator {
     private short[] strSizes;
     private int prefListLength;
 
+    /**
+     * Class constructor, take information about the tuples, and set up
+     * the NestedLoopsSkyline algorithm
+     *
+     * @param in1
+     * @param len_in1
+     * @param t1_str_sizes
+     * @param am1
+     * @param relationName
+     * @param pref_list
+     * @param pref_list_length
+     * @param n_pages
+     * @throws Exception
+     */
     public NestedLoopsSky(AttrType[] in1,
                           int len_in1,
                           short[] t1_str_sizes,
@@ -46,23 +62,25 @@ public class NestedLoopsSky extends Iterator {
         this.prefListLength = pref_list_length;
         this.noOfBufferPages = n_pages;
         this.skylineRIDList = new ArrayList<>();
+        this.skyFile = null;
+        this.skylineItr = null;
         setSkyline();
     }
 
-    /**
-     * Steps for performing getSkyline:
-     * (1) Open file mentioned by relation name
-     * (2) Have 2 scan:- inner and outer loop on file
-     * (3) get_next, Compare, if one is dominated, delete that record
-     */
+
     private void setSkyline() throws Exception {
         if(!relationName.isEmpty()) {
-            try {
-                skyFile = new Heapfile("skynls.in");
-            } catch (Exception e) {
-                System.err.println(" Could not open heapfile");
-                e.printStackTrace();
+            Heapfile origFile = new Heapfile(relationName);
+
+            // IMP: allow the skyline operation only if sufficient pages are available
+            int ridsPerPage = GlobalConst.MINIBASE_PAGESIZE/24;    /* 24 is the size of RID */
+            int minPagesNeeded = (int) Math.ceil(origFile.getRecCnt() / ridsPerPage);
+            if( noOfBufferPages < minPagesNeeded ) {
+                System.out.println("*** ERROR! Insufficient number of pages:- minimum "+minPagesNeeded+" pages needed ***");
+                return;
             }
+
+            skyFile = new Heapfile("skynls.in");
 
             RID rid = new RID();
             FileScan ogScan = getFileScan(relationName);
@@ -83,14 +101,6 @@ public class NestedLoopsSky extends Iterator {
                 t = ogScan.get_next();
             }
             ogScan.close();
-
-            // IMP: allow the skyline operation only if sufficient pages are available
-            int ridsPerPage = Tuple.MINIBASE_PAGESIZE/24;    /* 24 is the size of RID */
-            int minPagesNeeded = (int) Math.ceil(skyFile.getRecCnt() / ridsPerPage) + 4;
-            if( noOfBufferPages < minPagesNeeded ) {
-                System.out.println("Insufficient number of pages:- minimum "+minPagesNeeded+" pages needed");
-                return;
-            }
 
             // Creating new scans for inner and outer loops
             FileScan outerScan = getFileScan("skynls.in");
@@ -140,7 +150,7 @@ public class NestedLoopsSky extends Iterator {
             }
 
             // Scan and store in skyline heap file
-            outer = getFileScan("skynls.in");
+            skylineItr = getFileScan("skynls.in");
         } else {
             System.out.println("ERROR: Relation name not specified");
         }
@@ -169,27 +179,34 @@ public class NestedLoopsSky extends Iterator {
 
     @Override
     public Tuple get_next() throws IOException, JoinsException, IndexException, InvalidTupleSizeException, InvalidTypeException, PageNotReadException, TupleUtilsException, PredEvalException, SortException, LowMemException, UnknowAttrType, UnknownKeyTypeException, Exception {
-        TupleRIDPair currTupleRid = outer.get_next1();
-        if(currTupleRid == null) {
-            // Deleting records in temp heap file after scan is completed
-            for(RID skyRid : skylineRIDList) {
-                skyFile.deleteRecord(skyRid);
+        if( skylineItr != null ) {
+            TupleRIDPair currTupleRid = skylineItr.get_next1();
+            if(currTupleRid == null) {
+                // Deleting records in temp heap file after scan is completed
+                for(RID skyRid : skylineRIDList) {
+                    skyFile.deleteRecord(skyRid);
+                }
+                skylineRIDList = Collections.EMPTY_LIST;
+                return null;
             }
-            skylineRIDList = Collections.EMPTY_LIST;
-            return null;
+            Tuple currTuple = currTupleRid.getTuple();
+            RID currRid = currTupleRid.getRID();
+            skylineRIDList.add(currRid);
+            return currTuple;
         }
-        Tuple currTuple = currTupleRid.getTuple();
-        RID currRid = currTupleRid.getRID();
-        skylineRIDList.add(currRid);
-        return currTuple;
+        return null;
     }
 
     @Override
     public void close() throws IOException, JoinsException, SortException, IndexException {
         if (!closeFlag) {
             try {
-                outer.close();
-                skyFile.deleteFile();
+                if(skylineItr != null) {
+                    skylineItr.close();
+                }
+                if(skylineItr != null) {
+                    skyFile.deleteFile();
+                }
             }catch (Exception e) {
                 throw new JoinsException(e, "NestedLoopsJoin.java: error in closing iterator.");
             }
