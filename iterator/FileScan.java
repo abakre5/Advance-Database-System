@@ -164,6 +164,11 @@ public class FileScan extends Iterator {
         f.deleteFile();
     }
 
+    public Tuple fetchRecord(RID rid) throws Exception {
+        System.out.println("NOF " + f.getRecord(rid).noOfFlds());
+        return f.getRecord(rid);
+    }
+
     /**
      * implement the abstract method close() from super class Iterator
      * to finish cleaning up
