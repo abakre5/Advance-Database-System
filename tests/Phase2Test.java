@@ -14,6 +14,7 @@ import diskmgr.PageCounter;
 import global.*;
 import heap.*;
 import iterator.*;
+import hash.HashFile;
 
 class Args {
     String  skylineMethod;
@@ -217,24 +218,26 @@ class Ph2Driver extends TestDriver implements GlobalConst {
         Instant start = Instant.now();
 
         switch (args.skylineMethod) {
-            case "nested":
-                _passAll = nestedSkylineTest();
-                break;
-            case "blocknested":
-                _passAll = blockNestedSkylineTest();
-                break;
-            case "sortfirst":
-                _passAll = sortFirstSkylineTest();
-                break;
-            case "btree":
-                _passAll = bTreeSkylineTest();
-                break;
-            case "btreesort":
-                _passAll = bTreeSortedSkylineTest();
-                break;
-            case "all":
-                _passAll = nestedSkylineTest() && blockNestedSkylineTest() && sortFirstSkylineTest()
-                        && bTreeSkylineTest()  && bTreeSortedSkylineTest();
+            // case "nested":
+            //     _passAll = nestedSkylineTest();
+            //     break;
+            // case "blocknested":
+            //     _passAll = blockNestedSkylineTest();
+            //     break;
+            // case "sortfirst":
+            //     _passAll = sortFirstSkylineTest();
+            //     break;
+            // case "btree":
+            //     _passAll = bTreeSkylineTest();
+            //     break;
+            // case "btreesort":
+            //     _passAll = bTreeSortedSkylineTest();
+            //    break;
+            case "hash_index":
+                _passAll = HashFileTestFunctTest();
+            // case "all":
+            //     _passAll = nestedSkylineTest() && blockNestedSkylineTest() && sortFirstSkylineTest()
+            //             && bTreeSkylineTest()  && bTreeSortedSkylineTest();
                 break;
 
         }
@@ -563,6 +566,120 @@ class Ph2Driver extends TestDriver implements GlobalConst {
         return status;
     }
 
+
+    public boolean HashFileTestFunctTest(){
+        System.out.println("-----------------------------------------------Reached----------------------------------------------------------\n");
+        boolean status = OK;
+
+
+        FldSpec[] proj_list = new FldSpec[numAttribs];
+        for (int i=0; i<numAttribs; ++i) {
+            proj_list[i] = new FldSpec(new RelSpec(RelSpec.outer), i+1);
+        }
+
+        /* initialize PageCounter to track Page reads/writes */
+        PageCounter.init();
+        // create a scan
+        FileScan scan = null;
+        try {
+            scan  = new FileScan(dbfilename, attrType, null,
+                    (short)numAttribs, (short)numAttribs, proj_list, null);
+        }
+        catch (Exception e) {
+            status = FAIL;
+            System.err.println ("Failed to create file scan: " + e);
+        }
+
+        // create an scan on the heapfile
+        Scan heapfile_scan = null;
+
+        try {
+            heapfile_scan = new Scan(dbHeapFile);
+        } catch (Exception e) {
+            status = FAIL;
+            e.printStackTrace();
+            Runtime.getRuntime().exit(1);
+        }
+
+        HashFile hf = null;
+
+        try {
+            hf = new HashFile("data1.txt",1, AttrType.attrReal, scan);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+       System.out.println("Starting insert test");
+        
+
+        try{
+            Heapfile hf1 = new Heapfile("nc_2_7000_single1.txt");
+            RID rid = null;
+            proj_list = new FldSpec[numAttribs];
+            for (int i=0; i<numAttribs; ++i) {
+                proj_list[i] = new FldSpec(new RelSpec(RelSpec.outer), i+1);
+            }
+    
+            /* initialize PageCounter to track Page reads/writes */
+            PageCounter.init();
+            // create a scan
+            scan = null;
+            try {
+                scan  = new FileScan(dbfilename, attrType, null,
+                        (short)numAttribs, (short)numAttribs, proj_list, null);
+            }
+            catch (Exception e) {
+                status = FAIL;
+                System.err.println ("Failed to create file scan: " + e);
+            }
+
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        TupleRIDPair record = null;
+        Tuple data = null;
+        RID rid = null;
+        do {
+
+        
+        try {
+
+            
+            record = scan.get_next1();
+            if(record!=null) {
+                data = record.getTuple();
+                rid = record.getRID();
+            } else {
+                break;
+            }
+            AttrType[] attrTypes = new AttrType[5];
+            //short[] attrSize = new short[numAttribs];
+            for (int i = 0; i < 5; ++i) {
+                attrTypes[i] = new AttrType(AttrType.attrReal);
+            }
+            try {
+                data.setHdr((short) 5, attrTypes, null);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+
+            hf.insert(new hash.FloatKey(data.getFloFld(1)), rid);
+            //System.out.println("Inserted");
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }while(record!=null);
+
+    try{
+        hf.printindex();
+    } catch (Exception e) {
+        e.printStackTrace();
+    }
+    return true;
+    }
+
     /* BTreeSortedSky operator test */
     public boolean bTreeSortedSkylineTest() {
         System.out.println("---------------------------------------------------------------------------------------------------------\n");
@@ -710,12 +827,12 @@ public class Phase2Test {
     private  static  void usage() {
         System.out.println("\njava tests.Phase2Test " +
                 "-datafile=<datafile> " +
-                "-skyline=<nested | blocknested | sortfirst | btree | btreesort | all> " +
+                "-skyline=<nested | blocknested | sortfirst | btree | btreesort | hash_index | all> " +
                 "-attr=<comma separated numbers> " +
                 "-npages=<number-of-pages>\n");
     }
     private static boolean skylineMethodValid(String skyline) {
-        String[] validSkylines = {"nested", "blocknested", "sortfirst", "btree", "btreesort", "all"};
+        String[] validSkylines = {"nested", "blocknested", "sortfirst", "btree", "btreesort","hash_index","all"};
         for (String method : validSkylines) {
             if (method.equals(skyline)) {
                 return true;
