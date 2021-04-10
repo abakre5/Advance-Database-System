@@ -212,6 +212,10 @@ public class BlockNestedLoopsSky extends Iterator {
         return null;
     }
 
+    public List<Tuple> getAllSkylineMembers() {
+        return this.skyline;
+    }
+
     /**
      * close the initialItr
      *
