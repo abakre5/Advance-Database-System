@@ -18,4 +18,6 @@ public class NodeType {
      */
     public static final short BTHEAD = 13;
 
+    public static final short CLUSTERED_LEAF = 14;
+
 } 

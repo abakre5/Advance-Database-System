@@ -114,7 +114,7 @@ public class BT implements GlobalConst {
             throws NodeNotMatchException {
         if (pageType == NodeType.LEAF)
             return 8;
-        else if (pageType == NodeType.INDEX)
+        else if (pageType == NodeType.INDEX || pageType == NodeType.CLUSTERED_LEAF)
             return 4;
         else throw new NodeNotMatchException(null, "key types do not match");
     }
@@ -166,10 +166,14 @@ public class BT implements GlobalConst {
         int n;
         try {
 
+            //both index and clustered leafs use same type of data
             if (nodeType == NodeType.INDEX) {
                 n = 4;
                 data = new IndexData(Convert.getIntValue(offset + length - 4, from));
-            } else if (nodeType == NodeType.LEAF) {
+            } else if (nodeType == NodeType.CLUSTERED_LEAF) {
+                n = 4;
+                data = new ClusteredLeafData(Convert.getIntValue(offset + length - 4, from));
+            }else if (nodeType == NodeType.LEAF) {
                 n = 8;
                 RID rid = new RID();
                 rid.slotNo = Convert.getIntValue(offset + length - 8, from);
@@ -216,6 +220,8 @@ public class BT implements GlobalConst {
             m = n;
             if (entry.data instanceof IndexData)
                 n += 4;
+            else if(entry.data instanceof  ClusteredLeafData)
+                n += 4;
             else if (entry.data instanceof LeafData)
                 n += 8;
 
@@ -235,7 +241,10 @@ public class BT implements GlobalConst {
 
             if (entry.data instanceof IndexData) {
                 Convert.setIntValue(((IndexData) entry.data).getData().pid,
-                        m, data);
+                        m, data);}
+            else if (entry.data instanceof ClusteredLeafData) {
+                    Convert.setIntValue(((ClusteredLeafData) entry.data).getData().pid,
+                            m, data);
             } else if (entry.data instanceof LeafData) {
                 Convert.setIntValue(((LeafData) entry.data).getData().slotNo,
                         m, data);
@@ -304,7 +313,35 @@ public class BT implements GlobalConst {
 
             System.out.println("************** END ********");
             System.out.println("");
-        } else if (sortedPage.getType() == NodeType.LEAF) {
+        }else if (sortedPage.getType() == NodeType.CLUSTERED_LEAF) {
+            BTClusteredLeafPage leafPage = new BTClusteredLeafPage((Page) sortedPage, keyType);
+            System.out.println("");
+            System.out.println("**************To Print an Clustered Leaf Page ********");
+            System.out.println("Current Page ID: " + leafPage.getCurPage().pid);
+            System.out.println("Left Link      : " + leafPage.getPrevPage().pid);
+            System.out.println("Right Link     : " + leafPage.getNextPage().pid);
+
+            RID rid = new RID();
+
+            for (KeyDataEntry entry = leafPage.getFirst(rid); entry != null;
+                 entry = leafPage.getNext(rid)) {
+                if (keyType == AttrType.attrInteger)
+                    System.out.println(i + " (key, [pageNo]):   (" +
+                            (IntegerKey) entry.key + ",  " + (ClusteredLeafData) entry.data + " )");
+                if (keyType == AttrType.attrReal)
+                    System.out.println(i + " (key, [pageNo]):   (" +
+                            (FloatKey) entry.key + ",  " + (ClusteredLeafData) entry.data + " )");
+                if (keyType == AttrType.attrString)
+                    System.out.println(i + " (key, [pageNo]):   (" +
+                            (StringKey) entry.key + ",  " + (ClusteredLeafData) entry.data);
+
+                i++;
+            }
+
+            System.out.println("************** END ********");
+            System.out.println("");
+        }
+        else if (sortedPage.getType() == NodeType.LEAF) {
             BTLeafPage leafPage = new BTLeafPage((Page) sortedPage, keyType);
             System.out.println("");
             System.out.println("**************To Print an Leaf Page ********");
@@ -472,7 +509,12 @@ public class BT implements GlobalConst {
             }
         }
 
-        if (sortedPage.getType() == NodeType.LEAF) {
+        if (sortedPage.getType() == NodeType.CLUSTERED_LEAF) {
+
+            printPage(currentPageId, keyType);
+        }
+
+        if (sortedPage.getType() == NodeType.LEAF ) {
             printPage(currentPageId, keyType);
         }
 

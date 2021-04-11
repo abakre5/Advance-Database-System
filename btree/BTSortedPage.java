@@ -118,7 +118,9 @@ public class BTSortedPage extends HFPage {
 
             if (entry.data instanceof LeafData)
                 nType = NodeType.LEAF;
-            else  //  entry.data instanceof IndexData
+            else  if(entry.data instanceof ClusteredLeafData)
+                nType = NodeType.CLUSTERED_LEAF;
+            else
                 nType = NodeType.INDEX;
 
 

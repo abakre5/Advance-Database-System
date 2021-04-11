@@ -46,6 +46,18 @@ public class KeyDataEntry {
         }
     }
 
+    public KeyDataEntry(KeyClass key, int pageNo) {
+
+        data = new ClusteredLeafData(new PageId(pageNo));
+        if (key instanceof IntegerKey)
+            this.key = new IntegerKey(((IntegerKey) key).getKey());
+        else if (key instanceof StringKey)
+            this.key = new StringKey(((StringKey) key).getKey());
+        else if(key instanceof FloatKey){
+            this.key = new FloatKey(((FloatKey) key).getKey());
+        }
+    }
+
     ;
 
 
@@ -115,6 +127,8 @@ public class KeyDataEntry {
 
         if (data instanceof IndexData)
             this.data = new IndexData(((IndexData) data).getData());
+        else if (data instanceof ClusteredLeafData)
+            this.data = new ClusteredLeafData(((ClusteredLeafData) data).getData());
         else if (data instanceof LeafData)
             this.data = new LeafData(((LeafData) data).getData());
     }
@@ -140,9 +154,14 @@ public class KeyDataEntry {
             st1 = ((StringKey) key).getKey().equals
                     (((StringKey) entry.key).getKey());
 
-        if (data instanceof IndexData)
+        if (data instanceof IndexData){
             st2 = ((IndexData) data).getData().pid ==
                     ((IndexData) entry.data).getData().pid;
+        }
+        else  if (data instanceof ClusteredLeafData){
+            st2 = ((ClusteredLeafData) data).getData().pid ==
+                    ((ClusteredLeafData) entry.data).getData().pid;
+        }
         else
             st2 = ((RID) ((LeafData) data).getData()).equals
                     (((RID) ((LeafData) entry.data).getData()));
