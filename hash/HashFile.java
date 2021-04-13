@@ -12,7 +12,7 @@ import heap.*;
 import iterator.FileScan;
 import iterator.TupleRIDPair;
 
-public class HashFile extends IndexFile {
+public class HashFile extends IndexFile implements GlobalConst {
 
     private static short REC_LEN1 = 32;
     private static short REC_LEN2 = 160;
@@ -23,6 +23,7 @@ public class HashFile extends IndexFile {
     AttrType[] attrType;
     int numAttribs;
     boolean split = false;
+    boolean split_exists = false;
     int split_position = 0;
     double threshold = 0.75;
     int num_buckets;
@@ -33,19 +34,22 @@ public class HashFile extends IndexFile {
     Map<Integer,String> map = new HashMap<Integer,String>();
     Heapfile headerFile = null;
     int crossed =0;
+    Heapfile datafile = null;
+    String hashIndexName;
 
 
 
   
     //Constructor
-    public HashFile(String relationName, int indexField, int keyType, FileScan scan) throws IOException, HFException, HFDiskMgrException, HFBufMgrException,
+    public HashFile(String relationName,String hashFileName, int indexField, int keyType, FileScan scan, int num_records, Heapfile dbfile) throws IOException, HFException, HFDiskMgrException, HFBufMgrException,
                  InvalidTupleSizeException,InvalidSlotNumberException {
         
         
         System.out.println("Hello");
-        
-        headerFile = new Heapfile("headerHeapFile");
-        int num_records = 7178;            
+        hashIndexName = hashFileName;
+        datafile = dbfile;
+        headerFile = new Heapfile(hashIndexName);
+        System.out.println("Num of records = " + num_records);
         
         Tuple t = getWrapperForRID();
         int t_size = t.size();
@@ -134,11 +138,11 @@ public class HashFile extends IndexFile {
         
         AttrType[] attrTypes = new AttrType[5];
         //short[] attrSize = new short[numAttribs];
-        for (int i = 0; i < 5; ++i) {
+        for (int i = 0; i < 2; ++i) {
             attrTypes[i] = new AttrType(AttrType.attrReal);
         }
         try {
-            data.setHdr((short) 5, attrTypes, null);
+            data.setHdr((short) 2, attrTypes, null);
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -236,6 +240,11 @@ public class HashFile extends IndexFile {
 
 	}
         
+    //Constructor
+    public HashFile(String hashFileName) throws IOException,HFException,HFBufMgrException,HFBufMgrException,HFDiskMgrException{
+        hashIndexName = hashFileName;
+        headerFile = new Heapfile(hashIndexName);
+    }
 
     private FileScan getFileScan(String fname) throws IOException, FileScanException, TupleUtilsException, InvalidRelation {
         FileScan scan = null;
@@ -387,6 +396,7 @@ public class HashFile extends IndexFile {
             System.out.println("Target utilization has been crossed: "+current_util );
             crossed++;
             split = true;
+            split_exists = true;
             //split_position++;
             num_buckets++;
             String FileName = "hash_buckets_"+num_buckets;
@@ -481,14 +491,28 @@ public class HashFile extends IndexFile {
 		    System.out.println(set.getKey() + " = " + set.getValue());
             try {
                 Heapfile h = new Heapfile(set.getValue());
+                //Heapfile data = new Heapfile("nc_2_7000_single.txt");
                 total_count = total_count + h.getRecCnt();
 
                 FileScan scan = getFileScan(set.getValue());
                 Tuple tuple = scan.get_next();
+                RID rid = new RID();
 
                 while(tuple!=null) {
                     try {
-                        System.out.println("Key: "+ tuple.getFloFld(1) + ", "+ tuple.getIntFld(2)+ ":"+tuple.getIntFld(3));
+                        //System.out.println("Key: "+ tuple.getFloFld(1) + ", "+ tuple.getIntFld(2)+ ":"+tuple.getIntFld(3));
+                        rid.pageNo.pid = tuple.getIntFld(2);
+                        rid.slotNo = tuple.getIntFld(3);
+                        Tuple t = datafile.getRecord(rid);
+                        Tuple current_tuple = new Tuple(t.getTupleByteArray(), t.getOffset(),t.getLength());
+                        attrType = new AttrType[2];
+                        //short[] attrSize = new short[numAttribs];
+                        for (int i = 0; i < 2; ++i) {
+                            attrType[i] = new AttrType(AttrType.attrReal);
+                        }
+                        current_tuple.setHdr((short)2, attrType, null);
+                       //System.out.println("Data Tuple "+current_tuple.getFloFld(1) + " "+current_tuple.getFloFld(2));
+                        
                     }catch(Exception e){
                         e.printStackTrace();
                     }
@@ -504,11 +528,51 @@ public class HashFile extends IndexFile {
 
     } 
 
+    public void  printHeaderFile() throws IOException, HFException, HFBufMgrException,HFDiskMgrException, InvalidTupleSizeException {
+       
+        Heapfile headerFile = new Heapfile(hashIndexName);
+        Scan scan = headerFile.openScan();
+        RID rid = new RID();
+        Tuple headerTuple = wrapperForHeader();
+        Tuple r = null;
+        do {
+
+            try {
+                r = (Tuple)scan.getNext(rid);
+                if(r!=null) {
+                    headerTuple = new Tuple(r.getTupleByteArray(), r.getOffset(), r.getLength());
+                    short[] attrSize = new short[1];
+        
+                    attrSize[0] = REC_LEN1;
+                    AttrType[] Ptypes = new AttrType[2];
+
+                    Ptypes[0] = new AttrType (AttrType.attrInteger);
+                    Ptypes[1] = new AttrType (AttrType.attrString);
+
+                    headerTuple.setHdr((short)2, Ptypes, attrSize);
+
+                    System.out.println("Header "+ headerTuple.getIntFld(1) + " "+ headerTuple.getStrFld(2));
+                } 
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        } while(r!=null);
+        System.out.println("Printed hashindex "+hashIndexName);
+
+    }
+
 
     public boolean Delete(KeyClass key, RID rid) throws IOException {
         return true;
     }
 
+    public RID search(KeyClass key) throws IOException {
+        FloatKey floatKey = (FloatKey)key;
+        Float keyValue = floatKey.getKey();
+        int bucket = get_hash(keyValue);
+
+        return null;
+    }
     
     public int get_hash(Float value) {  
         if(split) {
