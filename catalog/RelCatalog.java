@@ -59,7 +59,7 @@ public class RelCatalog extends Heapfile
             IOException,
             Catalogrelnotfound {
         int recSize;
-        RID rid = null;
+        RID rid = new RID();
         Scan pscan = null;
 
         if (relation == null)
@@ -72,12 +72,17 @@ public class RelCatalog extends Heapfile
             throw new RelCatalogException(e1, "scan failed");
         }
 
+        Tuple temp;
         while (true) {
             try {
-                tuple = pscan.getNext(rid);
-                if (tuple == null)
+                temp = pscan.getNext(rid);
+                if (temp == null) {
                     throw new Catalogrelnotfound(null, "Catalog: Relation not Found!");
+                }
+                tuple.tupleCopy(temp);
                 read_tuple(tuple, record);
+            } catch (Catalogrelnotfound e) {
+                throw e;
             } catch (Exception e4) {
                 System.err.println("read_tuple" + e4);
                 throw new RelCatalogException(e4, "read_tuple failed");
@@ -101,8 +106,8 @@ public class RelCatalog extends Heapfile
             Catalogioerror,
             Cataloghferror {
         Heapfile rel;
-        RelDesc rd = null;
-        AttrDesc ad = null;
+        RelDesc rd = new RelDesc();
+        AttrDesc ad = new AttrDesc();
         int tupleWidth = 0;
         int offset = 0;
         int sizeOfInt = 4;
@@ -151,7 +156,7 @@ public class RelCatalog extends Heapfile
         rd.relName = new String(relation);
         rd.attrCnt = attrCnt;
         rd.indexCnt = 0;
-        rd.numTuples = NUMTUPLESFILE;
+        rd.numTuples = 0;
         rd.numPages = NUMPAGESFILE;
 
         try {
@@ -161,6 +166,8 @@ public class RelCatalog extends Heapfile
             throw new RelCatalogException(e2, "addInfo failed");
         }
 
+        ad.maxVal = new attrData();
+        ad.minVal = new attrData();
         ad.relName = new String(relation);
 
         for (int i = 0; i < attrCnt; i++) {
@@ -223,7 +230,7 @@ public class RelCatalog extends Heapfile
             Catalogbadtype,
             Catalogattrnotfound,
             Exception {
-        RelDesc rd = null;
+        RelDesc rd = new RelDesc();
 
         if ((relation == null) || (attrName == null))
             throw new Catalogmissparam(null, "MISSING_PARAM");

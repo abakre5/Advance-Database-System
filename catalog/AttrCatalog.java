@@ -124,15 +124,14 @@ public class AttrCatalog extends Heapfile
             Catalogattrnotfound,
             Catalogindexnotfound,
             Catalogrelnotfound {
-        RelDesc record = null;
-        AttrDesc attrRec = null;
+        RelDesc record = new RelDesc();
         int status;
         int recSize;
-        RID rid = null;
+        RID rid = new RID();
         Scan pscan = null;
         int count = 0;
 
-        if (relation == null)
+        if (relation == null || Attrs == null)
             throw new Catalogmissparam(null, "MISSING_PARAM");
 
         try {
@@ -169,26 +168,37 @@ public class AttrCatalog extends Heapfile
         }
 
         // ALLOCATE ARRAY
-
-        Attrs = new AttrDesc[attrCnt];
+        //Attrs = new AttrDesc[attrCnt];
         if (Attrs == null)
             throw new Catalognomem(null, "Catalog: No Enough Memory!");
 
         // SCAN FILE
+        Tuple temp;
+        AttrDesc[] attrRecs = new AttrDesc[attrCnt];
+        for (int i = 0; i < attrCnt; ++i) {
+            attrRecs[i] = new AttrDesc();
+            attrRecs[i].maxVal = new attrData();
+            attrRecs[i].minVal = new attrData();
+        }
 
         while (true) {
             try {
-                tuple = pscan.getNext(rid);
-                if (tuple == null)
+                temp = pscan.getNext(rid);
+                if (temp == null) {
                     throw new Catalogindexnotfound(null,
                             "Catalog: Index not Found!");
-                read_tuple(tuple, attrRec);
+                }
+
+                tuple.tupleCopy(temp);
+                read_tuple(tuple, attrRecs[count]);
+            } catch(Catalogindexnotfound e) {
+                throw e;
             } catch (Exception e4) {
                 throw new AttrCatalogException(e4, "read_tuple failed");
             }
 
-            if (attrRec.relName.equalsIgnoreCase(relation) == true) {
-                Attrs[attrRec.attrPos - 1] = attrRec;
+            if (attrRecs[count].relName.equalsIgnoreCase(relation) == true) {
+                Attrs[attrRecs[count].attrPos - 1] = attrRecs[count];
                 count++;
             }
 
@@ -217,8 +227,11 @@ public class AttrCatalog extends Heapfile
         AttrDesc[] attrs = null;
         int i, x;
 
+        if (relation == null || attrCnt == 0 || typeArray == null || sizeArray == null) {
+            throw new Catalogmissparam(null, "bad arguments ");
+        }
         // GET ALL OF THE ATTRIBUTES
-
+        attrs = new AttrDesc[attrCnt];
         try {
             attrCnt = getRelInfo(relation, attrCnt, attrs);
         } catch (Catalogioerror e) {
@@ -244,7 +257,7 @@ public class AttrCatalog extends Heapfile
 
         // ALLOCATE TYPEARRAY
 
-        typeArray = new AttrType[attrCnt];
+        //typeArray = new AttrType[attrCnt];
         if (typeArray == null)
             throw new Catalognomem(null, "Catalog, No Enough Memory!");
 
@@ -258,15 +271,15 @@ public class AttrCatalog extends Heapfile
         // ALLOCATE STRING SIZE ARRAY
 
         if (stringcount > 0) {
-            sizeArray = new short[stringcount];
+            //sizeArray = new short[stringcount];
             if (sizeArray == null)
                 throw new Catalognomem(null, "Catalog, No Enough Memory!");
         }
 
         // FILL ARRAYS WITH TYPE AND SIZE DATA
-
         for (x = 0, i = 0; i < attrCnt; i++) {
             typeArray[i].attrType = attrs[i].attrType.attrType;
+            //System.err.println("i=" + i + " " + typeArray[i]);
             if (attrs[i].attrType.attrType == AttrType.attrString) {
                 sizeArray[x] = (short) attrs[i].attrLen;
                 x++;
@@ -368,15 +381,15 @@ public class AttrCatalog extends Heapfile
             tuple.setIntFld(4, record.attrPos);
 
             if (record.attrType.attrType == AttrType.attrString) {
-                tuple.setIntFld(5, 0);
+                tuple.setIntFld(5, AttrType.attrString);
                 tuple.setStrFld(8, record.minVal.strVal);
                 tuple.setStrFld(9, record.maxVal.strVal);
             } else if (record.attrType.attrType == AttrType.attrReal) {
-                tuple.setIntFld(5, 1);
+                tuple.setIntFld(5, AttrType.attrReal);
                 tuple.setFloFld(8, record.minVal.floatVal);
                 tuple.setFloFld(9, record.minVal.floatVal);
             } else {
-                tuple.setIntFld(5, 2);
+                tuple.setIntFld(5, AttrType.attrInteger);
                 tuple.setIntFld(8, record.minVal.intVal);
                 tuple.setIntFld(9, record.maxVal.intVal);
             }
@@ -406,15 +419,15 @@ public class AttrCatalog extends Heapfile
 
             int temp;
             temp = tuple.getIntFld(5);
-            if (temp == 0) {
+            if (temp == AttrType.attrString) {
                 record.attrType = new AttrType(AttrType.attrString);
                 record.minVal.strVal = tuple.getStrFld(8);
                 record.maxVal.strVal = tuple.getStrFld(9);
-            } else if (temp == 1) {
+            } else if (temp == AttrType.attrReal) {
                 record.attrType = new AttrType(AttrType.attrReal);
                 record.minVal.floatVal = tuple.getFloFld(8);
                 record.maxVal.floatVal = tuple.getFloFld(9);
-            } else if (temp == 2) {
+            } else if (temp == AttrType.attrInteger) {
                 record.attrType = new AttrType(AttrType.attrInteger);
                 record.minVal.intVal = tuple.getIntFld(8);
                 record.maxVal.intVal = tuple.getIntFld(9);

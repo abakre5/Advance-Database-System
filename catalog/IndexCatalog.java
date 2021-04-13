@@ -153,7 +153,7 @@ public class IndexCatalog extends Heapfile
             Catalogattrnotfound,
             Exception {
         int recSize;
-        RID rid = null;
+        RID rid = new RID();
         Scan pscan = null;
 
         if ((relation == null) || (attrName == null))
@@ -172,12 +172,13 @@ public class IndexCatalog extends Heapfile
         }
 
         // SCAN FILE
-
+        Tuple temp;
         while (true) {
             try {
-                tuple = pscan.getNext(rid);
-                if (tuple == null)
+                temp = pscan.getNext(rid);
+                if (temp == null)
                     throw new Catalogattrnotfound(null, "Catalog: Attribute not Found!");
+                tuple.tupleCopy(temp);
                 read_tuple(tuple, record);
             } catch (Exception e4) {
                 throw new IndexCatalogException(e4, "read_tuple failed");
@@ -398,7 +399,7 @@ public class IndexCatalog extends Heapfile
             java.lang.Exception {
         RID rid = null;
         IndexDesc indexRec = null;
-        AttrDesc attrRec = null;
+        AttrDesc attrRec = new AttrDesc();
         int intKey = 0;
         float floatKey = (float) 0.0;
         String charKey = null;
@@ -437,6 +438,8 @@ public class IndexCatalog extends Heapfile
         }
 
         // GET ATTRIBUTE INFO
+        attrRec.minVal = new attrData();
+        attrRec.maxVal = new attrData();
 
         try {
             ExtendedSystemDefs.MINIBASE_ATTRCAT.getInfo(relation, attrName, attrRec);
@@ -541,12 +544,14 @@ public class IndexCatalog extends Heapfile
 
 
         // NOW PROCESS THE HEAPFILE AND INSERT KEY,RID INTO INDEX
-
+        rid = new RID();
+        Tuple temp;
         while (true) {
             try {
-                tuple = pscan.getNext(rid);
-                if (tuple == null)
+                temp = pscan.getNext(rid);
+                if (temp == null)
                     return;
+                tuple.tupleCopy(temp);
             } catch (Exception e) {
                 throw new IndexCatalogException(e, "getNext() failed");
             }
