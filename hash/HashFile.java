@@ -511,7 +511,7 @@ public class HashFile extends IndexFile implements GlobalConst {
                             attrType[i] = new AttrType(AttrType.attrReal);
                         }
                         current_tuple.setHdr((short)2, attrType, null);
-                       //System.out.println("Data Tuple "+current_tuple.getFloFld(1) + " "+current_tuple.getFloFld(2));
+                        System.out.println("Data Tuple "+current_tuple.getFloFld(1) + " "+current_tuple.getFloFld(2));
                         
                     }catch(Exception e){
                         e.printStackTrace();

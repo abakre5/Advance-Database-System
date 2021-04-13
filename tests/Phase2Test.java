@@ -37,6 +37,7 @@ class Ph2Driver extends TestDriver implements GlobalConst {
     private Args args;
     private int initialReads = 0;
     private int initialWrites = 0;
+    int num_records;
 
     /**
      * BMDriver Constructor, inherited from TestDriver
@@ -131,7 +132,7 @@ class Ph2Driver extends TestDriver implements GlobalConst {
             PageCounter.init();
             line = br.readLine();
             numAttribs = Integer.parseInt(line.trim());
-            //System.out.println("Number of data attributes: " + numAttribs);
+            System.out.println("Number of data attributes: " + numAttribs);
             attrType = new AttrType[numAttribs];
             //short[] attrSize = new short[numAttribs];
             for (int i = 0; i < numAttribs; ++i) {
@@ -202,6 +203,7 @@ class Ph2Driver extends TestDriver implements GlobalConst {
             initialWrites = PageCounter.getWriteCounter();
             System.out.println(initialReads + " " + initialWrites);
             System.out.println("Number of tuples added to DB: " + num_tuples + "\n");
+            num_records = num_tuples;
         }
         catch (IOException e) {
             status = FAIL;
@@ -604,7 +606,7 @@ class Ph2Driver extends TestDriver implements GlobalConst {
         HashFile hf = null;
 
         try {
-            hf = new HashFile("data1.txt",1, AttrType.attrReal, scan);
+            hf = new HashFile("nc_2_7000_single.txt","HashIndex",1, AttrType.attrReal, scan, num_records,dbHeapFile);
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -613,7 +615,7 @@ class Ph2Driver extends TestDriver implements GlobalConst {
         
 
         try{
-            Heapfile hf1 = new Heapfile("nc_2_7000_single1.txt");
+            Heapfile hf1 = new Heapfile("pc_dec_2_500_multi11.txt");
             RID rid = null;
             proj_list = new FldSpec[numAttribs];
             for (int i=0; i<numAttribs; ++i) {
@@ -640,6 +642,7 @@ class Ph2Driver extends TestDriver implements GlobalConst {
         TupleRIDPair record = null;
         Tuple data = null;
         RID rid = null;
+        int count = 0;
         do {
 
         
@@ -655,22 +658,25 @@ class Ph2Driver extends TestDriver implements GlobalConst {
             }
             AttrType[] attrTypes = new AttrType[5];
             //short[] attrSize = new short[numAttribs];
-            for (int i = 0; i < 5; ++i) {
+            for (int i = 0; i < 2; ++i) {
                 attrTypes[i] = new AttrType(AttrType.attrReal);
             }
             try {
-                data.setHdr((short) 5, attrTypes, null);
+                data.setHdr((short) 2, attrTypes, null);
             } catch (Exception e) {
                 e.printStackTrace();
             }
 
+            rid = dbHeapFile.insertRecord(data.getTupleByteArray());
+            
             hf.insert(new hash.FloatKey(data.getFloFld(1)), rid);
+            count++;
             //System.out.println("Inserted");
 
         } catch (Exception e) {
             e.printStackTrace();
         }
-    }while(record!=null);
+    }while(count <=200);
 
     try{
         hf.printindex();
