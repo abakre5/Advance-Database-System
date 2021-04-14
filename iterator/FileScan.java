@@ -165,7 +165,7 @@ public class FileScan extends Iterator {
     }
 
     public Tuple fetchRecord(RID rid) throws Exception {
-        System.out.println("NOF " + f.getRecord(rid).noOfFlds());
+//        System.out.println("NOF " + f.getRecord(rid).noOfFlds());
         return f.getRecord(rid);
     }
 

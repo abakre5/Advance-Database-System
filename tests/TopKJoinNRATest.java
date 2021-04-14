@@ -77,15 +77,29 @@ class JoinsDriver implements GlobalConst {
         reserves = new Vector();
 
         sailors.addElement(new Sailor(1, "Bob Holloway", 90, 53.6));
-        sailors.addElement(new Sailor(2, "Susan Horowitz", 10, 34.2));
-        sailors.addElement(new Sailor(3, "Yannis Ioannidis", 8, 40.2));
-        sailors.addElement(new Sailor(4, "Deborah Joseph", 2, 39.8));
-        sailors.addElement(new Sailor(5, "Landwebber", 1, 56.7));
-//        sailors.addElement(new Sailor(63, "James Larus", 9, 30.3));
-//        sailors.addElement(new Sailor(64, "Barton Miller", 5, 43.7));
-//        sailors.addElement(new Sailor(67, "David Parter", 1, 99.9));
-//        sailors.addElement(new Sailor(69, "Raghu Ramakrishnan", 9, 37.1));
-//        sailors.addElement(new Sailor(71, "Guri Sohi", 10, 42.1));
+        sailors.addElement(new Sailor(2, "Susan Horowitz", 80, 34.2));
+        sailors.addElement(new Sailor(3, "Yannis Ioannidis", 78, 40.2));
+        sailors.addElement(new Sailor(4, "Deborah Joseph", 62, 39.8));
+        sailors.addElement(new Sailor(5, "Landwebber", 51, 56.7));
+        sailors.addElement(new Sailor(63, "James Larus", 49, 30.3));
+        sailors.addElement(new Sailor(64, "Barton Miller", 35, 43.7));
+        sailors.addElement(new Sailor(21, "David Parter", 21, 99.9));
+        sailors.addElement(new Sailor(69, "Raghu Ramakrishnan", 19, 37.1));
+        sailors.addElement(new Sailor(35, "Guri Sohi", 10, 42.1));
+
+        reserves.addElement(new Reserves(5, 100, "05/10/95"));
+        reserves.addElement(new Reserves(2, 80, "05/11/95"));
+        reserves.addElement(new Reserves(100, 65, "05/11/95"));
+        reserves.addElement(new Reserves(3, 54, "05/12/95"));
+        reserves.addElement(new Reserves(4, 43, "05/13/95"));
+        reserves.addElement(new Reserves(69, 34, "05/12/95"));
+        reserves.addElement(new Reserves(70, 25, "05/14/95"));
+        reserves.addElement(new Reserves(21, 15, "05/16/95"));
+        reserves.addElement(new Reserves(57, 2, "05/10/95"));
+        reserves.addElement(new Reserves(35, 1, "05/15/95"));
+
+
+
 //        sailors.addElement(new Sailor(73, "Prasoon Tiwari", 8, 39.2));
 //        sailors.addElement(new Sailor(39, "Anne Condon", 3, 30.3));
 //        sailors.addElement(new Sailor(47, "Charles Fischer", 6, 46.3));
@@ -108,21 +122,14 @@ class JoinsDriver implements GlobalConst {
         boats.addElement(new Boats(4, "Voyager", "green"));
         boats.addElement(new Boats(5, "Wisconsin", "red"));
 
-        reserves.addElement(new Reserves(5, 10, "05/10/95"));
-        reserves.addElement(new Reserves(2, 8, "05/11/95"));
-        reserves.addElement(new Reserves(1, 6, "05/11/95"));
-        reserves.addElement(new Reserves(3, 4, "05/12/95"));
-        reserves.addElement(new Reserves(4, 3, "05/13/95"));
-//        reserves.addElement(new Reserves(69, 4, "05/12/95"));
-//        reserves.addElement(new Reserves(69, 5, "05/14/95"));
-//        reserves.addElement(new Reserves(21, 5, "05/16/95"));
-//        reserves.addElement(new Reserves(57, 2, "05/10/95"));
-//        reserves.addElement(new Reserves(35, 3, "05/15/95"));
+
+
+
 
         boolean status = OK;
-        int numsailors = 5;
+        int numsailors = 10;
         int numsailors_attrs = 4;
-        int numreserves = 5;
+        int numreserves = 10;
         int numreserves_attrs = 3;
         int numboats = 5;
         int numboats_attrs = 3;
@@ -374,7 +381,7 @@ class JoinsDriver implements GlobalConst {
 
         TopK_NRAJoin join = new TopK_NRAJoin(Stypes, 4, Ssizes, joinAttr1,
                 mrgAttr1, Rtypes, 3, Rsizes, joinAttr2, mrgAttr2, "sailors.in",
-                "reserves.in", 2, 100);
+                "reserves.in", 6, 100);
 
     }
 
