@@ -2,6 +2,8 @@ package iterator;
 
 import global.RID;
 
+import java.util.Arrays;
+
 public class CandidateDetailsNRA {
     private RID ridRel1;
     private RID ridRel2;
@@ -78,4 +80,17 @@ public class CandidateDetailsNRA {
     public void setRelation2Seen(boolean relation2Seen) {
         this.relation2Seen = relation2Seen;
     }
+
+    @Override
+    public String toString() {
+        return "CandidateDetailsNRA{" +
+                "ridRel1=" + ridRel1 +
+                ", ridRel2=" + ridRel2 +
+                ", lowerBound=" + Arrays.toString(lowerBound) +
+                ", upperBound=" + Arrays.toString(upperBound) +
+                ", relation1Seen=" + relation1Seen +
+                ", relation2Seen=" + relation2Seen +
+                '}';
+    }
+
 }
