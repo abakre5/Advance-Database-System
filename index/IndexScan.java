@@ -1,6 +1,11 @@
 package index;
 
 import global.*;
+import hash.HashFile;
+import hash.HashIndexFileScan;
+import hash.HashUnclusteredFileScan;
+import hash.HashUnclustredScan;
+import hash.KeyDataEntry;
 import bufmgr.*;
 import diskmgr.*;
 import btree.*;
@@ -115,30 +120,60 @@ public class IndexScan extends Iterator {
 
                 break;
 
-            case IndexType.B_ClusteredIndex:
-                try {
-                    clusteredIndexFile = new BTreeClusteredFile(indName);
-                } catch (Exception e) {
-                    throw new IndexException(e, "IndexScan.java: BTreeFile exceptions caught from BTreeFile constructor");
+            // case IndexType.B_ClusteredIndex:
+            //     try {
+            //         clusteredIndexFile = new BTreeClusteredFile(indName);
+            //     } catch (Exception e) {
+            //         throw new IndexException(e, "IndexScan.java: BTreeFile exceptions caught from BTreeFile constructor");
+            //     }
+
+            //     try {
+            //        indScan = (BTClusteredFileScan) IndexUtils.BTreeClusteredScan(selects, clusteredIndexFile);
+            //     } catch (Exception e) {
+            //         throw new IndexException(e, "IndexScan.java: BTreeFile exceptions caught from IndexUtils.BTree_scan().");
+            //     }
+            //     break;
+            case IndexType.Hash:
+                try{
+                    hashIndexFile = new HashFile(indName);
+                } catch(Exception e){
+                    throw new IndexException(e, "IndexScan.java: BTreeFile exceptions caught from HashFile constructor");
                 }
 
                 try {
-                    indScan = (BTClusteredFileScan) IndexUtils.BTreeClusteredScan(selects, clusteredIndexFile);
-                } catch (Exception e) {
-                    throw new IndexException(e, "IndexScan.java: BTreeFile exceptions caught from IndexUtils.BTree_scan().");
+                    hashIndScan = (HashUnclusteredFileScan) IndexUtils.HashUnclusteredScan(hashIndexFile); 
+                } catch(Exception e) {
+                    throw new IndexException(e, "IndexScan.java: BTreeFile exceptions caught from HashFile scan");
                 }
-                break;
             case IndexType.None:
             default:
                 throw new UnknownIndexTypeException("Only BTree index is supported so far");
 
         }
-        this.isPageCompleted = true;
-        this.currentPage = new HFPage();
-        this.currentPageId =  new PageId();
-        this.currentRID = new RID();
+        //this.isPageCompleted = true;
+        // this.currentPage = new HFPage();
+        // this.currentPageId =  new PageId();
+        // this.currentRID = new RID();
 
     }
+
+    private Tuple get_next_hashindex()
+    throws IndexException,
+    UnknownKeyTypeException,
+    IOException {
+
+        hash.KeyDataEntry entry = null;
+        try {
+           entry = hashIndScan.get_next();
+        } catch(Exception e){
+            e.printStackTrace();
+        }
+        
+        return null;
+    }
+
+
+
 
     /**
      * returns the next tuple.
@@ -157,7 +192,7 @@ public class IndexScan extends Iterator {
             IOException {
         RID rid;
         int unused;
-        KeyDataEntry nextentry = null;
+        btree.KeyDataEntry nextentry = null;
 
         try {
             nextentry = indScan.get_next();
@@ -274,7 +309,7 @@ public class IndexScan extends Iterator {
             throws IndexException,
             UnknownKeyTypeException,
             IOException {
-        KeyDataEntry nextentry = null;
+        btree.KeyDataEntry nextentry = null;
 
         try
         {
@@ -293,6 +328,7 @@ public class IndexScan extends Iterator {
         //TODO:Pawan check if there is need to skip the records
         //while (nextentry != null)
         {
+        
             if(isPageCompleted)
             {
                 PageId pageId = ((ClusteredLeafData) nextentry.data).getData();
@@ -373,6 +409,8 @@ public class IndexScan extends Iterator {
            return get_next_btclusteredindex();
        }else if (index.indexType == IndexType.B_Index){
            return get_next_btindex();
+       } else if(index.indexType == IndexType.Hash) {
+           return get_next_hashindex();
        }
 
         return null;
@@ -411,6 +449,7 @@ public class IndexScan extends Iterator {
     public FldSpec[] perm_mat;
     private IndexFile indFile;
     private IndexFileScan indScan;
+    private HashIndexFileScan hashIndScan;
     private AttrType[] _types;
     private short[] _s_sizes;
     private CondExpr[] _selects;
@@ -424,6 +463,8 @@ public class IndexScan extends Iterator {
     private boolean index_only;
     private IndexType index;
     private ClusteredIndexFile clusteredIndexFile;
+    private HashFile hashIndexFile;
+    private HashUnclustredScan hashScan;
     //Flag used for clustered index iteration
     private boolean isPageCompleted;
     private RID currentRID;

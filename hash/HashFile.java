@@ -3,6 +3,9 @@ package hash;
 import java.io.*;
 import java.security.KeyException;
 import java.util.*;
+
+import javax.management.relation.InvalidRelationTypeException;
+
 import hash.FloatKey;
 import iterator.*;
 import diskmgr.*;
@@ -14,8 +17,8 @@ import iterator.TupleRIDPair;
 
 public class HashFile extends IndexFile implements GlobalConst {
 
-    private static short REC_LEN1 = 32;
-    private static short REC_LEN2 = 160;
+    short REC_LEN1 = 32;
+    short REC_LEN2 = 160;
     private int indexField;
     private String relationName;
     private Scan relationScan = null;
@@ -32,10 +35,12 @@ public class HashFile extends IndexFile implements GlobalConst {
     int total_records = 0;
     boolean is_crossed = false;
     Map<Integer,String> map = new HashMap<Integer,String>();
+   //Map<String, RID> FileRIDMap = new HashMap<String, RID>();
     Heapfile headerFile = null;
     int crossed =0;
     Heapfile datafile = null;
     String hashIndexName;
+    int N;
 
 
 
@@ -59,6 +64,7 @@ public class HashFile extends IndexFile implements GlobalConst {
         System.out.println(n);
         double buckets = Math.ceil(num_records / (n * threshold));
         num_buckets = (int) buckets;
+        N = num_buckets;
         System.out.println("Number of buckets : "+ num_buckets);
         
         
@@ -105,7 +111,7 @@ public class HashFile extends IndexFile implements GlobalConst {
         
         //Populate headerFile entries.
         for (Map.Entry<Integer, String> set : map.entrySet()) {
-		    System.out.println(set.getKey() + " = " + set.getValue());
+		    System.out.println(set.getKey() + " == " + set.getValue());
 
             try {
                 h.setIntFld(1, (int)set.getKey());
@@ -136,7 +142,7 @@ public class HashFile extends IndexFile implements GlobalConst {
             e.printStackTrace();
         }
         
-        AttrType[] attrTypes = new AttrType[5];
+        AttrType[] attrTypes = new AttrType[2];
         //short[] attrSize = new short[numAttribs];
         for (int i = 0; i < 2; ++i) {
             attrTypes[i] = new AttrType(AttrType.attrReal);
@@ -246,6 +252,27 @@ public class HashFile extends IndexFile implements GlobalConst {
         headerFile = new Heapfile(hashIndexName);
     }
 
+    public HashUnclusteredFileScan new_scan() {
+
+        HashUnclusteredFileScan scan = new HashUnclusteredFileScan();
+        scan.hfile = this;
+        scan.header = this.headerFile;
+        scan.header_names = new LinkedList<>();
+        try{
+            scan.scan = scan.header.openScan();
+            
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        try{
+            populateHeaderFileMap(scan.header_names);
+        } catch(Exception e) {
+            e.printStackTrace();
+        }
+        return scan;
+
+    }
+
     private FileScan getFileScan(String fname) throws IOException, FileScanException, TupleUtilsException, InvalidRelation {
         FileScan scan = null;
 
@@ -264,6 +291,25 @@ public class HashFile extends IndexFile implements GlobalConst {
         attrSize[1] = REC_LEN1;
        
         scan = new FileScan(fname, attrType, attrSize,(short)3,3, Pprojection, null);
+        return scan;
+    }
+
+    private FileScan getHeaderFileScan(String fname) throws IOException, FileScanException, TupleUtilsException, InvalidRelation {
+        FileScan scan = null;
+
+        FldSpec[] Pprojection = new FldSpec[2];
+        for (int i = 1; i <= 2; i++) {
+            Pprojection[i - 1] = new FldSpec(new RelSpec(RelSpec.outer), i);
+        }
+        attrType = new AttrType[2];
+        //short[] attrSize = new short[numAttribs];
+        attrType[0] = new AttrType(AttrType.attrInteger);
+        attrType[1] = new AttrType(AttrType.attrString);
+    
+        short[] attrSize = new short[1];
+        attrSize[0] = REC_LEN1;
+       
+        scan = new FileScan(fname, attrType, attrSize,(short)2,2, Pprojection, null);
         return scan;
     }
 
@@ -420,7 +466,8 @@ public class HashFile extends IndexFile implements GlobalConst {
 
             try {
                 headerFile.insertRecord(h.returnTupleByteArray());
-                //System.out.println("Header file updated");
+                System.out.println(h.getIntFld(1) + " mapped to " +h.getStrFld(2));
+                System.out.println("Header file updated");
             } catch (Exception e) {
                 e.printStackTrace();
             }
@@ -448,11 +495,11 @@ public class HashFile extends IndexFile implements GlobalConst {
                         int hash2_value = get_hash(value);
     
                         if(hash2_value == split_position) {
-                            System.out.println("Hashed to same file");
+                            //System.out.println("Hashed to same file");
                             hf1.insertRecord(tuple.getTupleByteArray());
     
                         } else {
-                            System.out.println("Hashed to new file");
+                            //System.out.println("Hashed to new file");
                             hf.insertRecord(tuple.getTupleByteArray());
                         }
                     } else {
@@ -473,16 +520,93 @@ public class HashFile extends IndexFile implements GlobalConst {
         map.put(split_position, FileName_orig_dash);
 
         split = false;
+       
+
+
+        //Add entry for bucket_num_dash in header file.
+        //Todo: Delete old headerfile.
+        h = wrapperForHeader();
+        try {
+            h.setIntFld(1, split_position);
+            h.setStrFld(2, FileName_orig_dash);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        try {
+            headerFile.insertRecord(h.returnTupleByteArray());
+            System.out.println(h.getIntFld(1) + " dashed mapped to " +h.getStrFld(2));
+            System.out.println("Header file updated for dash bucket");
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
         split_position++;
+        
         System.out.println("Crossed value : "+crossed);
+        try{
+            deleteHeaderFileEntry(orig_File);
+        } catch (Exception e){
+            e.printStackTrace();
+        }
     }   
 
 
     //Printing Index
 }
 
+    public void printheapfile(String hf) throws HFBufMgrException,HFDiskMgrException,HFException,IOException, TupleUtilsException,InvalidRelation,FileScanException,FieldNumberOutOfBoundException {
+        FileScan scan = getFileScan(hf);
+        try {
+        Tuple t = scan.get_next();
+        while (t!=null) {
+            System.out.println(t.getFloFld(1) + " " + t.getIntFld(2)+ " "+t.getIntFld(3));
+            t = scan.get_next();
+        }
+    } catch(Exception e) {
+        e.printStackTrace();
+    }
+        
+    }
+
+    public void deleteHeaderFileEntry(String Name) throws IOException, HFException,HFDiskMgrException,HFBufMgrException,InvalidTupleSizeException, 
+    FileScanException,TupleUtilsException,InvalidRelation {
+
+        Heapfile headerFile = new Heapfile(hashIndexName);
+        FileScan scan = getHeaderFileScan(hashIndexName);
+        TupleRIDPair r = null;
+        do {
+
+            try {
+                r = scan.get_next1();
+                if(r!=null) {
+
+                    Tuple tupleOuter = r.getTuple();
+                    RID ridOuter = r.getRID();
+                    Tuple diskTupleToCompare = new Tuple(tupleOuter);
+                   
+
+                    //System.out.println("Delete "+ Name + " "+ diskTupleToCompare.getStrFld(2));
+                    if(Name.equals(diskTupleToCompare.getStrFld(2))) {
+                        headerFile.deleteRecord(ridOuter);
+                        System.out.println("Header Deleted "+ diskTupleToCompare.getIntFld(1)+" "+diskTupleToCompare.getStrFld(2));
+                    }
+
+                } 
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        } while(r!=null);
+
+    }
 
 
+    public HashUnclustredScan new_scan(KeyClass key) throws IOException {
+
+
+
+
+        return null;
+    }
 
     //Debug function to print the index.
     public void printindex() throws IOException {
@@ -511,7 +635,7 @@ public class HashFile extends IndexFile implements GlobalConst {
                             attrType[i] = new AttrType(AttrType.attrReal);
                         }
                         current_tuple.setHdr((short)2, attrType, null);
-                        System.out.println("Data Tuple "+current_tuple.getFloFld(1) + " "+current_tuple.getFloFld(2));
+                        //System.out.println("Data Tuple "+current_tuple.getFloFld(1) + " "+current_tuple.getFloFld(2));
                         
                     }catch(Exception e){
                         e.printStackTrace();
@@ -529,6 +653,49 @@ public class HashFile extends IndexFile implements GlobalConst {
     } 
 
     public void  printHeaderFile() throws IOException, HFException, HFBufMgrException,HFDiskMgrException, InvalidTupleSizeException {
+       
+        Heapfile headerFile = new Heapfile(hashIndexName);
+        try {
+            System.out.println("Headerfile elements"+ headerFile.getRecCnt());
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        Scan scan = headerFile.openScan();
+        RID rid = new RID();
+        Tuple headerTuple = wrapperForHeader();
+        Tuple r = null;
+        do {
+
+            try {
+                r = (Tuple)scan.getNext(rid);
+                if(r!=null) {
+                    headerTuple = new Tuple(r.getTupleByteArray(), r.getOffset(), r.getLength());
+                    short[] attrSize = new short[1];
+        
+                    attrSize[0] = REC_LEN1;
+                    AttrType[] Ptypes = new AttrType[2];
+
+                    Ptypes[0] = new AttrType (AttrType.attrInteger);
+                    Ptypes[1] = new AttrType (AttrType.attrString);
+
+                    headerTuple.setHdr((short)2, Ptypes, attrSize);
+
+                    System.out.println("Header "+ headerTuple.getIntFld(1) + " "+ headerTuple.getStrFld(2));
+                    //printheapfile(headerTuple.getStrFld(2));
+                    // Heapfile hf = new Heapfile(headerTuple.getStrFld(2));
+                    // System.out.println(hf.getRecCnt());
+
+
+                } 
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        } while(r!=null);
+        System.out.println("Printed hashindex "+hashIndexName);
+
+    }
+
+    public void  populateHeaderFileMap(Queue<String> bucketNames) throws IOException, HFException, HFBufMgrException,HFDiskMgrException, InvalidTupleSizeException {
        
         Heapfile headerFile = new Heapfile(hashIndexName);
         Scan scan = headerFile.openScan();
@@ -551,7 +718,13 @@ public class HashFile extends IndexFile implements GlobalConst {
 
                     headerTuple.setHdr((short)2, Ptypes, attrSize);
 
-                    System.out.println("Header "+ headerTuple.getIntFld(1) + " "+ headerTuple.getStrFld(2));
+                    //System.out.println("Header "+ headerTuple.getIntFld(1) + " "+ headerTuple.getStrFld(2));
+                    //printheapfile(headerTuple.getStrFld(2));
+                    Heapfile hf = new Heapfile(headerTuple.getStrFld(2));
+                    //System.out.println(hf.getRecCnt());
+                    bucketNames.add(headerTuple.getStrFld(2));
+
+
                 } 
             } catch (Exception e) {
                 e.printStackTrace();
@@ -576,9 +749,9 @@ public class HashFile extends IndexFile implements GlobalConst {
     
     public int get_hash(Float value) {  
         if(split) {
-            return (value.hashCode() % (2*175));
+            return (value.hashCode() % (2*N));
         }
-        return (value.hashCode() % 175);
+        return (value.hashCode() % N);
     }
 
     public void HashFileTestFunct() throws IOException {

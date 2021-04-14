@@ -8,13 +8,18 @@ import java.time.*;
 import btree.BTreeFile;
 import btree.FloatKey;
 import btree.IndexFile;
+import btree.KeyDataEntry;
 import chainexception.ChainException;
 import diskmgr.Page;
 import diskmgr.PageCounter;
 import global.*;
 import heap.*;
+import index.IndexUtils;
 import iterator.*;
 import hash.HashFile;
+import hash.HashIndexFileScan;
+import hash.HashUnclusteredFileScan;
+import hash.UnclusteredHashData;
 
 class Args {
     String  skylineMethod;
@@ -676,11 +681,43 @@ class Ph2Driver extends TestDriver implements GlobalConst {
         } catch (Exception e) {
             e.printStackTrace();
         }
-    }while(count <=200);
+    }while(count <=377);
 
     try{
-        hf.printindex();
+        //hf.printindex();
+        System.out.println("=======================================================");
+        //hf.printHeaderFile();
     } catch (Exception e) {
+        e.printStackTrace();
+    }
+
+    //Scanner
+    int elem_count = 0;
+    HashIndexFileScan hashScan = new HashUnclusteredFileScan();
+    
+    try {
+    hashScan = (HashUnclusteredFileScan)IndexUtils.HashUnclusteredScan(hf);
+    hash.KeyDataEntry entry = hashScan.get_next();
+        while(entry!=null) {
+            if(entry!=null) {
+            RID fetchRID = entry.data;
+            //System.out.println("Output :"+fetchRID.pageNo.pid + " "+fetchRID.slotNo);
+            Tuple t = dbHeapFile.getRecord(fetchRID);
+            Tuple current_tuple = new Tuple(t.getTupleByteArray(), t.getOffset(),t.getLength());
+            attrType = new AttrType[2];
+            //short[] attrSize = new short[numAttribs];
+            for (int i = 0; i < 2; ++i) {
+                attrType[i] = new AttrType(AttrType.attrReal);
+            }
+            current_tuple.setHdr((short)2, attrType, null);
+
+            //System.out.println(current_tuple.getFloFld(1) + " " + current_tuple.getFloFld(2));
+            elem_count++;
+            }
+            entry = hashScan.get_next();
+        }
+        System.out.println("Total elements scanned "+ elem_count);
+    } catch(Exception e) {
         e.printStackTrace();
     }
     return true;
