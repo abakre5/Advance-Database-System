@@ -2,9 +2,10 @@ package tests;
 
 
 import btree.*;
+import diskmgr.Page;
 import global.*;
 import heap.*;
-import index.IndexScan;
+import index.*;
 import iterator.*;
 
 import java.io.*;
@@ -146,6 +147,7 @@ class BTreeClusteredDriver extends TestDriver implements GlobalConst {
         Heapfile tempFile = null;
         String tempFileName = "unsorted_data.in";
         String heapFile = "BTreeClustered.in";
+        String indexFile  = "BTreeClusteredIndex" ;
         try {
             f = new Heapfile(heapFile);
             tempFile = new Heapfile(tempFileName);
@@ -166,7 +168,7 @@ class BTreeClusteredDriver extends TestDriver implements GlobalConst {
             e.printStackTrace();
         }
 
-        try (BufferedReader br = new BufferedReader(new FileReader("data3.txt")))
+        try (BufferedReader br = new BufferedReader(new FileReader("data2.txt")))
         {
             String line;
             boolean flag = false;
@@ -283,7 +285,7 @@ class BTreeClusteredDriver extends TestDriver implements GlobalConst {
         BTreeClusteredFile btf = null;
         try
         {
-            btf = new BTreeClusteredFile("BTreeClusteredIndex", AttrType.attrReal, REC_LEN1, 1/*delete*/);
+            btf = new BTreeClusteredFile(indexFile, AttrType.attrReal, REC_LEN1, 1/*delete*/);
         } catch (Exception e)
         {
             status = FAIL;
@@ -366,15 +368,47 @@ class BTreeClusteredDriver extends TestDriver implements GlobalConst {
         }
 
         System.out.println("BTree Clustered Index created successfully.\n");
+
         try
         {
-            BT.printBTree(btf.getHeaderPage());
-            BT.printAllLeafPages(btf.getHeaderPage());
+           BT.printBTree(btf.getHeaderPage());
+           BT.printAllLeafPages(btf.getHeaderPage());
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        System.out.println("----------Printing data using index scan on clustered btree index----------.\n");
+        IndexScan indexScan = null;
+        try {
+           indexScan = new IndexScan(new IndexType(IndexType.B_ClusteredIndex), heapFile, indexFile, Ptypes, attrSize, 5,5, Pprojection,null,1,false);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        Tuple indexTuple = null;
+
+        try {
+            indexTuple = indexScan.get_next();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+
+        try
+        {
+            while(indexTuple != null)
+            {
+                t = new Tuple(indexTuple.getTupleByteArray(), indexTuple.getOffset(), indexTuple.getLength());
+                t.setHdr((short) 5, Ptypes, attrSize);
+                System.out.println(t.getFloFld(1) + "\t" + t.getFloFld(2) + "\t" +t.getFloFld(3) + "\t"+t.getFloFld(4) + "\t"+t.getFloFld(5));
+                indexTuple = indexScan.get_next();
+            }
         } catch (Exception e)
         {
             e.printStackTrace();
             Runtime.getRuntime().exit(1);
         }
+
 
         try
         {

@@ -1705,11 +1705,10 @@ public class BTreeClusteredFile extends ClusteredIndexFile
         scan.curRid = new RID();
         scan.keyType = headerPage.get_keyType();
         scan.maxKeysize = headerPage.get_maxKeySize();
-        //TODO: Pawan
-       // scan.bfile = this;
+        scan.bfile = this;
 
         //this sets up scan at the starting position, ready for iteration
-        //scan.leafPage = findRunStart(lo_key, scan.curRid);
+        scan.leafPage = findRunStart(lo_key, scan.curRid);
         return scan;
     }
 

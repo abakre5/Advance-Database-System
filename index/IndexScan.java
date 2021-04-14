@@ -9,6 +9,8 @@ import heap.*;
 
 import java.io.*;
 
+import static global.GlobalConst.INVALID_PAGE;
+
 //TODO:Pawan add type in index scan
 /**
  * Index Scan iterator will directly access the required tuple using
@@ -64,7 +66,7 @@ public class IndexScan extends Iterator {
         AttrType[] Jtypes = new AttrType[noOutFlds];
         short[] ts_sizes;
         Jtuple = new Tuple();
-
+//
         try {
             ts_sizes = TupleUtils.setup_op_tuple(Jtuple, Jtypes, types, noInFlds, str_sizes, outFlds, noOutFlds);
         } catch (TupleUtilsException e) {
@@ -131,6 +133,10 @@ public class IndexScan extends Iterator {
                 throw new UnknownIndexTypeException("Only BTree index is supported so far");
 
         }
+        this.isPageCompleted = true;
+        this.currentPage = new HFPage();
+        this.currentPageId =  new PageId();
+        this.currentRID = new RID();
 
     }
 
@@ -145,7 +151,7 @@ public class IndexScan extends Iterator {
      * @throws UnknownKeyTypeException key type unknown
      * @throws IOException             from the lower layer
      */
-    public Tuple get_next_btindex()
+    private Tuple get_next_btindex()
             throws IndexException,
             UnknownKeyTypeException,
             IOException {
@@ -264,87 +270,70 @@ public class IndexScan extends Iterator {
         return null;
     }
 
-    public Tuple get_next_btclusteredindex()
+    private Tuple get_next_btclusteredindex()
             throws IndexException,
             UnknownKeyTypeException,
             IOException {
-        RID rid;
-        int unused;
         KeyDataEntry nextentry = null;
 
-        try {
-            nextentry = indScan.get_next();
+        try
+        {
+            if(isPageCompleted)
+            {
+                nextentry = indScan.get_next();
+                if(nextentry == null)
+                {
+                    return null;
+                }
+            }
         } catch (Exception e) {
             throw new IndexException(e, "IndexScan.java: BTree error");
         }
 
-        while (nextentry != null) {
-            if (index_only) {
-                // only need to return the key
-
-                AttrType[] attrType = new AttrType[1];
-                short[] s_sizes = new short[1];
-
-                if (_types[_fldNum - 1].attrType == AttrType.attrInteger) {
-                    attrType[0] = new AttrType(AttrType.attrInteger);
-                    try {
-                        Jtuple.setHdr((short) 1, attrType, s_sizes);
-                    } catch (Exception e) {
-                        throw new IndexException(e, "IndexScan.java: Heapfile error");
-                    }
-
-                    try {
-                        Jtuple.setIntFld(1, ((IntegerKey) nextentry.key).getKey().intValue());
-                    } catch (Exception e) {
-                        throw new IndexException(e, "IndexScan.java: Heapfile error");
-                    }
-                }else if(_types[_fldNum - 1].attrType == AttrType.attrReal) {
-                    attrType[0] = new AttrType(AttrType.attrReal);
-                    try {
-                        Jtuple.setHdr((short) 1, attrType, s_sizes);
-                    } catch (Exception e) {
-                        throw new IndexException(e, "IndexScan.java: Heapfile error");
-                    }
-
-                    try {
-                        Jtuple.setFloFld(1, ((FloatKey) nextentry.key).getKey().floatValue());
-                    } catch (Exception e) {
-                        throw new IndexException(e, "IndexScan.java: Heapfile error");
-                    }
+        //TODO:Pawan check if there is need to skip the records
+        //while (nextentry != null)
+        {
+            if(isPageCompleted)
+            {
+                PageId pageId = ((ClusteredLeafData) nextentry.data).getData();
+                //since page is entirely read, pin next page.
+                if(pageId == null)
+                {
+                    return null;
                 }
-                else if (_types[_fldNum - 1].attrType == AttrType.attrString) {
 
-                    attrType[0] = new AttrType(AttrType.attrString);
-                    // calculate string size of _fldNum
-                    int count = 0;
-                    for (int i = 0; i < _fldNum; i++) {
-                        if (_types[i].attrType == AttrType.attrString)
-                            count++;
-                    }
-                    s_sizes[0] = _s_sizes[count - 1];
-
-                    try {
-                        Jtuple.setHdr((short) 1, attrType, s_sizes);
-                    } catch (Exception e) {
-                        throw new IndexException(e, "IndexScan.java: Heapfile error");
-                    }
-
-                    try {
-                        Jtuple.setStrFld(1, ((StringKey) nextentry.key).getKey());
-                    } catch (Exception e) {
-                        throw new IndexException(e, "IndexScan.java: Heapfile error");
-                    }
-                } else {
-                    // attrReal not supported for now
-                    throw new UnknownKeyTypeException("Only Integer and String keys are supported so far");
+                currentPageId.pid = pageId.pid;
+                RID datapageRid =  new RID();
+                try {
+                    SystemDefs.JavabaseBM.pinPage(pageId, (Page)currentPage, false);
+                    datapageRid = currentPage.firstRecord();
+                } catch (Exception e) {
+                    //  System.err.println("SCAN: Error in 1stdatapg 3 " + e);
+                    e.printStackTrace();
                 }
-                return Jtuple;
+
+                if(datapageRid!= null){
+                    currentRID = new RID();
+                    currentRID.pageNo.pid = datapageRid.pageNo.pid;
+                    currentRID.slotNo = datapageRid.slotNo;
+                }
+
+                //One entry in clustered index points to a page. first read all the tuples from
+                //already fetched page and then allow to read next entry from index
+                isPageCompleted = false;
             }
 
-            // not index_only, need to return the whole tuple
-            rid = ((LeafData) nextentry.data).getData();
-            try {
-                tuple1 = f.getRecord(rid);
+            try
+            {
+                tuple1 = currentPage.getRecord(currentRID);
+                currentRID = currentPage.nextRecord(currentRID);
+                if (currentRID == null)
+                {
+                    //unpin current page and set flag to fetch next page in index
+                    SystemDefs.JavabaseBM.unpinPage(currentPageId, false);
+                    isPageCompleted = true;
+                    currentPageId.pid = INVALID_PAGE;
+                }
             } catch (Exception e) {
                 throw new IndexException(e, "IndexScan.java: getRecord failed");
             }
@@ -373,11 +362,6 @@ public class IndexScan extends Iterator {
                 return Jtuple;
             }
 
-            try {
-                nextentry = indScan.get_next();
-            } catch (Exception e) {
-                throw new IndexException(e, "IndexScan.java: BTree error");
-            }
         }
 
         return null;
@@ -440,5 +424,10 @@ public class IndexScan extends Iterator {
     private boolean index_only;
     private IndexType index;
     private ClusteredIndexFile clusteredIndexFile;
+    //Flag used for clustered index iteration
+    private boolean isPageCompleted;
+    private RID currentRID;
+    private PageId currentPageId;
+    private HFPage currentPage;
 }
 
