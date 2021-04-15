@@ -74,7 +74,7 @@ public class TopK_NRAJoin {
             // if given relation does not have clustered index then return zero
         } else {
             TupleRIDPair tupleRIDRelation1 = relation1.get_next1();
-            TupleRIDPair tupleRIDeRelation2 = relation2.get_next1();
+            TupleRIDPair tupleRIDRelation2 = relation2.get_next1();
 
 
             Heapfile f = new Heapfile(relationName1);
@@ -83,38 +83,63 @@ public class TopK_NRAJoin {
 //            System.out.println(" " + tupleRelation1.getIntFld(1) + " " +  tupleRelation1.getStrFld(2) + " " + tupleRelation1.getIntFld(3) + " " + tupleRelation1.getFloFld(4));
 //            System.out.println(" " + tupleRelation2.getIntFld(1) + " " +  tupleRelation2.getIntFld(2) + " " + tupleRelation2.getStrFld(3) );
 
-            while (tupleRIDRelation1 != null) {
-                Tuple tupleRelation1 = tupleRIDRelation1.getTuple();
-                Tuple tupleRelation2 = tupleRIDeRelation2.getTuple();
+            while (tupleRIDRelation1 != null || tupleRIDRelation2 != null) {
+                Tuple tupleRelation1;
+                Tuple tupleRelation2;
+                if (tupleRIDRelation1 != null) {
+                    tupleRelation1 = tupleRIDRelation1.getTuple();
+                    AttrType x = in1[joinAttr1.offset - 1];
+                    switch (x.attrType) {
+                        case attrString:
+                            //return "attrString";
+                            break;
+                        case attrInteger:
+                            joinAttributeValue1 = (float) tupleRelation1.getIntFld(joinAttr1.offset);
+                            break;
+                        case attrReal:
+                            joinAttributeValue1 = tupleRelation1.getFloFld(joinAttr1.offset);
+                            break;
+                    }
+
+                    AttrType y = in1[mergeAttr1.offset - 1];
+                    switch (y.attrType) {
+                        case attrInteger:
+                            mergeAttributeValue1 = tupleRelation1.getIntFld(mergeAttr1.offset);
+                            break;
+                        case attrReal:
+                            mergeAttributeValue1 = tupleRelation1.getFloFld(mergeAttr1.offset);
+                            break;
+                    }
+                }
+                if (tupleRIDRelation2 != null) {
+                    tupleRelation2 = tupleRIDRelation2.getTuple();
+                    AttrType x = in1[joinAttr1.offset - 1];
+                    switch (x.attrType) {
+                        case attrString:
+                            //return "attrString";
+                            break;
+                        case attrInteger:
+                            joinAttributeValue2 = (float) tupleRelation2.getIntFld(joinAttr2.offset);
+                            break;
+                        case attrReal:
+                            joinAttributeValue2 = tupleRelation2.getFloFld(joinAttr2.offset);
+                            break;
+                    }
+
+                    AttrType y = in1[mergeAttr1.offset - 1];
+                    switch (y.attrType) {
+                        case attrInteger:
+                            mergeAttributeValue2 = tupleRelation2.getIntFld(mergeAttr2.offset);
+                            break;
+                        case attrReal:
+                            mergeAttributeValue2 = tupleRelation2.getFloFld(mergeAttr2.offset);
+                            break;
+                    }
+                }
                 relation1TuplePartOfCandidateList = false;
                 relation2TuplePartOfCandidateList = false;
 
-                AttrType x = in1[joinAttr1.offset - 1];
-                switch (x.attrType) {
-                    case attrString:
-                        //return "attrString";
-                        break;
-                    case attrInteger:
-                        joinAttributeValue1 = (float) tupleRelation1.getIntFld(joinAttr1.offset);
-                        joinAttributeValue2 = (float) tupleRelation2.getIntFld(joinAttr2.offset);
-                        break;
-                    case attrReal:
-                        joinAttributeValue1 = tupleRelation1.getFloFld(joinAttr1.offset);
-                        joinAttributeValue2 = tupleRelation2.getFloFld(joinAttr2.offset);
-                        break;
-                }
 
-                AttrType y = in1[mergeAttr1.offset - 1];
-                switch (y.attrType) {
-                    case attrInteger:
-                        mergeAttributeValue1 = tupleRelation1.getIntFld(mergeAttr1.offset);
-                        mergeAttributeValue2 = tupleRelation2.getIntFld(mergeAttr2.offset);
-                        break;
-                    case attrReal:
-                        mergeAttributeValue1 = tupleRelation1.getFloFld(mergeAttr1.offset);
-                        mergeAttributeValue2 = tupleRelation2.getFloFld(mergeAttr2.offset);
-                        break;
-                }
 
 //                System.out.println("\n join Attr 1 : " + joinAttributeValue1 + "merge Attr 1 : " + mergeAttributeValue1 +
 //                        "\n join Attr 2 : " + joinAttributeValue2 + "merge Attr 2 : " + mergeAttributeValue2 );
@@ -158,7 +183,7 @@ public class TopK_NRAJoin {
 //                            candidateDetailsNRAReal.getUpperBound()[0] +" " +candidateDetailsNRAReal.getUpperBound()[1]);
 //                }
 
-                Set<CandidateDetailsNRAReal> duplicateCandidate2 = checkTupleWithTopKCandidate2(joinAttributeValue2, mergeAttributeValue2, tupleRIDeRelation2.getRID());
+                Set<CandidateDetailsNRAReal> duplicateCandidate2 = checkTupleWithTopKCandidate2(joinAttributeValue2, mergeAttributeValue2, tupleRIDRelation2.getRID());
 
                 if (duplicateCandidate2.size() > 0) {
                     for (CandidateDetailsNRAReal candidateDetailsNRAReal : duplicateCandidate2) {
@@ -174,7 +199,7 @@ public class TopK_NRAJoin {
 
                 if (!relation2TuplePartOfCandidateList) {
                     //DOn't use default value as 1000 for upper bound use value of first tuple if complementry relation. - solved.
-                    CandidateDetailsNRAReal tmp = new CandidateDetailsNRAReal(null, tupleRIDeRelation2.getRID(), new float[]{0, mergeAttributeValue2}, new float[]{mergeAttributeValue1, mergeAttributeValue2}, false, true, joinAttributeValue2);
+                    CandidateDetailsNRAReal tmp = new CandidateDetailsNRAReal(null, tupleRIDRelation2.getRID(), new float[]{0, mergeAttributeValue2}, new float[]{mergeAttributeValue1, mergeAttributeValue2}, false, true, joinAttributeValue2);
                     addToTopKCandidateIndexList(topKCandidate.size(), tmp.getLowerBound(), tmp.getUpperBound());
                     topKCandidate.add(tmp);
                 }
@@ -184,77 +209,50 @@ public class TopK_NRAJoin {
 
 
                 topKCandidateIndexList.sort((o1, o2) -> o2.get(0).compareTo(o1.get(0)));
-                List<CandidateDetailsNRAReal> topK = new ArrayList<>();
 
                 if (topKCandidateIndexList.size() > k) {
                     if (topKCandidateIndexList.get(k - 1).get(0) > mergeAttributeValue1 + mergeAttributeValue2 && !containsDuplicates) {
-                        int i = 0;
-                        int count = 0;
-                        for (ArrayList<Float> candidate : topKCandidateIndexList) {
-                            int index = candidate.get(2).intValue();
-                            if (topKCandidate.get(index).getRidRel1() == null || topKCandidate.get(index).getRidRel2() == null) {
-                                i++;
-                            }
-                            count++;
-                            if (count == k+i)
-                                break;
-                        }
-
-                        if (topKCandidateIndexList.get(k +i - 1).get(0) > mergeAttributeValue1 + mergeAttributeValue2){
-                            int counter = 1;
-                            for (ArrayList<Float> candidate : topKCandidateIndexList) {
-                                int index = candidate.get(2).intValue();
-                                if (topKCandidate.get(index).getRidRel1() != null && topKCandidate.get(index).getRidRel2() != null){
-                                    topK.add(topKCandidate.get(index));
-                                    Tuple t1 = relation1.fetchRecord(topKCandidate.get(index).getRidRel1());
-                                    Tuple rid_tuple = new Tuple(t1.getTupleByteArray(), t1.getOffset(), t1.getLength());
-                                    rid_tuple.setHdr((short) in1.length, in1, t1_str_sizes);
-                                    System.out.println("Printed tuple for t1 : " + rid_tuple.getLength() + " " + rid_tuple.getIntFld(1) + " " + rid_tuple.getStrFld(2) + " " + rid_tuple.getIntFld(3) + " " + rid_tuple.getFloFld(4));
-
-//                                    System.out.println("RID for tuple 2 : " + topKCandidate.get(index).getRidRel2() + " " + topKCandidate.get(index).getRidRel2());
-                                    Tuple t2 = relation2.fetchRecord(topKCandidate.get(index).getRidRel2());
-                                    Tuple rid_tuple2 = new Tuple(t2.getTupleByteArray(), t2.getOffset(), t2.getLength());
-                                    rid_tuple2.setHdr((short) in2.length, in2, t2_str_sizes);
-                                    System.out.println("Printed tuple for tuple 2  : " + rid_tuple2.getLength() + " " + rid_tuple2.getIntFld(1) + " " + rid_tuple2.getIntFld(2) + " " + rid_tuple2.getStrFld(3));
-
-                                    if (counter == k) {
-                                        break;
-                                    }
-                                    counter++;
-                                }
-
-                            }
-                        }
+                        System.out.println("Found top K without iterating over entire relation.");
+                        break;
                     }
                 }
-
                 tupleRIDRelation1 = relation1.get_next1();
-                tupleRIDeRelation2 = relation2.get_next1();
+                tupleRIDRelation2 = relation2.get_next1();
 
-                if (topK.size() > 0) {
-                    System.out.println("found Top k");
-                    break;
-                }
-                System.out.println("ggggggggggggggggggggggggggggggggggggggggggggggggggggggggggg : " + topKCandidate.size());
+                System.out.println("Number of elements in the candidate list : " + topKCandidate.size());
             }
-            int counter = 1;
-//            for (CandidateDetailsNRAReal candidate : topKCandidate) {
-//                System.out.println(candidate);
-//
-//            }
 
+            int counter = 1;
             for (ArrayList<Float> candidate : topKCandidateIndexList) {
                 int index = candidate.get(2).intValue();
-
-                Tuple t1 = relation1.fetchRecord(topKCandidate.get(index).getRidRel1());
+                Tuple t1 = new Tuple();
+                try {
+                    t1.setHdr((short) in1.length, in1, t1_str_sizes);
+                } catch (Exception e) {
+                    System.err.println("*** error in Tuple.setHdr() ***");
+                    e.printStackTrace();
+                }
+                if (topKCandidate.get(index).getRidRel1() != null) {
+                    t1 = relation1.fetchRecord(topKCandidate.get(index).getRidRel1());
+                }
                 Tuple rid_tuple = new Tuple(t1.getTupleByteArray(), t1.getOffset(), t1.getLength());
                 rid_tuple.setHdr((short) in1.length, in1, t1_str_sizes);
-                System.out.println("after full scan Printed tuple for t1 : " + rid_tuple.getLength() + " " + rid_tuple.getIntFld(1) + " " + rid_tuple.getStrFld(2) + " " + rid_tuple.getIntFld(3) + " " + rid_tuple.getFloFld(4));
+                System.out.println("Printed tuple for t1 : " + rid_tuple.getLength() + " " + rid_tuple.getIntFld(1) + " " + rid_tuple.getStrFld(2) + " " + rid_tuple.getIntFld(3) + " " + rid_tuple.getFloFld(4));
+                Tuple t2 = new Tuple();
+                try {
+                    t2.setHdr((short) in1.length, in1, t1_str_sizes);
+                } catch (Exception e) {
+                    System.err.println("*** error in Tuple.setHdr() ***");
+                    e.printStackTrace();
+                }
+                if (topKCandidate.get(index).getRidRel2() != null) {
+//                                    System.out.println("RID for tuple 2 : " + topKCandidate.get(index).getRidRel2() + " " + topKCandidate.get(index).getRidRel2());
+                    t2 = relation2.fetchRecord(topKCandidate.get(index).getRidRel2());
 
-                Tuple t2 = relation2.fetchRecord(topKCandidate.get(index).getRidRel2());
+                }
                 Tuple rid_tuple2 = new Tuple(t2.getTupleByteArray(), t2.getOffset(), t2.getLength());
                 rid_tuple2.setHdr((short) in2.length, in2, t2_str_sizes);
-                System.out.println("after full scan Printed tuple for tuple 2  : " + rid_tuple2.getLength() + " " + rid_tuple2.getIntFld(1) + " " + rid_tuple2.getIntFld(2) + " " + rid_tuple2.getStrFld(3));
+                System.out.println("Printed tuple for tuple 2  : " + rid_tuple2.getLength() + " " + rid_tuple2.getIntFld(1) + " " + rid_tuple2.getIntFld(2) + " " + rid_tuple2.getStrFld(3));
 
                 if (counter == k) {
                     break;
