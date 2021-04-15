@@ -17,8 +17,8 @@ public class AttrDesc {
     public AttrType attrType;                    // attribute type
     public int attrLen = 0;                     // attribute length
     public int indexCnt = 0;                    // number of indexes
-    public attrData minVal;                      // min max key values
-    public attrData maxVal;
+    public attrData minVal = new attrData();                      // min max key values
+    public attrData maxVal = new attrData();
 
 };
 

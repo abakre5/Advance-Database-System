@@ -44,14 +44,6 @@ public class Phase3Driver implements GlobalConst {
         return prevCmd;
     }
 
-    private void printTuple(Tuple t) throws Exception {
-        int num_fields = t.noOfFlds();
-        for (int i=0; i < num_fields; ++i) {
-            System.out.printf("%f ", t.getFloFld(i+1));
-        }
-        System.out.println("");
-    }
-
     private void printReadAndWrites() {
         System.out.println("Number of pages read: " + PageCounter.getReadCounter());
         System.out.println("Number of pages written: " + PageCounter.getWriteCounter());
@@ -93,15 +85,9 @@ public class Phase3Driver implements GlobalConst {
     }
     private static boolean closeDB() {
         boolean status = OK;
-        try {
-            SystemDefs.JavabaseBM.flushAllPages();
-        } catch (PagePinnedException e) {
 
-        } catch (Exception e) {
-            e.printStackTrace();
-            status = FAIL;
-        }
-
+        flushToDisk();
+        
         try {
             SystemDefs.JavabaseDB.closeDB();
         } catch (IOException e) {
@@ -225,6 +211,7 @@ public class Phase3Driver implements GlobalConst {
             } catch (Exception e) {
                 status = FAIL;
                 e.printStackTrace();
+                return status;
             }
 
             /* if query is create_table, create relation catalog */
@@ -358,14 +345,16 @@ public class Phase3Driver implements GlobalConst {
             }
             System.out.printf("Number of tuples added to table '%s': %d\n", tableName, num_tuples);
 
-        }
-        catch (IOException e) {
+        } catch (FileNotFoundException e) {
+            status = FAIL;
+            System.err.println("*** error: datafile not found");
+        } catch (IOException e) {
             status = FAIL;
             e.printStackTrace();
         }
         return status;
     }
-    private static boolean createTable(int indexType, String tableName, String filename) {
+    private static boolean createTable(String tableName, int indexType, int indexAttr, String filename) {
         boolean status = OK;
 
         status = readDataIntoHeapFile(tableName, filename, true);
@@ -380,6 +369,23 @@ public class Phase3Driver implements GlobalConst {
         }
 
         /* flush pages to disk */
+        status = flushToDisk();
+        System.out.println();
+
+        return status;
+    }
+    private static boolean insertIntoTable(String tableName, String fileName) {
+        boolean status = readDataIntoHeapFile(tableName, fileName, false);
+        if (status) {
+            /* flush pages to disk */
+            status = flushToDisk();
+            System.out.println();
+        }
+        return status;
+    }
+
+    private static boolean flushToDisk() {
+        boolean status = OK;
         try {
             SystemDefs.JavabaseBM.flushAllPages();
         } catch(PagePinnedException e){
@@ -389,27 +395,194 @@ public class Phase3Driver implements GlobalConst {
             e.printStackTrace();
             status = FAIL;
         }
-        System.out.println();
-
         return status;
     }
-    private static boolean insertIntoTable(String tableName, String fileName) {
-        boolean status = readDataIntoHeapFile(tableName, fileName, false);
-        if (status) {
-            /* flush pages to disk */
-            try {
-                SystemDefs.JavabaseBM.flushAllPages();
-            } catch(PagePinnedException e){
+    private static boolean deleteFromTable(String tableName, String fileName) {
+        boolean status = OK;
+        int numAttribs;
+        AttrType[] attrTypes;
+        String[] schemaInfo;
+        Heapfile tableFile = null;
+        Scan scan = null;
+        Tuple t = new Tuple();
+        int numDelTuples = 0;
+        List<Tuple> delTuples = new ArrayList<Tuple>();
 
+        try (BufferedReader br = new BufferedReader(new FileReader(fileName))) {
+            String line;
+            line = br.readLine();
+            /* Get the number of attributes from first line of input data file */
+            numAttribs = Integer.parseInt(line.trim());
+            //System.out.println("Number of data attributes: " + numAttribs);
+            attrTypes = new AttrType[numAttribs];
+
+            /*
+             * attrInfo[0] = attribute NAME
+             * attrInfo[1] - attribute TYPE (STR/INT)
+             */
+            String[] fieldNames = new String[numAttribs];
+            String[] attrInfo;
+            schemaInfo = new String[numAttribs];
+            int numStringAttr = 0;
+            for (int i = 0; i < numAttribs; ++i) {
+                schemaInfo[i] = br.readLine().trim();
+                attrInfo = schemaInfo[i].split("\\s+");
+                fieldNames[i] = attrInfo[0];
+
+                if (attrInfo[1].equalsIgnoreCase("INT")) {
+                    attrTypes[i] = new AttrType(AttrType.attrInteger);
+                } else {
+                    attrTypes[i] = new AttrType(AttrType.attrString);
+                    numStringAttr++;
+                }
+            }
+            System.out.println("delete_data_schema" + Arrays.toString(schemaInfo));
+
+            short[] strSizes = new short[numStringAttr];
+            for (int i = 0; i < strSizes.length; ++i) {
+                strSizes[i] = STR_SIZE;
+            }
+
+
+            try {
+                t.setHdr((short) numAttribs, attrTypes, strSizes);
             } catch (Exception e) {
-                System.err.println("*** error flushing pages to disk");
+                status = FAIL;
+                e.printStackTrace();
+                return  status;
+            }
+
+            /*
+             * ensure data file schema matches relation
+             * catalog before adding rows
+             */
+            RelDesc record = new RelDesc();
+            try {
+                ExtendedSystemDefs.MINIBASE_RELCAT.getInfo(tableName, record);
+            } catch (Catalogrelnotfound e) {
+                System.err.printf("*** error relation '%s' not found\n", tableName);
+                status = FAIL;
+                return status;
+            } catch (Exception e) {
+                e.printStackTrace();
+                return FAIL;
+            }
+
+            /* number of attributes as per catalog */
+            int numAttrCat;
+            AttrDesc[] attrs = new AttrDesc[numAttribs];
+            try {
+                numAttrCat = ExtendedSystemDefs.MINIBASE_ATTRCAT.getRelInfo(tableName, 0, attrs);
+                /* if number of attributes from datafile doesn't match catalog */
+                if (numAttrCat != numAttribs) {
+                    System.err.println("*** error: schema datafile and relation schema mismatch");
+                    return FAIL;
+                }
+            } catch (Catalogindexnotfound e) {
+                System.err.printf("*** error relation '%s' mismatch\n", tableName);
+                return FAIL;
+            } catch (Exception e) {
+                System.err.println("*** error " + e);
                 e.printStackTrace();
                 status = FAIL;
+                return status;
             }
-            System.out.println();
+
+            /* check if datafile schema matches catalog schema */
+            int idx;
+            for (int i = 0; i < numAttrCat; ++i) {
+                idx = attrs[i].attrPos - 1;
+                if (attrTypes[idx].attrType != attrs[i].attrType.attrType ||
+                        fieldNames[idx].equalsIgnoreCase(attrs[i].attrName) == false) {
+                    System.err.println("*** error: schema datafile and relation schema mismatch");
+                    return FAIL;
+                }
+            }
+
+            try {
+                tableFile = new Heapfile(tableName);
+                scan = tableFile.openScan();
+            } catch (Exception e) {
+                System.err.println("*** error creating Heapfile/scan");
+                e.printStackTrace();
+                status = FAIL;
+                return status;
+            }
+
+            while ((line = br.readLine()) != null) {
+                /* read each line from the file, create tuple, and insert into DB */
+                String row[] = line.trim().split("\\s+");
+                //System.out.println(Arrays.toString(row));
+
+                for (int i=0; i < numAttribs; ++i) {
+                    try {
+                        if (attrTypes[i].attrType == AttrType.attrInteger) {
+                            t.setIntFld(i + 1, Integer.parseInt(row[i]));
+                        } else {
+                            t.setStrFld(i + 1, row[i]);
+                        }
+                    }
+                    catch (Exception e) {
+                        System.err.println("*** Heapfile error in Tuple.setFloFld() ***");
+                        status = FAIL;
+                        e.printStackTrace();
+                    }
+                }
+                /* insert tuple into a list */
+                delTuples.add(new Tuple(t));
+            }
+            numDelTuples = delTuples.size();
+            if (numDelTuples == 0) {
+                return OK;
+            }
+            System.out.printf("Number of tuples in delete file %d\n", numDelTuples);
+
+        } catch (FileNotFoundException e) {
+            status = FAIL;
+            System.err.println("*** error: datafile not found");
+        } catch (IOException e) {
+            status = FAIL;
+            e.printStackTrace();
         }
+        if (status == FAIL) {
+            return status;
+        }
+
+        /* iterate through table heapfile, delete a tuple
+         * if it's present in delTuples list
+         */
+        RID rid = new RID();
+        Tuple temp;
+        boolean tupleDel = false;
+        int numRowsDeleted = 0;
+        try {
+            while (!delTuples.isEmpty() && status && ((temp = scan.getNext(rid)) != null)) {
+                t.tupleCopy(temp);
+                if (delTuples.isEmpty()) {
+                    break;
+                }
+                //System.err.println("tuple(rid=" + rid.hashCode() + ") equality: " + t.equals(delTuples.get(0)));
+                if (delTuples.contains(t)) {
+                    tupleDel = tableFile.deleteRecord(rid);
+                    delTuples.remove(t);
+                    numRowsDeleted++;
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("*** error: " + e);
+            e.printStackTrace();
+            status = FAIL;
+        }
+
+        if (status && (numRowsDeleted != 0)) {
+            /* flush pages to disk */
+            status = flushToDisk();
+        }
+        System.out.printf("Deleted %d rows from table '%s'\n", numRowsDeleted, tableName);
+
         return status;
     }
+
     private static void printTuple(Tuple t, AttrType[] attrTypes) {
 
         for (int i = 0; i < t.noOfFlds(); ++i) {
@@ -603,6 +776,11 @@ public class Phase3Driver implements GlobalConst {
                     break;
                 }
                 case "create_table": {
+                    String clustered = "";
+                    String index = "";
+                    String indexAttr = "";
+                    String datafile = "";
+
                     if (dbOpen == false) {
                         System.out.println("create_table: no database is open");
                         break;
@@ -611,18 +789,22 @@ public class Phase3Driver implements GlobalConst {
                         System.out.println("create_table: insufficent arguments");
                         break;
                     } else if (tokens.length >= 6) {
+                        clustered = tokens[2];
+                        index = tokens[3];
+                        indexAttr = tokens[4];
+                        datafile = tokens[5];
                         try {
-                            if (tokens[2].toLowerCase() != "clustered") {
+                            if (clustered.equalsIgnoreCase("clustered") == false) {
                                 System.out.println("create_table: only clustered index supported");
                                 break;
-                            } else if (tokens[3].equalsIgnoreCase("btree") == false &&
-                                    tokens[3].equalsIgnoreCase("hash") == false) {
+                            } else if (index.equalsIgnoreCase("btree") == false &&
+                                    index.equalsIgnoreCase("hash") == false) {
                                 System.out.println("create_table: only btree/hash index supported");
                                 break;
-                            } else if (Integer.parseInt(tokens[4]) < 1) {
+                            } else if (Integer.parseInt(indexAttr) < 1) {
                                 System.out.println("create_table: ATT_NO should be >1");
                                 break;
-                            } else if (new File(tokens[5]).isFile() == false) {
+                            } else if (new File(datafile).isFile() == false) {
                                 System.out.println("create_table: input datafile doesn't exist");
                                 break;
                             }
@@ -635,21 +817,18 @@ public class Phase3Driver implements GlobalConst {
                     }
 
                     /* inputs sanitized. proceed */
-                    boolean status = OK;
-                    int indexType = IndexType.None;
-                    String filename = new String(tokens[2]);
-                    String tableName = new String(tokens[1]);
+                    boolean status      = OK;
+                    int indexType       = IndexType.None;
+                    String filename     = new String(tokens[2]);
+                    String tableName    = new String(tokens[1]);
+                    int indexKeyAttr    = 0;
 
-                    if (tokens[1].equalsIgnoreCase("clustered")) {
-                        filename = new String(tokens[5]);
-
-                        if (tokens[2].equalsIgnoreCase("btree")) {
-                            indexType = IndexType.B_Index;
-                        } else {
-                            indexType = IndexType.Hash;
-                        }
+                    if (clustered.equalsIgnoreCase("clustered")) {
+                        filename = new String(datafile);
+                        indexType = index.equalsIgnoreCase("btree") ? IndexType.B_Index : IndexType.Hash;
+                        indexKeyAttr = Integer.parseInt(indexAttr);
                     }
-                    status = createTable(indexType, tableName, filename);
+                    status = createTable(tableName, indexType, indexKeyAttr, filename);
                     if (status == FAIL) {
                         //System.out.println("Error: create_table failed");
                     }
@@ -676,13 +855,29 @@ public class Phase3Driver implements GlobalConst {
                         break;
                     }
                     if (tokens.length < 3) {
-                        System.out.println("output_table: insufficient arguments");
+                        System.out.println("insert_data: insufficient arguments");
                         break;
                     }
                     String tableName = tokens[1];
                     String filename = tokens[2];
 
                     boolean status = insertIntoTable(tableName, filename);
+
+                    break;
+                }
+                case "delete_data": {
+                    if (dbOpen == false) {
+                        System.out.println("delete_data: no database is open");
+                        break;
+                    }
+                    if (tokens.length < 3) {
+                        System.out.println("delete_data: insufficient arguments");
+                        break;
+                    }
+                    String tableName = tokens[1];
+                    String filename = tokens[2];
+
+                    boolean status = deleteFromTable(tableName, filename);
 
                     break;
                 }
