@@ -90,7 +90,7 @@ public class Phase3Driver implements GlobalConst {
         boolean status = OK;
 
         flushToDisk();
-        
+
         try {
             SystemDefs.JavabaseDB.closeDB();
         } catch (IOException e) {
@@ -264,13 +264,13 @@ public class Phase3Driver implements GlobalConst {
                 }
 
                 /* number of attributes per catalog */
-                int numAttrCat;
-                AttrDesc[] attrs = new AttrDesc[numAttribs];
+                int numAttrCat = record.getAttrCnt();
+                AttrDesc[] attrs = new AttrDesc[numAttrCat];
                 try {
                     numAttrCat = ExtendedSystemDefs.MINIBASE_ATTRCAT.getRelInfo(tableName, 0, attrs);
                     /* if number of attributes from datafile doesn't match catalog */
                     if (numAttrCat != numAttribs) {
-                        System.err.println("*** error: schema datafile and relation schema mismatch");
+                        System.err.println("*** error: datafile schema and relation schema mismatch");
                         return FAIL;
                     }
                 } catch (Catalogindexnotfound e) {
@@ -288,7 +288,7 @@ public class Phase3Driver implements GlobalConst {
                 for (int i = 0; i < numAttrCat; ++i) {
                     idx = attrs[i].attrPos - 1;
                     if (attrTypes[idx].attrType != attrs[i].attrType.attrType || !fieldNames[idx].equalsIgnoreCase(attrs[i].attrName)) {
-                        System.err.println("*** error: schema datafile and relation schema mismatch");
+                        System.err.println("*** error: datafile schema and relation schema mismatch");
                         return FAIL;
                     }
                 }
@@ -473,8 +473,8 @@ public class Phase3Driver implements GlobalConst {
             }
 
             /* number of attributes as per catalog */
-            int numAttrCat;
-            AttrDesc[] attrs = new AttrDesc[numAttribs];
+            int numAttrCat = record.getAttrCnt();
+            AttrDesc[] attrs = new AttrDesc[numAttrCat];
             try {
                 numAttrCat = ExtendedSystemDefs.MINIBASE_ATTRCAT.getRelInfo(tableName, 0, attrs);
                 /* if number of attributes from datafile doesn't match catalog */
@@ -511,6 +511,17 @@ public class Phase3Driver implements GlobalConst {
                 e.printStackTrace();
                 status = FAIL;
                 return status;
+            }
+
+            try {
+                if (tableFile.getRecCnt() == 0) {
+                    System.out.printf("No records in table '%s'\n", tableName);
+                    scan.closescan();
+                    return OK;
+                }
+            } catch (Exception e) {
+                System.err.println("*** error: " + e);
+                return FAIL;
             }
 
             while ((line = br.readLine()) != null) {
@@ -577,6 +588,8 @@ public class Phase3Driver implements GlobalConst {
             e.printStackTrace();
             status = FAIL;
         }
+
+        scan.closescan();
 
         if (status && (numRowsDeleted != 0)) {
             /* flush pages to disk */
@@ -704,7 +717,11 @@ public class Phase3Driver implements GlobalConst {
                 ++pos;
             }
         }
-        System.out.println("\n----------------------------------");
+        System.out.println();
+        for (int i = 0; i < numAttr; ++i) {
+            System.out.print("--------------------");
+        }
+        System.out.println();
 
         int rows = 0;
         try {
@@ -724,14 +741,29 @@ public class Phase3Driver implements GlobalConst {
         return status;
 
     }
+    private static boolean createUnclusteredIndex(String tableName, int indexType, int indexAttr) {
+        boolean status = OK;
+        if (isTableInDB(tableName) == false) {
+            System.err.println("*** error: relation " + tableName + " not found in DB");
+            return FAIL;
+        }
 
-    private static void dbShell() throws java.io.IOException {
+        if (indexType == IndexType.B_Index) {
+            //ExtendedSystemDefs.MINIBASE_INDCAT.addIndex();
+        } else {
+
+        }
+        return status;
+    }
+    private static void dbShell() throws java.io.IOException
+    {
         String commandLine;
         BufferedReader console = new BufferedReader(new InputStreamReader(System.in));
         String[] tokens;
         boolean addCmdToHist = false;
         boolean dbOpen = false;
         String dbName = "";
+        String cmd = "";
 
         // Break with Ctrl+C
         while (true) {
@@ -746,7 +778,8 @@ public class Phase3Driver implements GlobalConst {
 
             addCmdToHist = true;
             tokens = commandLine.split("\\s+");
-            switch (tokens[0].toLowerCase()) {
+            cmd = tokens[0].toLowerCase();
+            switch (cmd) {
                 case "?":
                 case "help": {
                     showHelp();
@@ -813,10 +846,17 @@ public class Phase3Driver implements GlobalConst {
                                     index.equalsIgnoreCase("hash") == false) {
                                 System.out.println("create_table: only btree/hash index supported");
                                 break;
-                            } else if (Integer.parseInt(indexAttr) < 1) {
-                                System.out.println("create_table: ATT_NO should be >1");
-                                break;
-                            } else if (new File(datafile).isFile() == false) {
+                            }
+                            try {
+                                if (Integer.parseInt(indexAttr) < 1) {
+                                    System.out.println("create_table: ATT_NO should be >0");
+                                    break;
+                                }
+                            } catch (Exception e) {
+                                System.out.println("create_table: index ATT_NO is NaN: " + indexAttr);
+                            }
+
+                            if (new File(datafile).isFile() == false) {
                                 System.out.println("create_table: input datafile doesn't exist");
                                 break;
                             }
@@ -889,6 +929,38 @@ public class Phase3Driver implements GlobalConst {
                     String filename = tokens[2];
 
                     boolean status = deleteFromTable(tableName, filename);
+
+                    break;
+                }
+                case "create_index": {
+                    if (dbOpen == false) {
+                        System.out.println(cmd + ": no database is open");
+                        break;
+                    }
+                    if (tokens.length < 4) {
+                        System.out.println(cmd + ": insufficient arguments");
+                        break;
+                    }
+                    String indexTypeStr = tokens[1];
+                    String indexAttrStr = tokens[2];
+                    String tableName = tokens[3];
+
+                    if (!indexTypeStr.equalsIgnoreCase("btree") &&
+                            !indexTypeStr.equalsIgnoreCase("hash")) {
+                        System.out.println("create_index: only btree/hash index supported");
+                        break;
+                    }
+                    try {
+                        if (Integer.parseInt(indexAttrStr) < 1) {
+                            System.out.println("create_index: index ATT_NO should be >0");
+                        }
+                    } catch (Exception e) {
+                        System.out.println("create_index: index ATT_NO is NaN: " + indexAttrStr);
+                    }
+
+                    int indexType = indexTypeStr.equalsIgnoreCase("btree") ? IndexType.B_Index : IndexType.Hash;
+                    int indexAttr = Integer.parseInt(indexAttrStr);
+                    createUnclusteredIndex(tableName, indexType, indexAttr);
 
                     break;
                 }
@@ -1222,11 +1294,10 @@ public class Phase3Driver implements GlobalConst {
     }
 
     public static void main(String[] args) {
-        boolean dbstatus = true;
 
         try {
             dbShell();
-        } catch (java.io.IOException e) {
+        } catch (Exception e) {
             e.printStackTrace();
             Runtime.getRuntime().exit(1);
         }
