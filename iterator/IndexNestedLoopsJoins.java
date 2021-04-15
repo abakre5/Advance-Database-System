@@ -34,7 +34,7 @@ public class IndexNestedLoopsJoins extends Iterator {
     private FldSpec perm_mat[];
     private int nOutFlds;
     private Heapfile hf;
-    private Scan inner;
+    private IndexScan inner;
     private String _relationName;
     private NestedLoopsJoins nlj;
     private boolean isHash = false;
@@ -196,25 +196,68 @@ public class IndexNestedLoopsJoins extends Iterator {
             if (done)
                 return null;
 
+            RID rid = new RID();
+
+            // Get tuple from inner using index
+            int joinFldInner = OutputFilter[0].operand2.symbol.offset;
+            int joinFldOuter = OutputFilter[0].operand1.symbol.offset;
+
+            CondExpr[] selects = new CondExpr[2];
+            selects[0] = new CondExpr();
+            selects[0].op = new AttrOperator(AttrOperator.aopEQ);
+            selects[0].type1 = new AttrType(AttrType.attrSymbol);
+            selects[0].operand1.symbol = new FldSpec(new RelSpec(RelSpec.outer), joinFldInner);
+            selects[0].next = null;
+
+            selects[1] = null;
+            Tuple t = null;
+
             do {
                 // If get_from_outer is true, Get a tuple from the outer, delete
                 // an existing scan on the file, and reopen a new scan on the file.
                 // If a get_next on the outer returns DONE?, then the nested loops
                 //join is done too.
 
-                if (get_from_outer == true) {
+                if (get_from_outer) {
                     get_from_outer = false;
-                    if (inner != null)     // If this not the first time,
-                    {
-                        // close scan
-                        inner = null;
-                    }
 
                     // Get next tuple from outer on given join condition
                     if ((outer_tuple = outer.get_next()) == null) {
                         done = true;
 
                         return null;
+                    }
+
+                    switch (_in2[joinFldInner - 1].attrType) {
+                        case (AttrType.attrInteger) : {
+                            selects[0].type2 = new AttrType(AttrType.attrInteger);
+                            selects[0].operand2.integer = outer_tuple.getIntFld(joinFldOuter);
+                            break;
+                        }
+                        case (AttrType.attrReal) : {
+                            selects[0].type2 = new AttrType(AttrType.attrReal);
+                            selects[0].operand2.real = outer_tuple.getFloFld(joinFldOuter);
+                            break;
+                        }
+                        case (AttrType.attrString) : {
+                            selects[0].type2 = new AttrType(AttrType.attrString);
+                            selects[0].operand2.string = outer_tuple.getStrFld(joinFldOuter);
+                            break;
+                        }
+                    }
+
+                    FldSpec[] proj = new FldSpec[in2_len];
+                    for (int i = 1; i <= in2_len; i++) {
+                        proj[i - 1] = new FldSpec(new RelSpec(RelSpec.outer), i);
+                    }
+
+                    try {
+
+                        inner = new IndexScan(new IndexType(IndexType.B_Index), _relationName,
+                                "innerIndex", _in2, t2_str_sizescopy, in2_len, in2_len, proj,
+                                selects, joinFldInner, false);
+                    } catch (Exception e) {
+                        throw new IndexNestedLoopException(e, "Cannot get next tuple");
                     }
 
                 }  // ENDS: if (get_from_outer == TRUE)
@@ -225,69 +268,16 @@ public class IndexNestedLoopsJoins extends Iterator {
                 // is no match (with pred),get a tuple from the inner.
 
 
-                RID rid = new RID();
-
-                // Get tuple from inner using index
-                int joinFldInner = OutputFilter[0].operand2.symbol.offset;
-                int joinFldOuter = OutputFilter[0].operand1.symbol.offset;
-
-                CondExpr[] selects = new CondExpr[2];
-                selects[0] = new CondExpr();
-                selects[0].op = new AttrOperator(AttrOperator.aopEQ);
-                selects[0].type1 = new AttrType(AttrType.attrSymbol);
-                selects[0].operand1.symbol = new FldSpec(new RelSpec(RelSpec.outer), joinFldInner);
-                selects[0].next = null;
-
-                selects[1] = null;
-
-                switch (_in2[joinFldInner - 1].attrType) {
-                    case AttrType.attrInteger:
-                        selects[0].type2 = new AttrType(AttrType.attrInteger);
-                        int outerTupleValueInt = outer_tuple.getIntFld(joinFldOuter);
-                        selects[0].operand2.integer = outerTupleValueInt;
-                        break;
-                    case AttrType.attrReal:
-                        selects[0].type2 = new AttrType(AttrType.attrReal);
-                        float outerTupleValueReal = outer_tuple.getFloFld(joinFldOuter);
-                        selects[0].operand2.real = outerTupleValueReal;
-                        break;
-                    case AttrType.attrString:
-                        selects[0].type2 = new AttrType(AttrType.attrString);
-                        String outerTupleValueStr = outer_tuple.getStrFld(joinFldOuter);
-                        selects[0].operand2.string = outerTupleValueStr;
-                        break;
-                }
-
-                BTreeFile indFile = null;
-                IndexFileScan ifscan = null;
-
-                FldSpec[] proj = new FldSpec[in2_len];
-                for (int i = 1; i <= in2_len; i++) {
-                    proj[i - 1] = new FldSpec(new RelSpec(RelSpec.outer), i);
-                }
-
-                IndexScan iscan = null;
-                Heapfile f = null;
-                BTreeFile btf = null;
-                Tuple t = null;
-
                 try {
-                    f = new Heapfile(_relationName);
-                    btf = new BTreeFile("innerIndex");
-
-                    iscan = new IndexScan(new IndexType(IndexType.B_Index), _relationName,
-                            "innerIndex", _in2, t2_str_sizescopy, in2_len, in2_len, proj,
-                            selects, joinFldInner, false);
-
-                    t = iscan.get_next();
+                    t = inner.get_next();
 
                     if (t != null) {
                         Projection.Join(outer_tuple, _in1, t, _in2, Jtuple, perm_mat, nOutFlds);
-                        get_from_outer = true;
                         return Jtuple;
+                    } else {
+                        inner.close();
+                        get_from_outer = true;
                     }
-
-                    iscan.close();
 
                 } catch (Exception e) {
                     throw new IndexNestedLoopException(e, "Cannot get tuple from index");

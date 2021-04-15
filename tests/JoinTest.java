@@ -378,6 +378,7 @@ class JoinsDriver implements GlobalConst {
         Query7();
         Query8();
         Query9();
+        Query10();
 
 
         System.out.print("Finished joins testing" + "\n");
@@ -528,6 +529,17 @@ class JoinsDriver implements GlobalConst {
         expr[0].operand1.symbol = new FldSpec(new RelSpec(RelSpec.outer), 2);
         expr[0].type2 = new AttrType(AttrType.attrSymbol);
         expr[0].operand2.symbol = new FldSpec(new RelSpec(RelSpec.innerRel), 1);
+
+        expr[1] = null;
+    }
+
+    private void Query10_CondExpr(CondExpr[] expr) {
+        expr[0].next = null;
+        expr[0].op = new AttrOperator(AttrOperator.aopEQ);
+        expr[0].type1 = new AttrType(AttrType.attrSymbol);
+        expr[0].operand1.symbol = new FldSpec(new RelSpec(RelSpec.outer), 1);
+        expr[0].type2 = new AttrType(AttrType.attrSymbol);
+        expr[0].operand2.symbol = new FldSpec(new RelSpec(RelSpec.innerRel), 2);
 
         expr[1] = null;
     }
@@ -1688,7 +1700,7 @@ class JoinsDriver implements GlobalConst {
         // Create index on inner relation i.e. B in this example
         BTreeFile btf = null;
         try {
-            btf = new BTreeFile("innerIndex", AttrType.attrInteger, 4, 1/*delete*/);
+            btf = new BTreeFile("boatIndex", AttrType.attrInteger, 4, 1/*delete*/);
         } catch (Exception e) {
             status = FAIL;
             System.err.println("" + e);
@@ -1773,6 +1785,10 @@ class JoinsDriver implements GlobalConst {
                 System.err.println("*** WRONG RESULT: Less tuples than expected");
                 status = FAIL;
             }
+
+            inlj.close();
+            btf.close();
+            btf.destroyFile();
         } catch (Exception e) {
             System.err.println("*** Error while getting tuples from INLJ");
             System.err.println("" + e);
@@ -1879,6 +1895,8 @@ class JoinsDriver implements GlobalConst {
                 System.err.println("*** WRONG RESULT: Less tuples than expected");
                 status = FAIL;
             }
+
+            inlj.close();
         } catch (Exception e) {
             System.err.println("*** Error while getting tuples from INLJ");
             System.err.println("" + e);
@@ -2009,6 +2027,8 @@ class JoinsDriver implements GlobalConst {
                 System.err.println("*** WRONG RESULT: Less tuples than expected");
                 status = FAIL;
             }
+
+            hjoin.close();
         } catch (Exception e) {
             System.err.println("*** Error while getting tuples from INLJ");
             System.err.println("" + e);
@@ -2017,6 +2037,168 @@ class JoinsDriver implements GlobalConst {
 
         if (status == OK) {
             System.out.print("********************** Query9 completed successfully *********************\n");
+        }
+    }
+
+    public void Query10() {
+        System.out.print("********************** Query10 starting *********************\n");
+        boolean status = OK;
+
+        // Boats, Reserves Join Query.
+        System.out.print("SELECT B.bname, R.date\n"
+                + "  FROM   Boats B, Reserves R\n"
+                + "  WHERE  R.bid = B.bid\n\n");
+
+        System.out.print("\n(Tests Index Nested Loop Join when there are duplicates in index)\n");
+
+        CondExpr[] outFilter = new CondExpr[2];
+        outFilter[0] = new CondExpr();
+        outFilter[1] = new CondExpr();
+
+        Query10_CondExpr(outFilter);
+
+        AttrType[] Btypes = {
+                new AttrType(AttrType.attrInteger),
+                new AttrType(AttrType.attrString),
+                new AttrType(AttrType.attrString),
+        };
+
+        short[] Bsizes = new short[2];
+        Bsizes[0] = 30;
+        Bsizes[1] = 20;
+
+        FldSpec[] Bprojection = {
+                new FldSpec(new RelSpec(RelSpec.outer), 1),
+                new FldSpec(new RelSpec(RelSpec.outer), 2),
+                new FldSpec(new RelSpec(RelSpec.outer), 3)
+        };
+
+        AttrType[] Rtypes = {
+                new AttrType(AttrType.attrInteger),
+                new AttrType(AttrType.attrInteger),
+                new AttrType(AttrType.attrString),
+        };
+
+        short[] Rsizes = new short[1];
+        Rsizes[0] = 15;
+
+        FileScan am = null;
+        try {
+            am = new FileScan("boats.in", Btypes, Bsizes,
+                    (short) 3, (short) 3,
+                    Bprojection, null);
+        } catch (Exception e) {
+            status = FAIL;
+            System.err.println("" + e);
+            e.printStackTrace();
+        }
+
+        // Create index on inner relation i.e. B in this example
+        BTreeFile btf = null;
+        try {
+            btf = new BTreeFile("reserveIndex", AttrType.attrInteger, 4, 1/*delete*/);
+        } catch (Exception e) {
+            status = FAIL;
+            System.err.println("" + e);
+            e.printStackTrace();
+        }
+
+        Tuple tt = new Tuple();
+        try {
+            tt.setHdr((short) 3, Rtypes, Rsizes);
+        } catch (Exception e) {
+            status = FAIL;
+            System.err.println("" + e);
+            e.printStackTrace();
+        }
+
+        int size = tt.size();
+
+        Tuple t = new Tuple(size);
+        try {
+            t.setHdr((short) 3, Rtypes, Rsizes);
+        } catch (Exception e) {
+            status = FAIL;
+            e.printStackTrace();
+        }
+
+        RID rid = new RID();
+        Tuple temp = null;
+        Scan scan = null;
+        Heapfile hf = null;
+        int key = 0;
+
+        try {
+            hf = new Heapfile("reserves.in");
+            scan = new Scan(hf);
+            temp = scan.getNext(rid);
+            while (temp != null) {
+                t.tupleCopy(temp);
+                key = t.getIntFld(2);
+                btf.insert(new IntegerKey(key), rid);
+                temp = scan.getNext(rid);
+            }
+            scan.closescan();
+        } catch (Exception e) {
+            status = FAIL;
+            System.err.println("" + e);
+            e.printStackTrace();
+        }
+
+        FldSpec[] proj1 = {
+                new FldSpec(new RelSpec(RelSpec.outer), 2),
+                new FldSpec(new RelSpec(RelSpec.innerRel), 3)
+        }; // B.bname, R.date
+
+
+        IndexNestedLoopsJoins inlj = null;
+        try {
+            inlj = new IndexNestedLoopsJoins(Btypes, 3, Bsizes,
+                    Rtypes, 3, Rsizes,
+                    10,
+                    am, "reserves.in",
+                    outFilter, null, proj1, 2);
+        } catch (Exception e) {
+            System.err.println("*** Error preparing for INLJ");
+            System.err.println("" + e);
+            e.printStackTrace();
+            Runtime.getRuntime().exit(1);
+        }
+
+        // Now verify if INLJ actually works
+        t = null;
+        int EXPECTED_COUNT = 10;
+        int currentCnt = 0;
+        try {
+            t = inlj.get_next();
+            if( t != null ) {
+                do {
+                    currentCnt++;
+                    if( currentCnt > EXPECTED_COUNT ) {
+                        System.err.println("*** WRONG RESULT: More tuples than expected");
+                        status = FAIL;
+                        break;
+                    }
+                    t = inlj.get_next();
+                } while( t != null);
+            }
+
+            if( currentCnt < EXPECTED_COUNT ) {
+                System.err.println("*** WRONG RESULT: Less tuples than expected");
+                status = FAIL;
+            }
+
+            inlj.close();
+            btf.close();
+            btf.destroyFile();
+        } catch (Exception e) {
+            System.err.println("*** Error while getting tuples from INLJ");
+            System.err.println("" + e);
+            e.printStackTrace();
+        }
+
+        if(status == OK) {
+            System.out.print("********************** Query10 completed successfully *********************\n");
         }
     }
 
