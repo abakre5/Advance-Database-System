@@ -2,6 +2,7 @@ package iterator;
 
 import btree.*;
 import bufmgr.PageNotReadException;
+import catalog.*;
 import global.*;
 import heap.*;
 import index.IndexException;
@@ -36,6 +37,7 @@ public class IndexNestedLoopsJoins extends Iterator {
     private Scan inner;
     private String _relationName;
     private NestedLoopsJoins nlj;
+    private boolean isHash = false;
 
     /**
      * constructor
@@ -70,7 +72,7 @@ public class IndexNestedLoopsJoins extends Iterator {
                             CondExpr rightFilter[],
                             FldSpec proj_list[],
                             int n_out_flds
-    ) throws IOException, IndexNestedLoopException, GetFileEntryException, NestedLoopException {
+    ) throws IOException, IndexNestedLoopException, GetFileEntryException, NestedLoopException, Catalogindexnotfound, Catalogattrnotfound, Catalogmissparam, Cataloghferror, Catalognomem, IndexCatalogException, Catalogioerror, Catalogrelnotfound, AttrCatalogException {
         _in1 = new AttrType[in1.length];
         _in2 = new AttrType[in2.length];
         System.arraycopy(in1, 0, _in1, 0, in1.length);
@@ -112,10 +114,34 @@ public class IndexNestedLoopsJoins extends Iterator {
             throw new IndexNestedLoopException(e, "Create new heapfile failed.");
         }
 
+        // TODO: Check if index present on join attr, if yes, check if BTree or Hash
+        // Get attr name
+//        AttrDesc[] attrDescs = new AttrDesc[len_in2];
+//        ExtendedSystemDefs.MINIBASE_ATTRCAT.getRelInfo(relationName, len_in2, attrDescs);
+//        int joinFldInner = OutputFilter[0].operand2.symbol.offset;
+//        String attrName = attrDescs[joinFldInner-1].attrName;
+//        int indexCnt = 0;
+//        IndexDesc[] indexDescs = null;
+//        ExtendedSystemDefs.MINIBASE_INDCAT.getAttrIndexes(relationName, attrName, indexCnt, indexDescs);
+//
+//        if (indexCnt == 0) {
+//            nlj = new NestedLoopsJoins(in1, len_in1, t1_str_sizes, in2,
+//                    len_in2, t2_str_sizes, amt_of_mem, am1,
+//                    relationName, outFilter, rightFilter, proj_list, n_out_flds);
+//        } else {
+//            IndexDesc joinIndexDesc = indexDescs[joinFldInner-1];
+//            System.out.println("Index on attr: "+attrName);
+//            if (joinIndexDesc.getAccessType().indexType == IndexType.Hash) {
+//                isHash = true;
+//            }
+//        }
+
         PageId headerPageId = get_file_entry("innerIndex");
         if (headerPageId == null) //file not exist
         {
-            nlj = new NestedLoopsJoins(in1, len_in1, t1_str_sizes, in2, len_in2, t2_str_sizes, amt_of_mem, am1, relationName, outFilter, rightFilter, proj_list, n_out_flds);
+            nlj = new NestedLoopsJoins(in1, len_in1, t1_str_sizes, in2,
+                    len_in2, t2_str_sizes, amt_of_mem, am1,
+                    relationName, outFilter, rightFilter, proj_list, n_out_flds);
         } else {
             nlj = null;
         }
@@ -257,11 +283,6 @@ public class IndexNestedLoopsJoins extends Iterator {
 
                     if (t != null) {
                         Projection.Join(outer_tuple, _in1, t, _in2, Jtuple, perm_mat, nOutFlds);
-                        AttrType[] outFlds = {
-                                new AttrType(AttrType.attrString),
-                                new AttrType(AttrType.attrString),
-                        };
-
                         get_from_outer = true;
                         return Jtuple;
                     }

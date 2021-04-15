@@ -156,6 +156,9 @@ class JoinsDriver implements GlobalConst {
 			      1000,500,200,"Clock");
     */
 
+        // TODO: Revert after job completed
+//        ExtendedSystemDefs sysdef = new ExtendedSystemDefs(dbpath, 1000, NUMBUF, "Clock");
+
         SystemDefs sysdef = new SystemDefs(dbpath, 1000, NUMBUF, "Clock");
 
         // creating the sailors relation
@@ -374,6 +377,7 @@ class JoinsDriver implements GlobalConst {
 
         Query7();
         Query8();
+        Query9();
 
 
         System.out.print("Finished joins testing" + "\n");
@@ -1883,6 +1887,136 @@ class JoinsDriver implements GlobalConst {
 
         if(status == OK) {
             System.out.print("********************** Query8 completed successfully *********************\n");
+        }
+    }
+
+    public void Query9() {
+        System.out.print("********************** Query9 starting *********************\n");
+        boolean status = OK;
+
+        // Boats, Reserves Join Query.
+        System.out.print("SELECT B.bname, R.date\n"
+                + "  FROM   Reserves R, Boats B\n"
+                + "  WHERE  R.bid = B.bid\n\n");
+
+        System.out.print("\n(Tests Hash Join)\n");
+
+        CondExpr[] outFilter = new CondExpr[2];
+        outFilter[0] = new CondExpr();
+        outFilter[1] = new CondExpr();
+
+        Query7_CondExpr(outFilter);
+
+        AttrType[] Btypes = {
+                new AttrType(AttrType.attrInteger),
+                new AttrType(AttrType.attrString),
+                new AttrType(AttrType.attrString),
+        };
+
+        short[] Bsizes = new short[2];
+        Bsizes[0] = 30;
+        Bsizes[1] = 20;
+
+        FldSpec[] Rprojection = {
+                new FldSpec(new RelSpec(RelSpec.outer), 1),
+                new FldSpec(new RelSpec(RelSpec.outer), 2),
+                new FldSpec(new RelSpec(RelSpec.outer), 3)
+        };
+
+        AttrType[] Rtypes = {
+                new AttrType(AttrType.attrInteger),
+                new AttrType(AttrType.attrInteger),
+                new AttrType(AttrType.attrString),
+        };
+
+        short[] Rsizes = new short[1];
+        Rsizes[0] = 15;
+
+        FileScan am = null;
+        try {
+            am = new FileScan("reserves.in", Rtypes, Rsizes,
+                    (short) 3, (short) 3,
+                    Rprojection, null);
+        } catch (Exception e) {
+            status = FAIL;
+            System.err.println("" + e);
+            e.printStackTrace();
+        }
+
+        FldSpec[] proj1 = {
+                new FldSpec(new RelSpec(RelSpec.innerRel), 2),
+                new FldSpec(new RelSpec(RelSpec.outer), 3)
+        }; // B.bname, R.date
+
+        HashJoin hjoin = null;
+        try {
+            hjoin = new HashJoin(Rtypes, 3, Rsizes,
+                    Btypes, 3, Bsizes,
+                    10,
+                    am, "boats.in",
+                    outFilter, null, proj1, 2);
+        } catch (Exception e) {
+            System.err.println("*** Error preparing for INLJ");
+            System.err.println("" + e);
+            e.printStackTrace();
+            Runtime.getRuntime().exit(1);
+        }
+
+        AttrType[] jTypes = new AttrType[2];
+        jTypes[0] = new AttrType(AttrType.attrString);
+        jTypes[1] = new AttrType(AttrType.attrString);
+
+        short[] jSizes = new short[2];
+        jSizes[0] = 30;
+        jSizes[1] = 15;
+
+        Tuple t = new Tuple();
+        try {
+            t.setHdr((short) 2,jTypes, jSizes);
+        }
+        catch (Exception e) {
+            System.err.println("*** error in Tuple.setHdr() ***");
+            e.printStackTrace();
+        }
+
+        int size = t.size();
+        t = new Tuple(size);
+        try {
+            t.setHdr((short) 2, jTypes, jSizes);
+        }
+        catch (Exception e) {
+            System.err.println("*** error in Tuple.setHdr() ***");
+            e.printStackTrace();
+        }
+
+        int EXPECTED_COUNT = 10;
+        int currentCnt = 0;
+        try {
+            t = hjoin.get_next();
+            if( t != null ) {
+                do {
+                    currentCnt++;
+                    if( currentCnt > EXPECTED_COUNT ) {
+                        System.err.println("*** WRONG RESULT: More tuples than expected");
+                        status = FAIL;
+                        break;
+                    }
+                    t = hjoin.get_next();
+                } while( t != null);
+            }
+
+            if( currentCnt < EXPECTED_COUNT ) {
+                System.err.println("*** WRONG RESULT: Less tuples than expected");
+                status = FAIL;
+            }
+        } catch (Exception e) {
+            System.err.println("*** Error while getting tuples from INLJ");
+            System.err.println("" + e);
+            e.printStackTrace();
+        }
+
+        if (status == OK) {
+            System.out.print("********************** Query9 completed successfully *********************\n");
         }
     }
 
