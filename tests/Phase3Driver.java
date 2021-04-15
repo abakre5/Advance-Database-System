@@ -8,6 +8,7 @@ import java.time.*;
 import btree.BTreeFile;
 import btree.FloatKey;
 import btree.IndexFile;
+import bufmgr.PageNotReadException;
 import bufmgr.PagePinnedException;
 import catalog.*;
 import chainexception.ChainException;
@@ -16,6 +17,7 @@ import diskmgr.PageCounter;
 import global.*;
 import heap.*;
 import iterator.*;
+import iterator.Iterator;
 
 public class Phase3Driver implements GlobalConst {
 
@@ -61,7 +63,7 @@ public class Phase3Driver implements GlobalConst {
 
     private static void showHelp() {
         System.out.println(
-                        "Supported commands:\n\n" +
+                "Supported commands:\n\n" +
                         "help/?: shows this menu\n\n" +
                         "prev: shows previously entered command\n\n" +
                         "exit/quit\n\n" +
@@ -83,6 +85,7 @@ public class Phase3Driver implements GlobalConst {
     private static void clearScreen() {
         System.out.println("\u001b[2J\u001b[H");
     }
+
     private static boolean closeDB() {
         boolean status = OK;
 
@@ -103,7 +106,7 @@ public class Phase3Driver implements GlobalConst {
         String filePattern = NAMEROOT + System.getProperty("user.name") + ".minibase-";
         File[] files = directory.listFiles();
 
-        for (File file: files) {
+        for (File file : files) {
             try {
                 if (file.getName().contains(filePattern)) {
                     System.out.println("  Removed " + file.getCanonicalPath());
@@ -147,7 +150,7 @@ public class Phase3Driver implements GlobalConst {
         return status;
     }
 
-    private static boolean isTableInDB(String tableName) {
+    public static boolean isTableInDB(String tableName) {
         RelDesc record = new RelDesc();
         try {
             ExtendedSystemDefs.MINIBASE_RELCAT.getInfo(tableName, record);
@@ -160,12 +163,15 @@ public class Phase3Driver implements GlobalConst {
 
         return true;
     }
+
     private static boolean readDataIntoHeapFile(String tableName, String filename, boolean createRel) {
         int numAttribs;
         AttrType[] attrTypes;
         boolean status = OK;
         String[] schemaInfo;
         RID rid;
+
+        System.out.println(new File(filename).getAbsoluteFile());
 
         try (BufferedReader br = new BufferedReader(new FileReader(filename))) {
             String line;
@@ -317,15 +323,14 @@ public class Phase3Driver implements GlobalConst {
                 String row[] = line.trim().split("\\s+");
                 //System.out.println(Arrays.toString(row));
 
-                for (int i=0; i < numAttribs; ++i) {
+                for (int i = 0; i < numAttribs; ++i) {
                     try {
                         if (attrTypes[i].attrType == AttrType.attrInteger) {
                             t.setIntFld(i + 1, Integer.parseInt(row[i]));
                         } else {
                             t.setStrFld(i + 1, row[i]);
                         }
-                    }
-                    catch (Exception e) {
+                    } catch (Exception e) {
                         System.err.println("*** Heapfile error in Tuple.setFloFld() ***");
                         status = FAIL;
                         e.printStackTrace();
@@ -334,8 +339,7 @@ public class Phase3Driver implements GlobalConst {
                 /* insert tuple into heapfile */
                 try {
                     rid = tableHeapFile.insertRecord(t.getTupleByteArray());
-                }
-                catch (Exception e) {
+                } catch (Exception e) {
                     System.err.println("*** error in Heapfile.insertRecord() ***");
                     status = FAIL;
                     e.printStackTrace();
@@ -388,7 +392,7 @@ public class Phase3Driver implements GlobalConst {
         boolean status = OK;
         try {
             SystemDefs.JavabaseBM.flushAllPages();
-        } catch(PagePinnedException e){
+        } catch (PagePinnedException e) {
 
         } catch (Exception e) {
             System.err.println("*** error flushing pages to disk");
@@ -584,18 +588,24 @@ public class Phase3Driver implements GlobalConst {
     }
 
     private static void printTuple(Tuple t, AttrType[] attrTypes) {
-
         for (int i = 0; i < t.noOfFlds(); ++i) {
             if (attrTypes[i].attrType == AttrType.attrInteger) {
                 try {
-                    System.out.printf("%-10d", t.getIntFld(i + 1));
+                    System.out.printf("%-20d", t.getIntFld(i + 1));
                 } catch (Exception e) {
                     System.err.println(e);
                     return;
                 }
             } else if (attrTypes[i].attrType == AttrType.attrString) {
                 try {
-                    System.out.printf("%-10s", t.getStrFld(i + 1));
+                    System.out.printf("%-20s", t.getStrFld(i + 1));
+                } catch (Exception e) {
+                    System.err.println(e);
+                    return;
+                }
+            } else if (attrTypes[i].attrType == AttrType.attrReal) {
+                try {
+                    System.out.printf("%-20f", t.getFloFld(i + 1));
                 } catch (Exception e) {
                     System.err.println(e);
                     return;
@@ -604,6 +614,7 @@ public class Phase3Driver implements GlobalConst {
         }
         System.out.println();
     }
+
     private static boolean outputTable(String tableName) {
         /* TBD: get schema info */
 
@@ -611,7 +622,7 @@ public class Phase3Driver implements GlobalConst {
         Heapfile tableFile;
         Scan scan = null;
 
-        if (isTableInDB(tableName) == false) {
+        if (!isTableInDB(tableName)) {
             System.err.println("*** error: relation " + tableName + " not found in DB");
             return FAIL;
         }
@@ -689,7 +700,7 @@ public class Phase3Driver implements GlobalConst {
         for (int i = 0; pos < numAttr; ++i) {
             i = i % numAttr;
             if (attrs[i].attrPos - 1 == pos) {
-                System.out.printf("%-10s", attrs[i].attrName);
+                System.out.printf("%-20s", attrs[i].attrName);
                 ++pos;
             }
         }
@@ -713,8 +724,8 @@ public class Phase3Driver implements GlobalConst {
         return status;
 
     }
-    private static void dbShell() throws java.io.IOException
-    {
+
+    private static void dbShell() throws java.io.IOException {
         String commandLine;
         BufferedReader console = new BufferedReader(new InputStreamReader(System.in));
         String[] tokens;
@@ -788,7 +799,8 @@ public class Phase3Driver implements GlobalConst {
                     if (tokens.length < 3) {
                         System.out.println("create_table: insufficent arguments");
                         break;
-                    } else if (tokens.length >= 6) {
+                    } else if (tokens.length == 6) {
+                        System.out.println("6 attr");
                         clustered = tokens[2];
                         index = tokens[3];
                         indexAttr = tokens[4];
@@ -808,7 +820,6 @@ public class Phase3Driver implements GlobalConst {
                                 System.out.println("create_table: input datafile doesn't exist");
                                 break;
                             }
-
                         } catch (Exception e) {
                             System.out.println("create_table: invalid ATT_NO " + tokens[3]);
                             break;
@@ -850,7 +861,7 @@ public class Phase3Driver implements GlobalConst {
                     break;
                 }
                 case "insert_data": {
-                    if (dbOpen == false) {
+                    if (!dbOpen) {
                         System.out.println("insert_data: no database is open");
                         break;
                     }
@@ -887,10 +898,13 @@ public class Phase3Driver implements GlobalConst {
 
                 }
                 case "quit":
-                case "exit":
-                {
+                case "exit": {
                     return;
                 }
+                case "groupby":
+                    System.out.println((java.util.Arrays.toString(tokens)));
+                    performGroupBy(tokens);
+                    break;
                 default: {
                     addCmdToHist = false;
                     System.out.println("Unsupported command: " + tokens[0]);
@@ -906,13 +920,313 @@ public class Phase3Driver implements GlobalConst {
 
     }
 
+    private static void performGroupBy(String[] tokens) {
+        /**
+         * Collect arguments
+         */
+        boolean isSort = tokens[1].equals("SORT");
+        String aggOperator = tokens[2].toLowerCase();
+        int groupByAttr = Integer.parseInt(tokens[3]);
+        String aggListNonNormalized = tokens[4];
+        String tableName = tokens[5];
+        int nPages = Integer.parseInt(tokens[6]);
+        String isMater = tokens[7];
+        String tableNameT = tokens[8];
+
+        AggType aggType = getGroupByAggOperatorType(aggOperator);
+        short[] aggList = getAggList(aggListNonNormalized);
+
+        IteratorDesc iteratorDesc = null;
+        try {
+            iteratorDesc = getTableItr(tableName);
+        } catch (HFException | HFBufMgrException | HFDiskMgrException | InvalidTupleSizeException | FileScanException | TupleUtilsException | InvalidRelation | IOException | PredEvalException | JoinsException | FieldNumberOutOfBoundException | PageNotReadException | InvalidTypeException | WrongPermat | UnknowAttrType e) {
+            e.printStackTrace();
+        }
+
+        RelSpec relSpec = new RelSpec(RelSpec.outer);
+        FldSpec groupByAttrFldSpec = new FldSpec(relSpec, groupByAttr);
+        FldSpec[] aggListFldSpec = new FldSpec[aggList.length];
+        for (int i = 0;i < aggListFldSpec.length;i++) {
+            aggListFldSpec[i] = new FldSpec(relSpec, aggList[i]);
+        }
+
+        if (isSort) {
+            try {
+                assert iteratorDesc != null;
+                GroupBywithSort groupBywithSort = new GroupBywithSort(iteratorDesc.getAttrType(),
+                        iteratorDesc.getNumAttr(), iteratorDesc.getStrSizes(), iteratorDesc.getScan(), groupByAttrFldSpec, aggListFldSpec,
+                        aggType, iteratorDesc.getProjlist(), iteratorDesc.getNumAttr(), nPages, tableNameT);
+                groupBywithSort.getAggregateResult();
+                groupBywithSort.close();
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        } else {
+
+        }
+        assert iteratorDesc != null;
+        iteratorDesc.getScan().close();
+    }
+
+    private static AggType getGroupByAggOperatorType(String aggOperator) {
+        AggType aggType = null;
+        switch (aggOperator) {
+            case "min" :
+                aggType = new AggType(AggType.aggMin);
+                break;
+            case "max" :
+                aggType = new AggType(AggType.aggMax);
+                break;
+            case "avg" :
+                aggType = new AggType(AggType.aggAvg);
+                break;
+            case "sky" :
+                aggType = new AggType(AggType.aggSkyline);
+                break;
+            default :
+                System.out.println("Please enter a valid agg operator[MIN, MAX, AVG, SKY]");
+                break;
+
+        }
+        return aggType;
+    }
+
+    private static short[] getAggList(String aggListNonNormalized) {
+        String[] aggListStr = aggListNonNormalized.split(",");
+        short[] aggList = new short[aggListStr.length];
+        for (int i = 0;i < aggListStr.length;i++) {
+            aggList[i] = Short.parseShort(aggListStr[i]);
+        }
+        return aggList;
+    }
+
+    private static IteratorDesc getTableItr(String tableName) throws IOException, HFException, HFBufMgrException, HFDiskMgrException, InvalidTupleSizeException, FileScanException, TupleUtilsException, InvalidRelation, PredEvalException, JoinsException, FieldNumberOutOfBoundException, PageNotReadException, InvalidTypeException, WrongPermat, UnknowAttrType {
+        int numAttr = 0;
+
+        if (!Phase3Driver.isTableInDB(tableName)) {
+            System.err.println("*** error: relation " + tableName + " not found in DB");
+            return null;
+        }
+        RelDesc rec = new RelDesc();
+        try {
+            ExtendedSystemDefs.MINIBASE_RELCAT.getInfo(tableName, rec);
+            numAttr = rec.getAttrCnt();
+            if (numAttr == 0) {
+                System.err.println("*** error: catalog attribute count is 0 ");
+                return null;
+            }
+        } catch (Exception e) {
+            System.err.println("*** error: " + e);
+            return null;
+        }
+        AttrType[] attrTypes = new AttrType[numAttr];
+        for (int i = 0; i < attrTypes.length; ++i) {
+            attrTypes[i] = new AttrType(AttrType.attrNull);
+        }
+        short[] strSizes = new short[numAttr];
+
+        try {
+            ExtendedSystemDefs.MINIBASE_ATTRCAT.getTupleStructure(tableName, numAttr, attrTypes, strSizes);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return null;
+        }
+
+        return new IteratorDesc(tableName, (short) numAttr, attrTypes, strSizes);
+    }
+
+    private static boolean deleteDataFromTable(String tableName, String filename) {
+        boolean status = false;
+        try {
+            status = deleteData(tableName, filename);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        if (status) {
+            /* flush pages to disk */
+            try {
+                SystemDefs.JavabaseBM.flushAllPages();
+            } catch (PagePinnedException ignored) {
+
+            } catch (Exception e) {
+                System.err.println("*** error flushing pages to disk");
+                e.printStackTrace();
+                status = FAIL;
+            }
+            System.out.println();
+        }
+        return status;
+    }
+
+    private static boolean deleteData(String tableName, String filename) throws Exception {
+        /* TBD: get schema info */
+
+        boolean status = OK;
+        Heapfile tableFile = null;
+        Scan scan = null;
+
+        if (!isTableInDB(tableName)) {
+            System.err.println("*** error: relation " + tableName + " not found in DB");
+            return FAIL;
+        }
+
+        int numAttr = 0;
+        RelDesc rec = new RelDesc();
+        try {
+            ExtendedSystemDefs.MINIBASE_RELCAT.getInfo(tableName, rec);
+            numAttr = rec.getAttrCnt();
+            if (numAttr == 0) {
+                System.err.println("*** error: catalog attribute count is 0 ");
+                return FAIL;
+            }
+        } catch (Exception e) {
+            System.err.println("*** error: " + e);
+            return FAIL;
+        }
+        AttrType[] attrTypes = new AttrType[numAttr];
+        for (int i = 0; i < attrTypes.length; ++i) {
+            attrTypes[i] = new AttrType(AttrType.attrNull);
+        }
+        short[] strSizes = new short[numAttr];
+
+        try {
+            ExtendedSystemDefs.MINIBASE_ATTRCAT.getTupleStructure(tableName, numAttr, attrTypes, strSizes);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return FAIL;
+        }
+
+        Tuple t = new Tuple();
+        try {
+            t.setHdr((short) numAttr, attrTypes, strSizes);
+        } catch (Exception e) {
+            status = FAIL;
+            e.printStackTrace();
+            return status;
+        }
+
+        RID rid = new RID();
+        String key = null;
+        Tuple temp = null;
+
+        /* print relation header */
+        AttrDesc[] attrs = new AttrDesc[numAttr];
+        try {
+            int numAttrCat = ExtendedSystemDefs.MINIBASE_ATTRCAT.getRelInfo(tableName, 0, attrs);
+            /* if number of attributes from datafile doesn't match catalog */
+            if (numAttrCat != numAttr) {
+                System.err.println("*** error: schema datafile and relation schema mismatch");
+                return FAIL;
+            }
+        } catch (Catalogindexnotfound e) {
+            System.err.printf("*** error relation '%s' mismatch\n", tableName);
+            return FAIL;
+        } catch (Exception e) {
+            System.err.println("*** error " + e);
+            e.printStackTrace();
+            status = FAIL;
+            return status;
+        }
+
+        System.out.println("No Of atte " + attrs.length);
+        for (int i = 0; i < numAttr; i++) {
+            System.out.println(attrs[i].attrType);
+        }
+        System.out.println("\n----------------------------------");
+
+
+        List<RID> recordToBeDeleted = new ArrayList<>();
+        try (BufferedReader br = new BufferedReader(new FileReader(filename))) {
+            String line;
+            while ((line = br.readLine()) != null) {
+                /* read each line from the file, create tuple, and insert into DB */
+                String[] row = line.trim().split("\\s+");
+                try {
+                    /* create an scan on the heapfile */
+                    tableFile = new Heapfile(tableName);
+                    scan = new Scan(tableFile);
+                } catch (Exception e) {
+                    status = FAIL;
+                    e.printStackTrace();
+                    return status;
+                }
+
+                try {
+                    while ((temp = scan.getNext(rid)) != null) {
+                        temp = new Tuple(temp.getTupleByteArray(), temp.getOffset(), temp.getLength());
+                        temp.setHdr((short) attrTypes.length, attrTypes, strSizes);
+                        if (isSameTuple(row, temp, attrs)) {
+                            recordToBeDeleted.add(new RID(rid.pageNo, rid.slotNo));
+                        }
+                    }
+                    scan.closescan();
+                } catch (Exception e) {
+                    System.err.println(e);
+                }
+            }
+
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        int  deletionCount = 0;
+        tableFile = new Heapfile(tableName);
+        for (RID ridToDelete : recordToBeDeleted) {
+            tableFile.deleteRecord(ridToDelete);
+            deletionCount++;
+        }
+        System.out.println("Deletion Count is " + deletionCount);
+        return OK;
+    }
+
+    private static boolean isSameTuple(String[] row, Tuple temp, AttrDesc[] attrs) {
+        for (int i = 0; i < attrs.length; i++) {
+            if (attrs[i].attrType.attrType == AttrType.attrInteger) {
+                int val = 0;
+                try {
+                    val = temp.getIntFld(i + 1);
+                } catch (IOException e) {
+                    e.printStackTrace();
+                } catch (FieldNumberOutOfBoundException e) {
+                    e.printStackTrace();
+                }
+                if (val != Integer.parseInt(row[i])) {
+                    return false;
+                }
+            }
+            else if (attrs[i].attrType.attrType == AttrType.attrReal) {
+                float val = 0;
+                try {
+                    val = temp.getFloFld(i + 1);
+                } catch (IOException e) {
+                    e.printStackTrace();
+                } catch (FieldNumberOutOfBoundException e) {
+                    e.printStackTrace();
+                }
+                if (val != Float.parseFloat(row[i])) {
+                    return false;
+                }
+            } else {
+                try {
+                    if (!temp.getStrFld(i + 1).equals(row[i])) {
+                        return false;
+                    }
+                } catch (IOException e) {
+                    e.printStackTrace();
+                } catch (FieldNumberOutOfBoundException e) {
+                    e.printStackTrace();
+                }
+            }
+
+        }
+        return true;
+    }
+
     public static void main(String[] args) {
         boolean dbstatus = true;
 
         try {
             dbShell();
-        }
-        catch (java.io.IOException e) {
+        } catch (java.io.IOException e) {
             e.printStackTrace();
             Runtime.getRuntime().exit(1);
         }

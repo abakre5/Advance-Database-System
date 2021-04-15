@@ -108,6 +108,7 @@ public class BlockNestedLoopsSky extends Iterator {
             }
             tuple = outer.get_next();
         }
+
         return disk;
     }
 
