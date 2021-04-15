@@ -166,8 +166,6 @@ public class RelCatalog extends Heapfile
             throw new RelCatalogException(e2, "addInfo failed");
         }
 
-        ad.maxVal = new attrData();
-        ad.minVal = new attrData();
         ad.relName = new String(relation);
 
         for (int i = 0; i < attrCnt; i++) {
@@ -319,12 +317,14 @@ public class RelCatalog extends Heapfile
             throw new RelCatalogException(e1, "scan failed");
         }
 
+        Tuple temp;
         while (true) {
             try {
-                tuple = pscan.getNext(rid);
-                if (tuple == null)
+                temp = pscan.getNext(rid);
+                if (temp == null)
                     throw new Catalogattrnotfound(null,
                             "Catalog Attribute not Found!");
+                tuple.tupleCopy(temp);
                 read_tuple(tuple, record);
             } catch (Exception e4) {
                 System.err.println("read_tuple" + e4);

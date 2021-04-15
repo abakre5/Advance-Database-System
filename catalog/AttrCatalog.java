@@ -94,11 +94,13 @@ public class AttrCatalog extends Heapfile
         // SCAN FILE FOR ATTRIBUTE
         // NOTE MUST RETURN ATTRNOTFOUND IF NOT FOUND!!!
 
+        Tuple temp;
         while (true) {
             try {
-                tuple = pscan.getNext(rid);
-                if (tuple == null)
+                temp = pscan.getNext(rid);
+                if (temp == null)
                     throw new Catalogattrnotfound(null, "Catalog: Attribute not Found!");
+                tuple.tupleCopy(temp);
                 read_tuple(tuple, record);
             } catch (Exception e4) {
                 throw new AttrCatalogException(e4, "read_tuple failed");
@@ -177,8 +179,6 @@ public class AttrCatalog extends Heapfile
         AttrDesc[] attrRecs = new AttrDesc[attrCnt];
         for (int i = 0; i < attrCnt; ++i) {
             attrRecs[i] = new AttrDesc();
-            attrRecs[i].maxVal = new attrData();
-            attrRecs[i].minVal = new attrData();
         }
 
         while (true) {
@@ -339,12 +339,14 @@ public class AttrCatalog extends Heapfile
 
 
         // SCAN FILE
+        Tuple temp;
         while (true) {
             try {
-                tuple = pscan.getNext(rid);
-                if (tuple == null)
+                temp = pscan.getNext(rid);
+                if (temp == null)
                     throw new Catalogattrnotfound(null,
                             "Catalog: Attribute not Found!");
+                tuple.tupleCopy(temp);
                 read_tuple(tuple, record);
             } catch (Exception e4) {
                 throw new AttrCatalogException(e4, "read_tuple failed");
