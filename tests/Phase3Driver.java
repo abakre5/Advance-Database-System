@@ -85,15 +85,9 @@ public class Phase3Driver implements GlobalConst {
     }
     private static boolean closeDB() {
         boolean status = OK;
-        try {
-            SystemDefs.JavabaseBM.flushAllPages();
-        } catch (PagePinnedException e) {
 
-        } catch (Exception e) {
-            e.printStackTrace();
-            status = FAIL;
-        }
-
+        flushToDisk();
+        
         try {
             SystemDefs.JavabaseDB.closeDB();
         } catch (IOException e) {
@@ -375,6 +369,23 @@ public class Phase3Driver implements GlobalConst {
         }
 
         /* flush pages to disk */
+        status = flushToDisk();
+        System.out.println();
+
+        return status;
+    }
+    private static boolean insertIntoTable(String tableName, String fileName) {
+        boolean status = readDataIntoHeapFile(tableName, fileName, false);
+        if (status) {
+            /* flush pages to disk */
+            status = flushToDisk();
+            System.out.println();
+        }
+        return status;
+    }
+
+    private static boolean flushToDisk() {
+        boolean status = OK;
         try {
             SystemDefs.JavabaseBM.flushAllPages();
         } catch(PagePinnedException e){
@@ -384,28 +395,8 @@ public class Phase3Driver implements GlobalConst {
             e.printStackTrace();
             status = FAIL;
         }
-        System.out.println();
-
         return status;
     }
-    private static boolean insertIntoTable(String tableName, String fileName) {
-        boolean status = readDataIntoHeapFile(tableName, fileName, false);
-        if (status) {
-            /* flush pages to disk */
-            try {
-                SystemDefs.JavabaseBM.flushAllPages();
-            } catch(PagePinnedException e){
-
-            } catch (Exception e) {
-                System.err.println("*** error flushing pages to disk");
-                e.printStackTrace();
-                status = FAIL;
-            }
-            System.out.println();
-        }
-        return status;
-    }
-
     private static boolean deleteFromTable(String tableName, String fileName) {
         boolean status = OK;
         int numAttribs;
@@ -422,7 +413,7 @@ public class Phase3Driver implements GlobalConst {
             line = br.readLine();
             /* Get the number of attributes from first line of input data file */
             numAttribs = Integer.parseInt(line.trim());
-            System.out.println("Number of data attributes: " + numAttribs);
+            //System.out.println("Number of data attributes: " + numAttribs);
             attrTypes = new AttrType[numAttribs];
 
             /*
@@ -510,7 +501,7 @@ public class Phase3Driver implements GlobalConst {
 
             try {
                 tableFile = new Heapfile(tableName);
-                scan = new Scan(tableFile);
+                scan = tableFile.openScan();
             } catch (Exception e) {
                 System.err.println("*** error creating Heapfile/scan");
                 e.printStackTrace();
@@ -544,7 +535,7 @@ public class Phase3Driver implements GlobalConst {
             if (numDelTuples == 0) {
                 return OK;
             }
-            //System.out.printf("Number of tuples added to table '%s': %d\n", tableName, num_tuples);
+            System.out.printf("Number of tuples in delete file %d\n", numDelTuples);
 
         } catch (FileNotFoundException e) {
             status = FAIL;
@@ -562,22 +553,30 @@ public class Phase3Driver implements GlobalConst {
          */
         RID rid = new RID();
         Tuple temp;
+        boolean tupleDel = false;
         int numRowsDeleted = 0;
         try {
-            while (status && (temp = scan.getNext(rid)) != null) {
+            while (!delTuples.isEmpty() && status && ((temp = scan.getNext(rid)) != null)) {
                 t.tupleCopy(temp);
                 if (delTuples.isEmpty()) {
                     break;
                 }
+                //System.err.println("tuple(rid=" + rid.hashCode() + ") equality: " + t.equals(delTuples.get(0)));
                 if (delTuples.contains(t)) {
-                    tableFile.deleteRecord(rid);
+                    tupleDel = tableFile.deleteRecord(rid);
+                    delTuples.remove(t);
                     numRowsDeleted++;
                 }
-                //printTuple(t, attrTypes);
             }
         } catch (Exception e) {
-            System.err.println(e);
+            System.err.println("*** error: " + e);
+            e.printStackTrace();
             status = FAIL;
+        }
+
+        if (status && (numRowsDeleted != 0)) {
+            /* flush pages to disk */
+            status = flushToDisk();
         }
         System.out.printf("Deleted %d rows from table '%s'\n", numRowsDeleted, tableName);
 
