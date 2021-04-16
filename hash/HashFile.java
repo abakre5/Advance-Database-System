@@ -1,6 +1,7 @@
 package hash;
 
 import java.io.*;
+import java.lang.management.GarbageCollectorMXBean;
 import java.security.KeyException;
 import java.util.*;
 
@@ -41,6 +42,8 @@ public class HashFile extends IndexFile implements GlobalConst {
     Heapfile datafile = null;
     String hashIndexName;
     int N;
+    boolean globalSplit = false;
+    boolean secondTry = true;
 
 
 
@@ -218,7 +221,7 @@ public class HashFile extends IndexFile implements GlobalConst {
         total_records = ii;
         current_util = a;
         System.out.println(current_util);
-
+        num_buckets--;
         System.out.println("Printing hash bucket 0");
         // FileScan s =  null;
         // Tuple tuple = null;
@@ -383,6 +386,7 @@ public class HashFile extends IndexFile implements GlobalConst {
         return header_tuple;
 
     }
+
     //PlaceHolders for delete/insert.
 
     public void insert(hash.KeyClass key, RID rid) throws IOException, FieldNumberOutOfBoundException, HFException, HFDiskMgrException, HFBufMgrException,
@@ -434,7 +438,7 @@ public class HashFile extends IndexFile implements GlobalConst {
             e.printStackTrace();
         }
 
-        double a = (num_buckets*n);
+        double a = ((num_buckets)*n);
         a = total_records/a;        
         current_util = a;
         if(current_util >= threshold) {
@@ -442,6 +446,7 @@ public class HashFile extends IndexFile implements GlobalConst {
             System.out.println("Target utilization has been crossed: "+current_util );
             crossed++;
             split = true;
+            globalSplit = true;
             split_exists = true;
             //split_position++;
             num_buckets++;
@@ -449,6 +454,7 @@ public class HashFile extends IndexFile implements GlobalConst {
             String FileName_orig_dash = "hash_buckets_"+split_position+"_1";
             String orig_File = map.get(split_position);
             Heapfile hf = new Heapfile(FileName);
+            System.out.println("Creating bucket "+FileName);
             Heapfile hf1 = new Heapfile(FileName_orig_dash);
             Heapfile hf2 = new Heapfile(orig_File);
             map.put(num_buckets, FileName);
@@ -624,7 +630,7 @@ public class HashFile extends IndexFile implements GlobalConst {
 
                 while(tuple!=null) {
                     try {
-                        //System.out.println("Key: "+ tuple.getFloFld(1) + ", "+ tuple.getIntFld(2)+ ":"+tuple.getIntFld(3));
+                        System.out.println("Key: "+ tuple.getFloFld(1) + ", "+ tuple.getIntFld(2)+ ":"+tuple.getIntFld(3));
                         rid.pageNo.pid = tuple.getIntFld(2);
                         rid.slotNo = tuple.getIntFld(3);
                         Tuple t = datafile.getRecord(rid);
@@ -681,6 +687,8 @@ public class HashFile extends IndexFile implements GlobalConst {
                     headerTuple.setHdr((short)2, Ptypes, attrSize);
 
                     System.out.println("Header "+ headerTuple.getIntFld(1) + " "+ headerTuple.getStrFld(2));
+                    Heapfile hf = new Heapfile(headerTuple.getStrFld(2));
+                    System.out.println("Count: "+ hf.getRecCnt());
                     //printheapfile(headerTuple.getStrFld(2));
                     // Heapfile hf = new Heapfile(headerTuple.getStrFld(2));
                     // System.out.println(hf.getRecCnt());
@@ -739,16 +747,97 @@ public class HashFile extends IndexFile implements GlobalConst {
         return true;
     }
 
-    public RID search(KeyClass key) throws IOException {
+    public Tuple search(KeyClass key) throws IOException {
         FloatKey floatKey = (FloatKey)key;
         Float keyValue = floatKey.getKey();
+        System.out.println("Trying to find "+keyValue);
+        Heapfile searchBucket = null;
+        if (globalSplit) {
+            split = true;
+        }
         int bucket = get_hash(keyValue);
+        String bucket_file = map.get(bucket);
+        System.out.println("Bucket Name "+ bucket_file);
 
+        try{
+            searchBucket = new Heapfile(bucket_file);
+            FileScan fs = getFileScan(bucket_file);
+            RID rid =  findKey(fs, keyValue);
+
+            if(rid == null && secondTry) {
+                if(secondTry) {
+                    System.out.println("Trying in another bucket");
+                    globalSplit = false;
+                    split = false;
+                    secondTry = false;
+                    Tuple tup = search(key);
+                    return tup;
+                }
+                return null;
+            } else if(rid == null && !secondTry) {
+                System.out.println("Key not present");
+                return null;
+
+            } else {
+                System.out.println("RID is not null for "+ keyValue);
+                System.out.println("RID "+ rid.pageNo.pid+ ":"+rid.slotNo);
+                // rid.pageNo.pid = 14;
+                // rid.slotNo = 26;
+                Tuple t = datafile.getRecord(rid);
+                System.out.println(t);
+                Tuple current_tuple = new Tuple(t.getTupleByteArray(), t.getOffset(),t.getLength());
+                attrType = new AttrType[2];
+                //short[] attrSize = new short[numAttribs];
+                for (int i = 0; i < 2; ++i) {
+                    attrType[i] = new AttrType(AttrType.attrReal);
+                }
+                current_tuple.setHdr((short)2, attrType, null);
+                System.out.println(current_tuple);
+                return current_tuple;
+            }
+
+        } catch(Exception e) {
+            e.printStackTrace();
+        }
+
+
+        return null;
+    }
+
+    public RID findKey(FileScan fs, Float key) throws IOException, JoinsException, InvalidTupleSizeException{
+        Tuple tuple = null;
+        try{
+            tuple = fs.get_next();
+        } catch(Exception e){
+            e.printStackTrace();
+        }
+        
+        RID rid = null;
+
+        while(tuple!=null) {
+            try {
+
+                if(tuple.getFloFld(1) == key) {
+                    //System.out.println("Key: "+ tuple.getFloFld(1) + ", "+ tuple.getIntFld(2)+ ":"+tuple.getIntFld(3));
+                    rid = new RID();
+                    rid.pageNo.pid = tuple.getIntFld(2);
+                    rid.slotNo = tuple.getIntFld(3);
+                    return rid;
+                }
+                //System.out.println("DEBUG: Key: "+ tuple.getFloFld(1) + ", "+ tuple.getIntFld(2)+ ":"+tuple.getIntFld(3));
+                tuple = fs.get_next();
+            }catch(Exception e){
+                e.printStackTrace();
+            }
+            
+            
+        }
         return null;
     }
     
     public int get_hash(Float value) {  
         if(split) {
+            System.out.println("Split hash function in action");
             return (value.hashCode() % (2*N));
         }
         return (value.hashCode() % N);

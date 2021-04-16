@@ -8,6 +8,7 @@ import java.time.*;
 import btree.BTreeFile;
 import btree.FloatKey;
 import btree.IndexFile;
+import btree.KeyClass;
 import btree.KeyDataEntry;
 import chainexception.ChainException;
 import diskmgr.Page;
@@ -681,7 +682,7 @@ class Ph2Driver extends TestDriver implements GlobalConst {
         } catch (Exception e) {
             e.printStackTrace();
         }
-    }while(count <=377);
+    }while(count <=200);
 
     try{
         //hf.printindex();
@@ -694,7 +695,7 @@ class Ph2Driver extends TestDriver implements GlobalConst {
     //Scanner
     int elem_count = 0;
     HashIndexFileScan hashScan = new HashUnclusteredFileScan();
-    
+    hash.KeyClass key = null;
     try {
     hashScan = (HashUnclusteredFileScan)IndexUtils.HashUnclusteredScan(hf);
     hash.KeyDataEntry entry = hashScan.get_next();
@@ -711,12 +712,29 @@ class Ph2Driver extends TestDriver implements GlobalConst {
             }
             current_tuple.setHdr((short)2, attrType, null);
 
-            //System.out.println(current_tuple.getFloFld(1) + " " + current_tuple.getFloFld(2));
+            System.out.println(current_tuple.getFloFld(1) + " " + current_tuple.getFloFld(2));
+            if(elem_count == 550)
+                key = new hash.FloatKey(current_tuple.getFloFld(1));
             elem_count++;
             }
             entry = hashScan.get_next();
         }
         System.out.println("Total elements scanned "+ elem_count);
+    
+        System.out.println("\n\n\n\n\n\n\n");
+        Tuple t = hf.search(key);
+
+        if(t!=null) {
+            System.out.println("Found.......................................\n");
+            System.out.println(t.getFloFld(1)+" "+t.getFloFld(2));
+            hf.printHeaderFile();
+        } else{
+            System.out.println("Not Found.......................................\n");
+            hf.printHeaderFile();
+            System.out.println("..................Not Found.......................................\n");
+            hf.printindex();
+        }
+
     } catch(Exception e) {
         e.printStackTrace();
     }

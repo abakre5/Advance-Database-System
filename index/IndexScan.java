@@ -101,7 +101,6 @@ public class IndexScan extends Iterator {
         }
 
         switch (index.indexType) {
-            // linear hashing is not yet implemented
             case IndexType.B_Index:
                 // error check the select condition
                 // must be of the type: value op symbol || symbol op value
@@ -120,40 +119,40 @@ public class IndexScan extends Iterator {
 
                 break;
 
-            // case IndexType.B_ClusteredIndex:
-            //     try {
-            //         clusteredIndexFile = new BTreeClusteredFile(indName);
-            //     } catch (Exception e) {
-            //         throw new IndexException(e, "IndexScan.java: BTreeFile exceptions caught from BTreeFile constructor");
-            //     }
+            case IndexType.B_ClusteredIndex:
+                try {
+                    clusteredIndexFile = new BTreeClusteredFile(indName);
+                } catch (Exception e) {
+                    throw new IndexException(e, "IndexScan.java: BTreeFile exceptions caught from BTreeFile constructor");
+                }
 
-            //     try {
-            //        indScan = (BTClusteredFileScan) IndexUtils.BTreeClusteredScan(selects, clusteredIndexFile);
-            //     } catch (Exception e) {
-            //         throw new IndexException(e, "IndexScan.java: BTreeFile exceptions caught from IndexUtils.BTree_scan().");
-            //     }
-            //     break;
+                try {
+                   indScan = (BTClusteredFileScan) IndexUtils.BTreeClusteredScan(selects, clusteredIndexFile);
+                } catch (Exception e) {
+                    throw new IndexException(e, "IndexScan.java: BTreeFile exceptions caught from IndexUtils.BTree_scan().");
+                }
+                break;
             case IndexType.Hash:
                 try{
                     hashIndexFile = new HashFile(indName);
                 } catch(Exception e){
-                    throw new IndexException(e, "IndexScan.java: BTreeFile exceptions caught from HashFile constructor");
+                    throw new IndexException(e, "IndexScan.java: HashFile exceptions caught from HashFile constructor");
                 }
 
                 try {
                     hashIndScan = (HashUnclusteredFileScan) IndexUtils.HashUnclusteredScan(hashIndexFile); 
                 } catch(Exception e) {
-                    throw new IndexException(e, "IndexScan.java: BTreeFile exceptions caught from HashFile scan");
+                    throw new IndexException(e, "IndexScan.java: HashFile exceptions caught from HashFile scan");
                 }
             case IndexType.None:
             default:
                 throw new UnknownIndexTypeException("Only BTree index is supported so far");
 
         }
-        //this.isPageCompleted = true;
-        // this.currentPage = new HFPage();
-        // this.currentPageId =  new PageId();
-        // this.currentRID = new RID();
+        this.isPageCompleted = true;
+        this.currentPage = new HFPage();
+        this.currentPageId =  new PageId();
+        this.currentRID = new RID();
 
     }
 

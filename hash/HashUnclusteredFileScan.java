@@ -37,7 +37,7 @@ public class HashUnclusteredFileScan extends HashIndexFileScan implements Global
         currentBucketName = header_names.peek();
         //header_names.size();
 
-        System.out.println("Scanning Size "+header_names.size() +currentBucketName);
+        //System.out.println("Scanning Size "+header_names.size() +currentBucketName);
     
         if(is_first_bucket_scan) {
         try {
@@ -69,7 +69,7 @@ public class HashUnclusteredFileScan extends HashIndexFileScan implements Global
             ridTuple = bucket_scan.getNext(bucketRID);
             if(ridTuple!=null) {
                 ridTuple.setHdr((short)3, attrType, attrSizes);
-                System.out.println("Bucket Entry Cnt "+ bucketEntryCnt);
+                //System.out.println("Bucket Entry Cnt "+ bucketEntryCnt);
                 bucketEntryCnt--;
                 entry.key = ridTuple.getFloFld(1);
                 RID insert_rid = new RID();
