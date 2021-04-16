@@ -80,6 +80,6 @@ public abstract class IndexFile {
      * @throws DeleteRecException        delete record failed
      * @throws IndexSearchException      index search failed
      */
-    abstract public boolean Delete(final KeyClass data, final RID rid)
+    abstract public boolean delete(final KeyClass data)
             throws IOException;
 }

@@ -718,25 +718,34 @@ class Ph2Driver extends TestDriver implements GlobalConst {
             entry = hashScan.get_next();
         
         System.out.println("Total elements scanned "+ elem_count);
-    
-        System.out.println("\n\n\n\n\n\n\n");
-        Tuple tt = hf.search(key);
-
-        if(tt!=null) {
-            System.out.println("Found.......................................\n");
-            System.out.println(tt.getFloFld(1)+" "+tt.getFloFld(2));
-            //hf.printHeaderFile();
-        } else{
-            System.out.println("******************Not Found.......................................\n");
-            //hf.printHeaderFile();
-            System.out.println("..................Not Found.......................................\n");
-            //hf.printindex();
-            break;
+        System.out.println("\n\n");
             
-        }
-      
+        if (elem_count == 121 || elem_count == 222 || elem_count == 312) {
+            System.out.println("Testing delete");
+            boolean del = hf.delete(key);
+            if (del){
+                System.out.println("Delete: "+ key+" deleted successfully");
+            }
+            System.out.println("Delete: "+ key+" Could not be deleted successfully");
+        } else {
+            System.out.println("Testing search");
+            Tuple tt = hf.search(key);
+
+            if(tt!=null) {
+                System.out.println("Found.......................................\n");
+                System.out.println(tt.getFloFld(1)+" "+tt.getFloFld(2));
+                //hf.printHeaderFile();
+            } else{
+                System.out.println("******************Not Found : Breaking ********************\n");
+                //hf.printHeaderFile();
+                System.out.println("..................Not Found.......................................\n");
+                //hf.printindex();
+                break;   
+            } 
+        } 
+          
     }
-    }
+}
     // hf.printindex();
     hf.printHeaderFile();
 } catch(Exception e) {
