@@ -1029,12 +1029,20 @@ public class Phase3Driver implements GlobalConst {
                         iteratorDesc.getNumAttr(), iteratorDesc.getStrSizes(), iteratorDesc.getScan(), groupByAttrFldSpec, aggListFldSpec,
                         aggType, iteratorDesc.getProjlist(), iteratorDesc.getNumAttr(), nPages, tableNameT);
                 groupBywithSort.getAggregateResult();
-                groupBywithSort.close();
             } catch (Exception e) {
                 e.printStackTrace();
             }
         } else {
-
+            try {
+                assert iteratorDesc != null;
+                GroupBywithHash groupBywithHash = new GroupBywithHash(iteratorDesc.getAttrType(),
+                        iteratorDesc.getNumAttr(), iteratorDesc.getStrSizes(), tableName, groupByAttrFldSpec, aggListFldSpec,aggType,
+                        iteratorDesc.getProjlist(), iteratorDesc.getNumAttr(), nPages, tableNameT);
+                groupBywithHash.getAggregateResult();
+                //groupBywithHash.close();
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
         }
         assert iteratorDesc != null;
         iteratorDesc.getScan().close();

@@ -8,7 +8,6 @@ import java.time.*;
 import btree.BTreeFile;
 import btree.FloatKey;
 import btree.IndexFile;
-import btree.KeyClass;
 import btree.KeyDataEntry;
 import chainexception.ChainException;
 import diskmgr.Page;
@@ -330,9 +329,6 @@ class Ph2Driver extends TestDriver implements GlobalConst {
         System.out.println("---------------------------------------------------------------------------------------------------------\n");
         System.out.println("Finding skylines using BlockNestedLoopsSky operator...\n");
         boolean status = OK;
-        int[] pref_list = new int[2];
-        pref_list[0] = 2;
-        pref_list[1] = 3;
 
         FldSpec[] proj_list = new FldSpec[numAttribs];
         for (int i=0; i<numAttribs; ++i) {
@@ -369,7 +365,7 @@ class Ph2Driver extends TestDriver implements GlobalConst {
         try {
             while ((t = blockNestedLoopsSky.get_next()) != null) {
                 num_skylines++;
-                printTuple(t);
+                //printTuple(t);
             }
         } catch (Exception e) {
             status = FAIL;
@@ -575,14 +571,14 @@ class Ph2Driver extends TestDriver implements GlobalConst {
     }
 
 
-    public boolean HashFileTestFunctTest(){
+    public boolean HashFileTestFunctTest() {
         System.out.println("-----------------------------------------------Reached----------------------------------------------------------\n");
         boolean status = OK;
 
 
         FldSpec[] proj_list = new FldSpec[numAttribs];
-        for (int i=0; i<numAttribs; ++i) {
-            proj_list[i] = new FldSpec(new RelSpec(RelSpec.outer), i+1);
+        for (int i = 0; i < numAttribs; ++i) {
+            proj_list[i] = new FldSpec(new RelSpec(RelSpec.outer), i + 1);
         }
 
         /* initialize PageCounter to track Page reads/writes */
@@ -590,12 +586,11 @@ class Ph2Driver extends TestDriver implements GlobalConst {
         // create a scan
         FileScan scan = null;
         try {
-            scan  = new FileScan(dbfilename, attrType, null,
-                    (short)numAttribs, (short)numAttribs, proj_list, null);
-        }
-        catch (Exception e) {
+            scan = new FileScan(dbfilename, attrType, null,
+                    (short) numAttribs, (short) numAttribs, proj_list, null);
+        } catch (Exception e) {
             status = FAIL;
-            System.err.println ("Failed to create file scan: " + e);
+            System.err.println("Failed to create file scan: " + e);
         }
 
         // create an scan on the heapfile
@@ -612,33 +607,31 @@ class Ph2Driver extends TestDriver implements GlobalConst {
         HashFile hf = null;
 
         try {
-            hf = new HashFile("nc_2_7000_single.txt","HashIndex",1, AttrType.attrReal, scan, num_records,dbHeapFile);
+            hf = new HashFile("nc_2_7000_single.txt", "HashIndex", 1, AttrType.attrReal, scan, num_records, dbHeapFile);
         } catch (Exception e) {
             e.printStackTrace();
         }
 
-       System.out.println("Starting insert test");
-        
+        System.out.println("Starting insert test");
 
-        try{
+        try {
             Heapfile hf1 = new Heapfile("pc_dec_2_500_multi11.txt");
             RID rid = null;
             proj_list = new FldSpec[numAttribs];
-            for (int i=0; i<numAttribs; ++i) {
-                proj_list[i] = new FldSpec(new RelSpec(RelSpec.outer), i+1);
+            for (int i = 0; i < numAttribs; ++i) {
+                proj_list[i] = new FldSpec(new RelSpec(RelSpec.outer), i + 1);
             }
-    
+
             /* initialize PageCounter to track Page reads/writes */
             PageCounter.init();
             // create a scan
             scan = null;
             try {
-                scan  = new FileScan(dbfilename, attrType, null,
-                        (short)numAttribs, (short)numAttribs, proj_list, null);
-            }
-            catch (Exception e) {
+                scan = new FileScan(dbfilename, attrType, null,
+                        (short) numAttribs, (short) numAttribs, proj_list, null);
+            } catch (Exception e) {
                 status = FAIL;
-                System.err.println ("Failed to create file scan: " + e);
+                System.err.println("Failed to create file scan: " + e);
             }
 
 
@@ -651,107 +644,77 @@ class Ph2Driver extends TestDriver implements GlobalConst {
         int count = 0;
         do {
 
-        
-        try {
 
-            
-            record = scan.get_next1();
-            if(record!=null) {
-                data = record.getTuple();
-                rid = record.getRID();
-            } else {
-                break;
-            }
-            AttrType[] attrTypes = new AttrType[5];
-            //short[] attrSize = new short[numAttribs];
-            for (int i = 0; i < 2; ++i) {
-                attrTypes[i] = new AttrType(AttrType.attrReal);
-            }
             try {
-                data.setHdr((short) 2, attrTypes, null);
+
+
+                record = scan.get_next1();
+                if (record != null) {
+                    data = record.getTuple();
+                    rid = record.getRID();
+                } else {
+                    break;
+                }
+                AttrType[] attrTypes = new AttrType[5];
+                //short[] attrSize = new short[numAttribs];
+                for (int i = 0; i < 2; ++i) {
+                    attrTypes[i] = new AttrType(AttrType.attrReal);
+                }
+                try {
+                    data.setHdr((short) 2, attrTypes, null);
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+
+                rid = dbHeapFile.insertRecord(data.getTupleByteArray());
+
+                hf.insert(new hash.FloatKey(data.getFloFld(1)), rid);
+                count++;
+                //System.out.println("Inserted");
+
             } catch (Exception e) {
                 e.printStackTrace();
             }
+        } while (count <= 377);
 
-            rid = dbHeapFile.insertRecord(data.getTupleByteArray());
-            
-            hf.insert(new hash.FloatKey(data.getFloFld(1)), rid);
-            count++;
-            //System.out.println("Inserted");
-
+        try {
+            //hf.printindex();
+            System.out.println("=======================================================");
+            //hf.printHeaderFile();
         } catch (Exception e) {
             e.printStackTrace();
         }
-    }while(count <=420);
 
-    try{
-        //hf.printindex();
-        System.out.println("=======================================================");
-        //hf.printHeaderFile();
-    } catch (Exception e) {
-        e.printStackTrace();
-    }
+        //Scanner
+        int elem_count = 0;
+        HashIndexFileScan hashScan = new HashUnclusteredFileScan();
 
-    //Scanner
-    int elem_count = 0;
-    HashIndexFileScan hashScan = new HashUnclusteredFileScan();
-    hash.KeyClass key = null;
-    try {
-    hashScan = (HashUnclusteredFileScan)IndexUtils.HashUnclusteredScan(hf);
-    hash.KeyDataEntry entry = hashScan.get_next();
-        while(entry!=null) {
-            if(entry!=null) {
-            RID fetchRID = entry.data;
-            //System.out.println("Output :"+fetchRID.pageNo.pid + " "+fetchRID.slotNo);
-            Tuple t = dbHeapFile.getRecord(fetchRID);
-            Tuple current_tuple = new Tuple(t.getTupleByteArray(), t.getOffset(),t.getLength());
-            attrType = new AttrType[2];
-            //short[] attrSize = new short[numAttribs];
-            for (int i = 0; i < 2; ++i) {
-                attrType[i] = new AttrType(AttrType.attrReal);
+        try {
+            hashScan = (HashUnclusteredFileScan) IndexUtils.HashUnclusteredScan(hf);
+            hash.KeyDataEntry entry = hashScan.get_next();
+            while (entry != null) {
+                if (entry != null) {
+                    RID fetchRID = entry.data;
+                    //System.out.println("Output :"+fetchRID.pageNo.pid + " "+fetchRID.slotNo);
+                    Tuple t = dbHeapFile.getRecord(fetchRID);
+                    Tuple current_tuple = new Tuple(t.getTupleByteArray(), t.getOffset(), t.getLength());
+                    attrType = new AttrType[2];
+                    //short[] attrSize = new short[numAttribs];
+                    for (int i = 0; i < 2; ++i) {
+                        attrType[i] = new AttrType(AttrType.attrReal);
+                    }
+                    current_tuple.setHdr((short) 2, attrType, null);
+
+                    //System.out.println(current_tuple.getFloFld(1) + " " + current_tuple.getFloFld(2));
+                    elem_count++;
+                }
+                entry = hashScan.get_next();
             }
-            current_tuple.setHdr((short)2, attrType, null);
-
-            System.out.println(current_tuple.getFloFld(1) + " " + current_tuple.getFloFld(2));
-            key = new hash.FloatKey(current_tuple.getFloFld(1));
-            elem_count++;
-            entry = hashScan.get_next();
-        
-        System.out.println("Total elements scanned "+ elem_count);
-        System.out.println("\n\n");
-            
-        if (elem_count == 121 || elem_count == 222 || elem_count == 312) {
-            System.out.println("Testing delete");
-            boolean del = hf.delete(key);
-            if (del){
-                System.out.println("Delete: "+ key+" deleted successfully");
-            }
-            System.out.println("Delete: "+ key+" Could not be deleted successfully");
-        } else {
-            System.out.println("Testing search");
-            Tuple tt = hf.search(key);
-
-            if(tt!=null) {
-                System.out.println("Found.......................................\n");
-                System.out.println(tt.getFloFld(1)+" "+tt.getFloFld(2));
-                //hf.printHeaderFile();
-            } else{
-                System.out.println("******************Not Found : Breaking ********************\n");
-                //hf.printHeaderFile();
-                System.out.println("..................Not Found.......................................\n");
-                //hf.printindex();
-                break;   
-            } 
-        } 
-          
-    }
-}
-    // hf.printindex();
-    hf.printHeaderFile();
-} catch(Exception e) {
-        e.printStackTrace();
-    }
-    return true;
+            System.out.println("Total elements scanned " + elem_count);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return true;
     }
 
     /* BTreeSortedSky operator test */
@@ -970,7 +933,6 @@ public class Phase2Test {
         System.err.println("skyline: " + pa.skylineMethod);
         System.err.println("preferred attributes: " + Arrays.toString(pa.pref_attribs));
         System.err.println("n_pages: " + pa.n_pages);
-
         Ph2Driver ph2Driver = new Ph2Driver(pa);
         boolean dbstatus;
 
