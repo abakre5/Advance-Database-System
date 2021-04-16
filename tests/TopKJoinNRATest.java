@@ -86,6 +86,28 @@ class JoinsDriver implements GlobalConst {
         sailors.addElement(new Sailor(21, "David Parter", 21, 99.9));
         sailors.addElement(new Sailor(69, "Raghu Ramakrishnan", 19, 37.1));
         sailors.addElement(new Sailor(35, "Guri Sohi", 10, 42.1));
+        sailors.addElement(new Sailor(73, "Prasoon Tiwari", 8, 39.2));
+        sailors.addElement(new Sailor(39, "Anne Condon", 3, 30.3));
+        sailors.addElement(new Sailor(47, "Charles Fischer", 6, 46.3));
+        sailors.addElement(new Sailor(49, "James Goodman", 4, 50.3));
+        sailors.addElement(new Sailor(50, "Mark Hill", 5, 35.2));
+        sailors.addElement(new Sailor(75, "Mary Vernon", 7, 43.1));
+        sailors.addElement(new Sailor(79, "David Wood", 3, 39.2));
+        sailors.addElement(new Sailor(84, "Mark Smucker", 9, 25.3));
+        sailors.addElement(new Sailor(87, "Martin Reames", 10, 24.1));
+        sailors.addElement(new Sailor(10, "Mike Carey", 9, 40.3));
+        sailors.addElement(new Sailor(21, "David Dewitt", 10, 47.2));
+        sailors.addElement(new Sailor(29, "Tom Reps", 7, 39.1));
+        sailors.addElement(new Sailor(31, "Jeff Naughton", 5, 35.0));
+        sailors.addElement(new Sailor(35, "Miron Livny", 7, 37.6));
+        sailors.addElement(new Sailor(37, "Marv Solomon", 10, 48.9));
+
+        boats.addElement(new Boats(1, "Onion", "white"));
+        boats.addElement(new Boats(2, "Buckey", "red"));
+        boats.addElement(new Boats(3, "Enterprise", "blue"));
+        boats.addElement(new Boats(4, "Voyager", "green"));
+        boats.addElement(new Boats(5, "Wisconsin", "red"));
+
 
         reserves.addElement(new Reserves(5, 100, "05/10/95"));
         reserves.addElement(new Reserves(2, 80, "05/11/95"));
@@ -99,35 +121,8 @@ class JoinsDriver implements GlobalConst {
         reserves.addElement(new Reserves(35, 1, "05/15/95"));
 
 
-
-//        sailors.addElement(new Sailor(73, "Prasoon Tiwari", 8, 39.2));
-//        sailors.addElement(new Sailor(39, "Anne Condon", 3, 30.3));
-//        sailors.addElement(new Sailor(47, "Charles Fischer", 6, 46.3));
-//        sailors.addElement(new Sailor(49, "James Goodman", 4, 50.3));
-//        sailors.addElement(new Sailor(50, "Mark Hill", 5, 35.2));
-//        sailors.addElement(new Sailor(75, "Mary Vernon", 7, 43.1));
-//        sailors.addElement(new Sailor(79, "David Wood", 3, 39.2));
-//        sailors.addElement(new Sailor(84, "Mark Smucker", 9, 25.3));
-//        sailors.addElement(new Sailor(87, "Martin Reames", 10, 24.1));
-//        sailors.addElement(new Sailor(10, "Mike Carey", 9, 40.3));
-//        sailors.addElement(new Sailor(21, "David Dewitt", 10, 47.2));
-//        sailors.addElement(new Sailor(29, "Tom Reps", 7, 39.1));
-//        sailors.addElement(new Sailor(31, "Jeff Naughton", 5, 35.0));
-//        sailors.addElement(new Sailor(35, "Miron Livny", 7, 37.6));
-//        sailors.addElement(new Sailor(37, "Marv Solomon", 10, 48.9));
-
-        boats.addElement(new Boats(1, "Onion", "white"));
-        boats.addElement(new Boats(2, "Buckey", "red"));
-        boats.addElement(new Boats(3, "Enterprise", "blue"));
-        boats.addElement(new Boats(4, "Voyager", "green"));
-        boats.addElement(new Boats(5, "Wisconsin", "red"));
-
-
-
-
-
         boolean status = OK;
-        int numsailors = 10;
+        int numsailors = 25;
         int numsailors_attrs = 4;
         int numreserves = 10;
         int numreserves_attrs = 3;

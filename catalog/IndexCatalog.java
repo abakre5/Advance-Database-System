@@ -438,8 +438,6 @@ public class IndexCatalog extends Heapfile
         }
 
         // GET ATTRIBUTE INFO
-        attrRec.minVal = new attrData();
-        attrRec.maxVal = new attrData();
 
         try {
             ExtendedSystemDefs.MINIBASE_ATTRCAT.getInfo(relation, attrName, attrRec);
