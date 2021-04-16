@@ -216,7 +216,7 @@ public class HashFile extends IndexFile implements GlobalConst {
         System.out.println(num_buckets);
         System.out.println(n);
 
-        double a = (num_buckets*n);
+        double a = (N*n);
         a = ii/a;
         total_records = ii;
         current_util = a;
@@ -438,7 +438,7 @@ public class HashFile extends IndexFile implements GlobalConst {
             e.printStackTrace();
         }
 
-        double a = ((num_buckets)*n);
+        double a = ((N)*n);
         a = total_records/a;        
         current_util = a;
         if(current_util >= threshold) {
@@ -451,8 +451,8 @@ public class HashFile extends IndexFile implements GlobalConst {
             //split_position++;
             num_buckets++;
             String FileName = "hash_buckets_"+num_buckets;
-            String FileName_orig_dash = "hash_buckets_"+split_position+"_1";
             String orig_File = map.get(split_position);
+            String FileName_orig_dash = orig_File+"_1";
             Heapfile hf = new Heapfile(FileName);
             System.out.println("Creating bucket "+FileName);
             Heapfile hf1 = new Heapfile(FileName_orig_dash);
@@ -479,7 +479,9 @@ public class HashFile extends IndexFile implements GlobalConst {
             }
             Scan bucket_scan = null;
             String fname = map.get(split_position);
-            System.out.println("Trying to open : "+fname);
+            System.out.println("Trying to open : "+fname+ " to read");
+            System.out.println("Trying to open : "+fname+ " to read");
+
             //System.out.println(fname);
             //bucketFile = new Heapfile(fname);
 
@@ -501,11 +503,11 @@ public class HashFile extends IndexFile implements GlobalConst {
                         int hash2_value = get_hash(value);
     
                         if(hash2_value == split_position) {
-                            //System.out.println("Hashed to same file");
+                            System.out.println("Hashed to same file");
                             hf1.insertRecord(tuple.getTupleByteArray());
     
                         } else {
-                            //System.out.println("Hashed to new file");
+                            System.out.println("Hashed to new file");
                             hf.insertRecord(tuple.getTupleByteArray());
                         }
                     } else {
@@ -547,6 +549,14 @@ public class HashFile extends IndexFile implements GlobalConst {
             e.printStackTrace();
         }
         split_position++;
+        
+        if(split_position == (N)) {
+            N = 2*N;
+            split = false;
+            System.out.println("Split position is as follows ->"+ split_position+" and N: "+ N);
+            split_position = 0;
+        
+        }
         
         System.out.println("Crossed value : "+crossed);
         try{
@@ -757,7 +767,7 @@ public class HashFile extends IndexFile implements GlobalConst {
         }
         int bucket = get_hash(keyValue);
         String bucket_file = map.get(bucket);
-        System.out.println("Bucket Name "+ bucket_file);
+        System.out.println("Bucket Name "+ bucket + bucket_file);
 
         try{
             searchBucket = new Heapfile(bucket_file);
@@ -779,6 +789,12 @@ public class HashFile extends IndexFile implements GlobalConst {
                 return null;
 
             } else {
+
+                if(!secondTry) {
+                    secondTry = true;
+                    globalSplit = true;
+                    split = true;
+                }
                 System.out.println("RID is not null for "+ keyValue);
                 System.out.println("RID "+ rid.pageNo.pid+ ":"+rid.slotNo);
                 // rid.pageNo.pid = 14;

@@ -682,7 +682,7 @@ class Ph2Driver extends TestDriver implements GlobalConst {
         } catch (Exception e) {
             e.printStackTrace();
         }
-    }while(count <=200);
+    }while(count <=420);
 
     try{
         //hf.printindex();
@@ -713,29 +713,33 @@ class Ph2Driver extends TestDriver implements GlobalConst {
             current_tuple.setHdr((short)2, attrType, null);
 
             System.out.println(current_tuple.getFloFld(1) + " " + current_tuple.getFloFld(2));
-            if(elem_count == 550)
-                key = new hash.FloatKey(current_tuple.getFloFld(1));
+            key = new hash.FloatKey(current_tuple.getFloFld(1));
             elem_count++;
-            }
             entry = hashScan.get_next();
-        }
+        
         System.out.println("Total elements scanned "+ elem_count);
     
         System.out.println("\n\n\n\n\n\n\n");
-        Tuple t = hf.search(key);
+        Tuple tt = hf.search(key);
 
-        if(t!=null) {
+        if(tt!=null) {
             System.out.println("Found.......................................\n");
-            System.out.println(t.getFloFld(1)+" "+t.getFloFld(2));
-            hf.printHeaderFile();
+            System.out.println(tt.getFloFld(1)+" "+tt.getFloFld(2));
+            //hf.printHeaderFile();
         } else{
-            System.out.println("Not Found.......................................\n");
-            hf.printHeaderFile();
+            System.out.println("******************Not Found.......................................\n");
+            //hf.printHeaderFile();
             System.out.println("..................Not Found.......................................\n");
-            hf.printindex();
+            //hf.printindex();
+            break;
+            
         }
-
-    } catch(Exception e) {
+      
+    }
+    }
+    // hf.printindex();
+    hf.printHeaderFile();
+} catch(Exception e) {
         e.printStackTrace();
     }
     return true;
