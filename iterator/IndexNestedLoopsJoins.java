@@ -8,6 +8,7 @@ import heap.*;
 import index.IndexException;
 import index.IndexScan;
 import index.IndexUtils;
+import tests.Phase3Utils;
 
 import java.io.File;
 import java.io.IOException;
@@ -115,36 +116,36 @@ public class IndexNestedLoopsJoins extends Iterator {
         }
 
         // TODO: Check if index present on join attr, if yes, check if BTree or Hash
-        // Get attr name
-//        AttrDesc[] attrDescs = new AttrDesc[len_in2];
-//        ExtendedSystemDefs.MINIBASE_ATTRCAT.getRelInfo(relationName, len_in2, attrDescs);
-//        int joinFldInner = OutputFilter[0].operand2.symbol.offset;
-//        String attrName = attrDescs[joinFldInner-1].attrName;
-//        int indexCnt = 0;
-//        IndexDesc[] indexDescs = null;
-//        ExtendedSystemDefs.MINIBASE_INDCAT.getAttrIndexes(relationName, attrName, indexCnt, indexDescs);
-//
-//        if (indexCnt == 0) {
-//            nlj = new NestedLoopsJoins(in1, len_in1, t1_str_sizes, in2,
-//                    len_in2, t2_str_sizes, amt_of_mem, am1,
-//                    relationName, outFilter, rightFilter, proj_list, n_out_flds);
-//        } else {
-//            IndexDesc joinIndexDesc = indexDescs[joinFldInner-1];
-//            System.out.println("Index on attr: "+attrName);
-//            if (joinIndexDesc.getAccessType().indexType == IndexType.Hash) {
-//                isHash = true;
-//            }
-//        }
 
-        PageId headerPageId = get_file_entry("innerIndex");
-        if (headerPageId == null) //file not exist
-        {
+        // Check if index is present on inner relation on given join attribute
+        int joinFldInner = OutputFilter[0].operand2.symbol.offset;
+        int indexCnt = 0;
+        IndexDesc[] indexDescsList = null;
+        Phase3Utils.checkIndexesOnTable(relationName, len_in2, joinFldInner, indexCnt, indexDescsList);
+
+        if (indexCnt == 0) {
             nlj = new NestedLoopsJoins(in1, len_in1, t1_str_sizes, in2,
                     len_in2, t2_str_sizes, amt_of_mem, am1,
                     relationName, outFilter, rightFilter, proj_list, n_out_flds);
         } else {
             nlj = null;
+            IndexDesc joinIndexDesc = indexDescsList[joinFldInner-1];
+            System.out.println("Index on attr: "+indexDescsList);
+            IndexType joinIndexType = joinIndexDesc.getAccessType();
+            if (joinIndexType.indexType == IndexType.Hash) {
+                isHash = true;
+            }
         }
+
+//        PageId headerPageId = get_file_entry("innerIndex");
+//        if (headerPageId == null) //file not exist
+//        {
+//            nlj = new NestedLoopsJoins(in1, len_in1, t1_str_sizes, in2,
+//                    len_in2, t2_str_sizes, amt_of_mem, am1,
+//                    relationName, outFilter, rightFilter, proj_list, n_out_flds);
+//        } else {
+//            nlj = null;
+//        }
     }
 
     private PageId get_file_entry(String filename)

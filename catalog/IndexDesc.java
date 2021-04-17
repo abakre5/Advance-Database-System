@@ -19,5 +19,9 @@ public class IndexDesc {
     int clustered = 0;                 //
     int distinctKeys = 0;              // no of distinct key values
     int indexPages = 0;                // no of index pages
+
+    public IndexType getAccessType() {
+        return accessType;
+    }
 };
 

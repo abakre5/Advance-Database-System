@@ -5,37 +5,42 @@ import catalog.*;
 import global.AggType;
 import global.AttrType;
 import global.ExtendedSystemDefs;
-import global.TupleOrder;
+import global.RID;
+import hash.HashFile;
+import hash.HashIndexFileScan;
+import hash.HashUnclusteredFileScan;
+import hash.ScanIteratorException;
 import heap.*;
-import tests.Phase3Driver;
+import index.IndexUtils;
 import tests.Phase3Utils;
 
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * @author Abhishek Bakare
- */
-public class GroupBywithSort {
+public class GroupBywithHash {
 
     private final AttrType[] attrType;
     private final short noOfColumns;
     private final short[] strSize;
-    private final Iterator itr;
+    private final String tableName;
     private final FldSpec groupByAttr;
     private final FldSpec[] aggList;
     private final AggType aggType;
     private final FldSpec[] projList;
     private final int nOutFields;
     private final int nPages;
+    private Heapfile materHeapfile;
+    private Heapfile dbHeapFile;
+
+    private HashFile hashFile;
     private final String materTableName;
 
-    private static final String SortedRelationName = "SortedTuples1";
-    private final Heapfile materHeapfile;
+    private String hashIndexName;
 
-    private Heapfile sortedTuples;
+    private Heapfile hashBucketTuples;
     private FileScan scan;
+    private HashIndexFileScan hashScan;
 
     /**
      * Perform Group by operation on a relation using @Sort class of the Minibase.
@@ -43,92 +48,86 @@ public class GroupBywithSort {
      * @param in1           Attribute Types in the relation
      * @param len_in1       No Of Columns in the relation
      * @param t1_str_sizes  String size in the relation if any
-     * @param am1           Filescan over the relation
+     * @param tableName
      * @param group_by_attr Attribute on which group by needs to be performed
      * @param agg_list      Aggregation Attributes
      * @param agg_type      Aggregation Attributes types
      * @param proj_list     Projection of each attribute in the relation
      * @param n_out_flds    no of fields in the relation
      * @param n_pages       N_PAGES
-     * @param materTableName
+     * @param tableNameT
      * @throws Exception
      */
-    public GroupBywithSort(AttrType[] in1, int len_in1, short[] t1_str_sizes,
-                           Iterator am1, FldSpec group_by_attr, FldSpec[] agg_list,
-                           AggType agg_type, FldSpec[] proj_list, int n_out_flds, int n_pages, String materTableName) throws Exception {
+    public GroupBywithHash(AttrType[] in1, int len_in1, short[] t1_str_sizes,
+                           String tableName, FldSpec group_by_attr, FldSpec[] agg_list,
+                           AggType agg_type, FldSpec[] proj_list, int n_out_flds, int n_pages, String tableNameT) throws IOException, HFException, HFBufMgrException, HFDiskMgrException, FileScanException, TupleUtilsException, InvalidRelation, JoinsException, FieldNumberOutOfBoundException, PageNotReadException, WrongPermat, InvalidTypeException, InvalidTupleSizeException, PredEvalException, UnknowAttrType {
         this.attrType = in1;
         this.noOfColumns = (short) len_in1;
         this.strSize = t1_str_sizes;
-        this.itr = am1;
+        this.tableName = tableName;
         this.groupByAttr = group_by_attr;
         this.aggList = agg_list;
         this.aggType = agg_type;
         this.projList = proj_list;
         this.nOutFields = n_out_flds;
         this.nPages = n_pages;
-        this.materTableName = materTableName;
-
-        this.materHeapfile = new Heapfile(materTableName);
-
+        this.materTableName = tableNameT;
+        this.materHeapfile = null;
         if (Phase3Utils.aggListContainsStringAttr(agg_list, in1)) {
             System.err.println("Aggregation attributes does not support String attribute!");
             return;
         }
+        this.materHeapfile = new Heapfile(materTableName);
 
-        //if (!isRelationSortedOnGroupByAttr()) {
-            System.out.println("Sorting Relation based on group by Attr.");
-            Tuple t = null;
-            sortRelation();
-            System.out.println("Sorting finished!");
-        //} else {
-//            System.out.println("Relation is already sorted on Group By Attr.");
-//            scan = (FileScan) itr;
-        //}
-    }
-    /**
-     *
-     * @return
-     * @throws Exception
-     */
-    private boolean isRelationSortedOnGroupByAttr() throws Exception {
-        Tuple curr = itr.get_next();
-        while (curr != null) {
-            curr = new Tuple(curr);
-            Tuple next = itr.get_next();
-            if (next != null) {
-                next = new Tuple(next);
-                int isT1GreaterThanT2 = TupleUtils.CompareTupleWithTuple(attrType[groupByAttr.offset], curr, groupByAttr.offset, next, groupByAttr.offset);
-                if (isT1GreaterThanT2 == 1) {
-                    return false;
-                }
+        this.hashIndexName = tableName + "HASH" + (groupByAttr.offset);
+        System.out.println("Hash Index name: " + this.hashIndexName);
+
+        this.dbHeapFile  = new Heapfile(tableName);
+        System.out.println("No of elements: " + noOfColumns);
+        System.out.println("Attr type no: " + in1.length);
+        System.out.println("Project No : " + proj_list.length);
+        scan = new FileScan(tableName, attrType, strSize, noOfColumns, noOfColumns, proj_list, null);
+        if (!ifIndexExistOnTheTable()) {
+            try {
+                hashFile = new HashFile("", hashIndexName, group_by_attr.offset,
+                        new AttrType(attrType[groupByAttr.offset - 1].attrType).attrType,
+                        scan, dbHeapFile.getRecCnt(), dbHeapFile);
+            } catch (Exception e) {
+                System.err.println("Error occurred while creating Index.");
+                return;
             }
-            curr = next;
+            System.out.println("Hash Index created on group by attr -> " + groupByAttr.offset);
+        } else {
+            hashFile = new HashFile(hashIndexName);
+            System.out.println("Reusing hash index created on group by attr -> " + groupByAttr.offset);
         }
-        return true;
     }
 
-    /**
-     * Perform sort on the given relation and stores sort result in a new heap file.
-     *
-     * @throws Exception
-     */
-    private void sortRelation() throws Exception {
-        TupleOrder order = new TupleOrder(TupleOrder.Ascending);
-        Sort sortedRelation = new Sort(attrType, noOfColumns, strSize, itr, groupByAttr.offset, order, noOfColumns, nPages);
-        sortedTuples = new Heapfile(SortedRelationName);
-        Tuple tuple = null;
-        while ((tuple = sortedRelation.get_next()) != null) {
-            sortedTuples.insertRecord(new Tuple(tuple).returnTupleByteArray());
+    private boolean ifIndexExistOnTheTable() {
+        try {
+            int numOfRecords = new Heapfile(hashIndexName).getRecCnt();
+            if (numOfRecords > 0) {
+                System.out.println("Hash Index present on group by attr");
+                return true;
+            }
+        } catch (InvalidSlotNumberException | InvalidTupleSizeException | HFDiskMgrException | HFBufMgrException | IOException | HFException e) {
+            e.printStackTrace();
         }
+        System.out.println("Hash Index not present ... Creating one");
+        return false;
     }
+
 
     /**
      * @return a list of tuples for the desired aggregation operator.
      * @throws Exception
      */
-    public void getAggregateResult() throws IOException, InvalidTypeException, WrongPermat, JoinsException, PredEvalException, UnknowAttrType, PageNotReadException, InvalidTupleSizeException, FieldNumberOutOfBoundException, FileScanException, TupleUtilsException, InvalidRelation, FileAlreadyDeletedException, HFBufMgrException, InvalidSlotNumberException, HFDiskMgrException {
-        scan = new FileScan(SortedRelationName, attrType, strSize,
-                noOfColumns, noOfColumns, projList, null);
+    public void getAggregateResult() throws IOException, InvalidTypeException, WrongPermat, JoinsException, PredEvalException, UnknowAttrType, PageNotReadException, InvalidTupleSizeException, FieldNumberOutOfBoundException, FileScanException, TupleUtilsException, InvalidRelation {
+        try {
+            hashScan = (HashUnclusteredFileScan) IndexUtils.HashUnclusteredScan(hashFile);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
         System.out.println("Computing " + aggType.toString() + " ...");
         try {
             switch (aggType.aggType) {
@@ -149,17 +148,15 @@ public class GroupBywithSort {
             System.out.println("Error occurred -> " + e.getMessage());
             e.printStackTrace();
         }
-        System.out.println("Done!");
-        scan.close();
-        sortedTuples.deleteFile();
         //Phase3Utils.writeToDisk();
+        System.out.println("Done!");
     }
 
     /**
      * @return list of tuples from each group which is min of that group based on agg_list.
      * @throws Exception
      */
-    private List<Tuple> getMin() throws IOException, InvalidTypeException, PageNotReadException, JoinsException, PredEvalException, WrongPermat, UnknowAttrType, InvalidTupleSizeException, FieldNumberOutOfBoundException, TupleUtilsException, SpaceNotAvailableException, HFException, HFBufMgrException, InvalidSlotNumberException, HFDiskMgrException, Catalogrelexists, Catalogmissparam, Catalognomem, RelCatalogException, Cataloghferror, Catalogdupattrs, Catalogioerror {
+    private List<Tuple> getMin() throws Exception {
         int SIZE_OF_INT = 4;
         attrInfo[] attrs = new attrInfo[2];
 
@@ -181,8 +178,15 @@ public class GroupBywithSort {
         float min = Float.MAX_VALUE;
         float groupByAttrValue = 0;
         int rows = 0;
-        while ((tuple = scan.get_next()) != null) {
-            tuple = new Tuple(tuple);
+
+
+
+        hash.KeyDataEntry entry = hashScan.get_next();
+        while (entry != null) {
+            RID fetchRID = entry.data;
+            tuple = dbHeapFile.getRecord(fetchRID);
+            tuple = new Tuple(tuple.getTupleByteArray(), tuple.getOffset(), tuple.getLength());
+            tuple.setHdr(noOfColumns, attrType, null);
             int index = groupByAttr.offset;
             groupByAttrValue = getAttrVal(tuple, index, attrType[index - 1]);
             if (previousGroupByAttrValue == Float.MIN_VALUE) {
@@ -203,6 +207,8 @@ public class GroupBywithSort {
                 rows++;
             }
             previousGroupByAttrValue = groupByAttrValue;
+
+            entry = hashScan.get_next();
         }
         assert minTuple != null;
         rows++;
@@ -213,40 +219,13 @@ public class GroupBywithSort {
         return minElementsOfEachGroup;
     }
 
-    private Tuple getAggTuple(float groupByAttrValue, int groupByAttr, float aggVal, AttrType aggAttrType) {
-        Tuple t = new Tuple();
-        try {
-            AttrType[] attrTypes = {attrType[groupByAttr - 1], aggAttrType};
-            short[] strSizes = new short[1];
-            try {
-                t.setHdr((short) 2, attrTypes, strSizes);
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-
-            if (attrType[groupByAttr - 1].attrType == AttrType.attrInteger) {
-                t.setIntFld(1, (int) groupByAttrValue);
-            } else {
-                t.setFloFld(1, groupByAttrValue);
-            }
-            if (aggAttrType.attrType == AttrType.attrInteger) {
-                t.setIntFld(2, (int) aggVal);
-            } else {
-                t.setFloFld(2, aggVal);
-            }
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-
-        return t;
-    }
-
     /**
      * @return list of tuples from each group which is max of that group based on agg_list.
      * @throws Exception
      */
-    private List<Tuple> getMax() throws IOException, InvalidTypeException, PageNotReadException, JoinsException, PredEvalException, WrongPermat, UnknowAttrType, InvalidTupleSizeException, FieldNumberOutOfBoundException, TupleUtilsException, SpaceNotAvailableException, HFException, HFBufMgrException, InvalidSlotNumberException, HFDiskMgrException, Catalogrelexists, Catalogmissparam, Catalognomem, RelCatalogException, Cataloghferror, Catalogdupattrs, Catalogioerror {
+    private List<Tuple> getMax() throws Exception {
 
+        List<Tuple> maxElementsOfEachGroup = new ArrayList<>();
         int SIZE_OF_INT = 4;
         attrInfo[] attrs = new attrInfo[2];
 
@@ -261,14 +240,18 @@ public class GroupBywithSort {
         attrs[1].attrLen = (attrType[aggList[0].offset - 1].attrType == AttrType.attrInteger) ? SIZE_OF_INT : 0;
         ExtendedSystemDefs.MINIBASE_RELCAT.createRel(materTableName, 2, attrs);
 
-        Tuple tuple;
+        Tuple tuple = null;
         float previousGroupByAttrValue = Float.MAX_VALUE;
-        List<Tuple> maxElementsOfEachGroup = new ArrayList<>();
         Tuple minTuple = null;
         float max = Float.MIN_VALUE;
         float groupByAttrValue = 0;
-        while ((tuple = scan.get_next()) != null) {
-            tuple = new Tuple(tuple);
+
+        hash.KeyDataEntry entry = hashScan.get_next();
+        while (entry != null) {
+            RID fetchRID = entry.data;
+            tuple = dbHeapFile.getRecord(fetchRID);
+            tuple = new Tuple(tuple.getTupleByteArray(), tuple.getOffset(), tuple.getLength());
+            tuple.setHdr(noOfColumns, attrType, null);
             int index = groupByAttr.offset;
             groupByAttrValue = getAttrVal(tuple, index, attrType[index - 1]);
             if (previousGroupByAttrValue == Float.MAX_VALUE) {
@@ -288,6 +271,8 @@ public class GroupBywithSort {
                 minTuple = tuple;
             }
             previousGroupByAttrValue = groupByAttrValue;
+
+            entry = hashScan.get_next();
         }
         maxElementsOfEachGroup.add(minTuple);
         materHeapfile.insertRecord(new Tuple(getAggTuple(groupByAttrValue, groupByAttr.offset, max,
@@ -302,8 +287,9 @@ public class GroupBywithSort {
      * @return list of tuples from each group having average of that group based on agg_list.
      * @throws Exception
      */
-    private List<Tuple> getAvg() throws IOException, InvalidTypeException, PageNotReadException, JoinsException, PredEvalException, WrongPermat, UnknowAttrType, InvalidTupleSizeException, FieldNumberOutOfBoundException, TupleUtilsException, SpaceNotAvailableException, HFException, HFBufMgrException, InvalidSlotNumberException, HFDiskMgrException, Catalogrelexists, Catalogmissparam, Catalognomem, RelCatalogException, Cataloghferror, Catalogdupattrs, Catalogioerror {
+    private List<Tuple> getAvg() throws Exception {
         int SIZE_OF_INT = 4;
+        List<Tuple> avgElementsOfEachGroup = new ArrayList<>();
         attrInfo[] attrs = new attrInfo[2];
 
         attrs[0] = new attrInfo();
@@ -319,12 +305,16 @@ public class GroupBywithSort {
         ExtendedSystemDefs.MINIBASE_RELCAT.createRel(materTableName, 2, attrs);
         Tuple tuple;
         float previousGroupByAttrValue = Float.MAX_VALUE;
-        List<Tuple> avgElementsOfEachGroup = new ArrayList<>();
         float sum = 0;
         int count = 0;
         float groupByAttrValue = 0;
-        while ((tuple = scan.get_next()) != null) {
-            tuple = new Tuple(tuple);
+
+        hash.KeyDataEntry entry = hashScan.get_next();
+        while (entry != null) {
+            RID fetchRID = entry.data;
+            tuple = dbHeapFile.getRecord(fetchRID);
+            tuple = new Tuple(tuple.getTupleByteArray(), tuple.getOffset(), tuple.getLength());
+            tuple.setHdr(noOfColumns, attrType, null);
             int index = groupByAttr.offset;
             groupByAttrValue = getAttrVal(tuple, index, attrType[index - 1]);
             if (previousGroupByAttrValue == Float.MAX_VALUE) {
@@ -341,6 +331,8 @@ public class GroupBywithSort {
             }
             count++;
             previousGroupByAttrValue = groupByAttrValue;
+
+            entry = hashScan.get_next();
         }
         Tuple t = getAggTuple(previousGroupByAttrValue, groupByAttr.offset, sum / count, new AttrType(AttrType.attrReal));
         materHeapfile.insertRecord(new Tuple(t).returnTupleByteArray());
@@ -369,6 +361,7 @@ public class GroupBywithSort {
      * @throws Exception
      */
     private List<Tuple> getSkyline() throws Exception {
+
         int SIZE_OF_INT = 4;
         attrInfo[] attrs = new attrInfo[noOfColumns];
 
@@ -380,16 +373,20 @@ public class GroupBywithSort {
         }
 
         ExtendedSystemDefs.MINIBASE_RELCAT.createRel(materTableName, noOfColumns, attrs);
-
+        List<Tuple> skylineElementsOfEachGroup = new ArrayList<>();
         Tuple tuple;
         float previousGroupByAttrValue = Float.MAX_VALUE;
-        List<Tuple> skylineElementsOfEachGroup = new ArrayList<>();
         Heapfile file = new Heapfile("SkylineComputation.in");
         int[] prefList = new int[aggList.length];
         for (int i = 0; i < aggList.length; i++) {
             prefList[i] = aggList[i].offset;
         }
-        while ((tuple = scan.get_next()) != null) {
+        hash.KeyDataEntry entry = hashScan.get_next();
+        while (entry != null) {
+            RID fetchRID = entry.data;
+            tuple = dbHeapFile.getRecord(fetchRID);
+            tuple = new Tuple(tuple.getTupleByteArray(), tuple.getOffset(), tuple.getLength());
+            tuple.setHdr(noOfColumns, attrType, null);
             tuple = new Tuple(tuple);
             int index = groupByAttr.offset;
             float groupByAttrValue = getAttrVal(tuple, index, attrType[index - 1]);
@@ -408,17 +405,15 @@ public class GroupBywithSort {
                 file.insertRecord(tuple.returnTupleByteArray());
             }
             previousGroupByAttrValue = groupByAttrValue;
+
+            entry = hashScan.get_next();
         }
 
         FileScan scan = new FileScan("SkylineComputation.in", attrType, strSize, noOfColumns, noOfColumns, projList, null);
         BlockNestedLoopsSky blockNestedLoopsSky = new BlockNestedLoopsSky(attrType, noOfColumns, strSize, scan, "SkylineComputation.in", prefList, prefList.length, nPages);
-        //skylineElementsOfEachGroup.addAll(blockNestedLoopsSky.getAllSkylineMembers());
         Phase3Utils.insertIntoTable(blockNestedLoopsSky.getAllSkylineMembers(), materHeapfile);
         scan.close();
         file.deleteFile();
-        /**
-         * last element
-         */
         return skylineElementsOfEachGroup;
     }
 
@@ -439,13 +434,32 @@ public class GroupBywithSort {
         }
     }
 
-    /**
-     * Close the open instance of the intermediate heap file containing sorted tuples for the given group by attribute.
-     *
-     * @throws Exception
-     */
-    public void close() throws HFDiskMgrException, InvalidTupleSizeException, IOException, InvalidSlotNumberException, FileAlreadyDeletedException, HFBufMgrException {
-        sortedTuples.deleteFile();
+    private Tuple getAggTuple(float groupByAttrValue, int groupByAttr, float aggVal, AttrType aggAttrType) {
+        Tuple t = new Tuple();
+        try {
+            AttrType[] attrTypes = {attrType[groupByAttr - 1], aggAttrType};
+            short[] strSizes = new short[1];
+            try {
+                t.setHdr((short) 2, attrTypes, strSizes);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+
+            if (attrType[groupByAttr - 1].attrType == AttrType.attrInteger) {
+                t.setIntFld(1, (int) groupByAttrValue);
+            } else {
+                t.setFloFld(1, groupByAttrValue);
+            }
+            if (aggAttrType.attrType == AttrType.attrInteger) {
+                t.setIntFld(2, (int) aggVal);
+            } else {
+                t.setFloFld(2, aggVal);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        return t;
     }
 
 }
