@@ -3,16 +3,19 @@ package iterator;
 import bufmgr.PageNotReadException;
 import global.AttrType;
 import global.RID;
-import heap.*;
+import heap.FieldNumberOutOfBoundException;
+import heap.InvalidTupleSizeException;
+import heap.InvalidTypeException;
+import heap.Tuple;
 
 import java.io.IOException;
 import java.util.*;
 
 import static global.AttrType.*;
 
-public class TopK_NRAJoin {
+public class TopK_NRAJoinString {
 
-    List<CandidateDetailsNRAReal> topKCandidate = new ArrayList<>();
+    List<CandidateDetailsNRAString> topKCandidate = new ArrayList<>();
     ArrayList<ArrayList<Float>> topKCandidateIndexList = new ArrayList<ArrayList<Float>>();
     AttrType[] in1;
     int len_in1;
@@ -32,7 +35,7 @@ public class TopK_NRAJoin {
     boolean relation2TuplePartOfCandidateList = false;
     boolean containsDuplicates = false;
 
-    public TopK_NRAJoin(AttrType[] in1, int len_in1, short[] t1_str_sizes, FldSpec joinAttr1, FldSpec mergeAttr1, AttrType[] in2, int len_in2, short[] t2_str_sizes, FldSpec joinAttr2, FldSpec mergeAttr2, String relationName1, String relationName2, int k, int n_pages) throws IOException, PageNotReadException, WrongPermat, JoinsException, InvalidTypeException, TupleUtilsException, UnknowAttrType, FileScanException, PredEvalException, InvalidTupleSizeException, InvalidRelation, FieldNumberOutOfBoundException {
+    public TopK_NRAJoinString(AttrType[] in1, int len_in1, short[] t1_str_sizes, FldSpec joinAttr1, FldSpec mergeAttr1, AttrType[] in2, int len_in2, short[] t2_str_sizes, FldSpec joinAttr2, FldSpec mergeAttr2, String relationName1, String relationName2, int k, int n_pages) throws IOException, PageNotReadException, WrongPermat, JoinsException, InvalidTypeException, TupleUtilsException, UnknowAttrType, FileScanException, PredEvalException, InvalidTupleSizeException, InvalidRelation, FieldNumberOutOfBoundException {
         this.in1 = in1;
         this.len_in1 = len_in1;
         this.t1_str_sizes = t1_str_sizes;
@@ -57,8 +60,8 @@ public class TopK_NRAJoin {
     private void computeKJoin() throws Exception {
         FileScan relation1 = getFileScan(relationName1, (short) len_in1, in1, t1_str_sizes);
         FileScan relation2 = getFileScan(relationName2, (short) len_in2, in2, t2_str_sizes);
-        float joinAttributeValue1 = 0;
-        float joinAttributeValue2 = 0;
+        String joinAttributeValue1 = null;
+        String joinAttributeValue2 = null;
         float mergeAttributeValue1 = 0;
         float mergeAttributeValue2 = 0;
 
@@ -74,16 +77,8 @@ public class TopK_NRAJoin {
                 if (tupleRIDRelation1 != null) {
                     tupleRelation1 = tupleRIDRelation1.getTuple();
                     AttrType x = in1[joinAttr1.offset - 1];
-                    switch (x.attrType) {
-                        case attrString:
-                            //return "attrString";
-                            break;
-                        case attrInteger:
-                            joinAttributeValue1 = (float) tupleRelation1.getIntFld(joinAttr1.offset);
-                            break;
-                        case attrReal:
-                            joinAttributeValue1 = tupleRelation1.getFloFld(joinAttr1.offset);
-                            break;
+                    if (x.attrType == attrString) {
+                        joinAttributeValue1 = tupleRelation1.getStrFld(joinAttr1.offset);
                     }
 
                     AttrType y = in1[mergeAttr1.offset - 1];
@@ -99,16 +94,8 @@ public class TopK_NRAJoin {
                 if (tupleRIDRelation2 != null) {
                     tupleRelation2 = tupleRIDRelation2.getTuple();
                     AttrType x = in1[joinAttr1.offset - 1];
-                    switch (x.attrType) {
-                        case attrString:
-                            //return "attrString";
-                            break;
-                        case attrInteger:
-                            joinAttributeValue2 = (float) tupleRelation2.getIntFld(joinAttr2.offset);
-                            break;
-                        case attrReal:
-                            joinAttributeValue2 = tupleRelation2.getFloFld(joinAttr2.offset);
-                            break;
+                    if (x.attrType == attrString) {
+                        joinAttributeValue2 = tupleRelation2.getStrFld(joinAttr2.offset);
                     }
 
                     AttrType y = in1[mergeAttr1.offset - 1];
@@ -125,28 +112,28 @@ public class TopK_NRAJoin {
                 relation2TuplePartOfCandidateList = false;
 
                 if (tupleRIDRelation1 != null) {
-                    Set<CandidateDetailsNRAReal> duplicateCandidate = checkTupleWithTopKCandidate(joinAttributeValue1, mergeAttributeValue1, tupleRIDRelation1.getRID());
+                    Set<CandidateDetailsNRAString> duplicateCandidate = checkTupleWithTopKCandidate(joinAttributeValue1, mergeAttributeValue1, tupleRIDRelation1.getRID());
                     if (duplicateCandidate.size() > 0) {
-                        for (CandidateDetailsNRAReal candidateDetailsNRAReal : duplicateCandidate) {
-                            addToTopKCandidateIndexList(topKCandidate.size(), candidateDetailsNRAReal.getLowerBound(), candidateDetailsNRAReal.getUpperBound());
-                            topKCandidate.add(candidateDetailsNRAReal);
+                        for (CandidateDetailsNRAString candidateDetails : duplicateCandidate) {
+                            addToTopKCandidateIndexList(topKCandidate.size(), candidateDetails.getLowerBound(), candidateDetails.getUpperBound());
+                            topKCandidate.add(candidateDetails);
                         }
                         relation1TuplePartOfCandidateList = true;
                     }
                     if (!relation1TuplePartOfCandidateList) {
-                        CandidateDetailsNRAReal tmp = new CandidateDetailsNRAReal(tupleRIDRelation1.getRID(), null, new float[]{mergeAttributeValue1, 0}, new float[]{mergeAttributeValue1, mergeAttributeValue2}, true, false, joinAttributeValue1);
+                        CandidateDetailsNRAString tmp = new CandidateDetailsNRAString(tupleRIDRelation1.getRID(), null, new float[]{mergeAttributeValue1, 0}, new float[]{mergeAttributeValue1, mergeAttributeValue2}, true, false, joinAttributeValue1);
                         addToTopKCandidateIndexList(topKCandidate.size(), tmp.getLowerBound(), tmp.getUpperBound());
                         topKCandidate.add(tmp);
 
                     }
                 }
                 if (tupleRIDRelation2 != null) {
-                    Set<CandidateDetailsNRAReal> duplicateCandidate2 = checkTupleWithTopKCandidate2(joinAttributeValue2, mergeAttributeValue2, tupleRIDRelation2.getRID());
+                    Set<CandidateDetailsNRAString> duplicateCandidate2 = checkTupleWithTopKCandidate2(joinAttributeValue2, mergeAttributeValue2, tupleRIDRelation2.getRID());
 
                     if (duplicateCandidate2.size() > 0) {
-                        for (CandidateDetailsNRAReal candidateDetailsNRAReal : duplicateCandidate2) {
-                            addToTopKCandidateIndexList(topKCandidate.size(), candidateDetailsNRAReal.getLowerBound(), candidateDetailsNRAReal.getUpperBound());
-                            topKCandidate.add(candidateDetailsNRAReal);
+                        for (CandidateDetailsNRAString candidateDetails : duplicateCandidate2) {
+                            addToTopKCandidateIndexList(topKCandidate.size(), candidateDetails.getLowerBound(), candidateDetails.getUpperBound());
+                            topKCandidate.add(candidateDetails);
                         }
                         // check this assignment is correct or not.
                         relation2TuplePartOfCandidateList = true;
@@ -154,7 +141,7 @@ public class TopK_NRAJoin {
 
                     if (!relation2TuplePartOfCandidateList) {
                         //DOn't use default value as 1000 for upper bound use value of first tuple if complementry relation. - solved.
-                        CandidateDetailsNRAReal tmp = new CandidateDetailsNRAReal(null, tupleRIDRelation2.getRID(), new float[]{0, mergeAttributeValue2}, new float[]{mergeAttributeValue1, mergeAttributeValue2}, false, true, joinAttributeValue2);
+                        CandidateDetailsNRAString tmp = new CandidateDetailsNRAString(null, tupleRIDRelation2.getRID(), new float[]{0, mergeAttributeValue2}, new float[]{mergeAttributeValue1, mergeAttributeValue2}, false, true, joinAttributeValue2);
                         addToTopKCandidateIndexList(topKCandidate.size(), tmp.getLowerBound(), tmp.getUpperBound());
                         topKCandidate.add(tmp);
                     }
@@ -172,7 +159,7 @@ public class TopK_NRAJoin {
                 tupleRIDRelation1 = relation1.get_next1();
                 tupleRIDRelation2 = relation2.get_next1();
 
-//                System.out.println("Number of elements in the candidate list : " + topKCandidate.size());
+                System.out.println("Number of elements in the candidate list : " + topKCandidate.size());
             }
 
             int counter = 1;
@@ -190,8 +177,8 @@ public class TopK_NRAJoin {
                 }
                 Tuple rid_tuple = new Tuple(t1.getTupleByteArray(), t1.getOffset(), t1.getLength());
                 rid_tuple.setHdr((short) in1.length, in1, t1_str_sizes);
-//                System.out.println("Printed tuple for t1 : "  + rid_tuple.getIntFld(1) + " " + rid_tuple.getStrFld(2) + " " + rid_tuple.getIntFld(3) + " " + rid_tuple.getFloFld(4));
                 rid_tuple.print(in1);
+//                System.out.println("Printed tuple for t1 : "  + rid_tuple.getIntFld(1) + " " + rid_tuple.getStrFld(2) + " " + rid_tuple.getIntFld(3) + " " + rid_tuple.getFloFld(4));
                 Tuple t2 = new Tuple();
                 try {
                     t2.setHdr((short) in2.length, in2, t2_str_sizes);
@@ -241,12 +228,12 @@ public class TopK_NRAJoin {
         topKCandidateIndexList.add(tmp);
     }
 
-    private Set<CandidateDetailsNRAReal> checkTupleWithTopKCandidate(float joinAttributeValue1, float mergeAttributeValue1, RID tuple1Rid) {
+    private Set<CandidateDetailsNRAString> checkTupleWithTopKCandidate(String joinAttributeValue1, float mergeAttributeValue1, RID tuple1Rid) {
         int i = 0;
-        Set<CandidateDetailsNRAReal> tmp = new LinkedHashSet<>();
-        for (CandidateDetailsNRAReal candidateDetails : topKCandidate) {
+        Set<CandidateDetailsNRAString> tmp = new LinkedHashSet<>();
+        for (CandidateDetailsNRAString candidateDetails : topKCandidate) {
             boolean candidateFlagToUpdateTheBounds = true;
-            if (candidateDetails.getIdentifier() == joinAttributeValue1) {
+            if (candidateDetails.getIdentifier().equals(joinAttributeValue1)) {
                 if (!candidateDetails.isRelation1Seen()) {
                     // add one if condition to check if( setRelation1Seen != true) to handle duplicates.
                     // else part of this new if should add new entry to the list.
@@ -264,7 +251,7 @@ public class TopK_NRAJoin {
                     lowerBound[0] = mergeAttributeValue1;
                     float[] upperBound = Arrays.copyOf(candidateDetails.getUpperBound(), 2);
                     upperBound[0] = mergeAttributeValue1;
-                    CandidateDetailsNRAReal tmp1 = new CandidateDetailsNRAReal(tuple1Rid, candidateDetails.getRidRel2(),
+                    CandidateDetailsNRAString tmp1 = new CandidateDetailsNRAString(tuple1Rid, candidateDetails.getRidRel2(),
                             lowerBound, upperBound, true, true, joinAttributeValue1);
                     tmp.add(tmp1);
                 }
@@ -281,12 +268,12 @@ public class TopK_NRAJoin {
         return tmp;
     }
 
-    private Set<CandidateDetailsNRAReal> checkTupleWithTopKCandidate2(float joinAttributeValue2, float mergeAttributeValue2, RID tuple2RID) {
+    private Set<CandidateDetailsNRAString> checkTupleWithTopKCandidate2(String joinAttributeValue2, float mergeAttributeValue2, RID tuple2RID) {
         int i = 0;
-        Set<CandidateDetailsNRAReal> tmp = new LinkedHashSet<>();
-        for (CandidateDetailsNRAReal candidateDetails : topKCandidate) {
+        Set<CandidateDetailsNRAString> tmp = new LinkedHashSet<>();
+        for (CandidateDetailsNRAString candidateDetails : topKCandidate) {
             boolean candidateFlagToUpdateTheBounds = true;
-            if (candidateDetails.getIdentifier() == joinAttributeValue2) {
+            if (candidateDetails.getIdentifier().equals(joinAttributeValue2)) {
                 if (!candidateDetails.isRelation2Seen()) {
                     // add one if condition to check if( setRelation2Seen != true) to handle duplicates.
                     // further check does the old entry have relation1 data if yes you will need that data.
@@ -305,7 +292,7 @@ public class TopK_NRAJoin {
                     lowerBound[1] = mergeAttributeValue2;
                     float[] upperBound = Arrays.copyOf(candidateDetails.getUpperBound(), 2);
                     upperBound[1] = mergeAttributeValue2;
-                    CandidateDetailsNRAReal tmp1 = new CandidateDetailsNRAReal(candidateDetails.getRidRel1(), tuple2RID,
+                    CandidateDetailsNRAString tmp1 = new CandidateDetailsNRAString(candidateDetails.getRidRel1(), tuple2RID,
                             lowerBound, upperBound, true, true, joinAttributeValue2);
                     tmp.add(tmp1);
                 }

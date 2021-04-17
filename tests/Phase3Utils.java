@@ -74,4 +74,13 @@ public class Phase3Utils {
             e.printStackTrace();
         }
     }
+
+    public static boolean aggListContainsStringAttr(FldSpec[] agg_list, AttrType[] type) {
+        for (FldSpec attr : agg_list) {
+            if (!(type[attr.offset - 1].attrType == AttrType.attrInteger || type[attr.offset - 1].attrType == AttrType.attrReal)) {
+                return true;
+            }
+        }
+        return false;
+    }
 }
