@@ -70,6 +70,10 @@ public class GroupBywithSort {
 
         this.materHeapfile = new Heapfile(materTableName);
 
+        if (Phase3Utils.aggListContainsStringAttr(agg_list, in1)) {
+            System.err.println("Aggregation attributes does not support String attribute!");
+            return;
+        }
 
         //if (!isRelationSortedOnGroupByAttr()) {
             System.out.println("Sorting Relation based on group by Attr.");
@@ -81,7 +85,6 @@ public class GroupBywithSort {
 //            scan = (FileScan) itr;
         //}
     }
-
     /**
      *
      * @return

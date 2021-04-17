@@ -72,7 +72,11 @@ public class GroupBywithHash {
         this.nOutFields = n_out_flds;
         this.nPages = n_pages;
         this.materTableName = tableNameT;
-
+        
+        if (Phase3Utils.aggListContainsStringAttr(agg_list, in1)) {
+            System.err.println("Aggregation attributes does not support String attribute!");
+            return;
+        }
         this.materHeapfile = new Heapfile(materTableName);
 
         this.hashIndexName = tableName + "HASH" + (groupByAttr.offset);

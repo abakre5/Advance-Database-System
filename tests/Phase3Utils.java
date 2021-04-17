@@ -60,4 +60,14 @@ public class Phase3Utils {
 
         return new IteratorDesc(tableName, (short) numAttr, attrTypes, strSizes);
     }
+
+    public static boolean aggListContainsStringAttr(FldSpec[] agg_list, AttrType[] type) {
+        for (FldSpec attr : agg_list) {
+            if (!(type[attr.offset - 1].attrType == AttrType.attrInteger || type[attr.offset - 1].attrType == AttrType.attrReal)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
 }

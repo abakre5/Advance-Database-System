@@ -761,7 +761,7 @@ public class Phase3Driver implements GlobalConst {
         }
         return status;
     }
-    private static void dbShell() throws java.io.IOException
+    private static void dbShell() throws Exception
     {
         String commandLine;
         BufferedReader console = new BufferedReader(new InputStreamReader(System.in));
@@ -982,6 +982,10 @@ public class Phase3Driver implements GlobalConst {
                     System.out.println((java.util.Arrays.toString(tokens)));
                     performGroupBy(tokens);
                     break;
+                case "skyline":
+                    System.out.println((java.util.Arrays.toString(tokens)));
+                    performSkyline(tokens);
+                    break;
                 case "join": {
                     if (!dbOpen) {
                         System.out.println(cmd + ": no database is open");
@@ -1009,6 +1013,41 @@ public class Phase3Driver implements GlobalConst {
 
     }
 
+    private static void performSkyline(String[] tokens) throws Exception {
+        String typeOfSkyline = tokens[1];
+        int[] prefList = getAggList(tokens[2]);
+        String tableName = tokens[3];
+        int nPages = Integer.parseInt(tokens[4]);
+        String materTableName = null;
+        if (tokens.length > 5 ){
+            materTableName = tokens[6];
+        }
+
+        IteratorDesc iteratorDesc = Phase3Utils.getTableItr(tableName);
+
+        switch (typeOfSkyline.toLowerCase()) {
+            case "nls":
+                break;
+            case "bnls":
+                assert iteratorDesc != null;
+                BlockNestedLoopsSky blockNestedLoopsSky = new BlockNestedLoopsSky(iteratorDesc.getAttrType(), iteratorDesc.getNumAttr(),
+                        iteratorDesc.getStrSizes(), iteratorDesc.getScan(), tableName, prefList, prefList.length,nPages);
+                assert materTableName != null;
+                blockNestedLoopsSky.printSkyline(materTableName);
+                blockNestedLoopsSky.close();
+                break;
+            case "SFS":
+                break;
+            case "BTS":
+                break;
+            case "BTSS":
+                break;
+            default:
+                System.out.println("Select skyline operator from the specified list ...");
+                return;
+        }
+    }
+
     private static void performGroupBy(String[] tokens) {
         /**
          * Collect arguments
@@ -1023,7 +1062,7 @@ public class Phase3Driver implements GlobalConst {
         String tableNameT = tokens[8];
 
         AggType aggType = getGroupByAggOperatorType(aggOperator);
-        short[] aggList = getAggList(aggListNonNormalized);
+        int[] aggList = getAggList(aggListNonNormalized);
 
         IteratorDesc iteratorDesc = null;
         try {
@@ -1088,9 +1127,9 @@ public class Phase3Driver implements GlobalConst {
         return aggType;
     }
 
-    private static short[] getAggList(String aggListNonNormalized) {
+    private static int[] getAggList(String aggListNonNormalized) {
         String[] aggListStr = aggListNonNormalized.split(",");
-        short[] aggList = new short[aggListStr.length];
+        int[] aggList = new int[aggListStr.length];
         for (int i = 0;i < aggListStr.length;i++) {
             aggList[i] = Short.parseShort(aggListStr[i]);
         }
