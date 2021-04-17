@@ -37,7 +37,7 @@ public class HashUnclusteredFileScan extends HashIndexFileScan implements Global
         currentBucketName = header_names.peek();
         //header_names.size();
 
-        //System.out.println("Scanning Size "+header_names.size() +currentBucketName);
+        System.out.println("Scanning Size "+header_names.size() +currentBucketName);
     
         if(is_first_bucket_scan) {
         try {
@@ -69,7 +69,7 @@ public class HashUnclusteredFileScan extends HashIndexFileScan implements Global
             ridTuple = bucket_scan.getNext(bucketRID);
             if(ridTuple!=null) {
                 ridTuple.setHdr((short)3, attrType, attrSizes);
-                //System.out.println("Bucket Entry Cnt "+ bucketEntryCnt);
+                System.out.println("Bucket Entry Cnt "+ bucketEntryCnt);
                 bucketEntryCnt--;
                 entry.key = ridTuple.getFloFld(1);
                 RID insert_rid = new RID();
@@ -77,16 +77,14 @@ public class HashUnclusteredFileScan extends HashIndexFileScan implements Global
                 insert_rid.slotNo = ridTuple.getIntFld(3);
                 entry.data = new RID(insert_rid.pageNo,insert_rid.slotNo);
                 
-                // bucketNextRID.pageNo.pid = bucketRID.pageNo.pid;
-                // bucketNextRID.slotNo = bucketRID.slotNo;
-                // nextTuple = bucket_scan.getNext(bucketNextRID);
-                // if(nextTuple == null) {
-                //     System.out.println("This is the last entry");
-                //     header_names.remove(currentBucketCnt);
-                //     currentBucketCnt++;
-                //     bucketRID = new RID();
-                //     is_first_bucket_scan = true;
-                // }
+                if(bucketEntryCnt == 0) {
+                    System.out.println("This is the last entry");
+                    header_names.remove();
+                    currentBucketCnt++;
+                    bucketRID = new RID();
+                    is_first_bucket_scan = true;
+                    return entry;
+                }
                 
                 if(entry == null){
                     System.out.println("Null entry");
@@ -94,16 +92,7 @@ public class HashUnclusteredFileScan extends HashIndexFileScan implements Global
                 }
                 return entry;   
                     
-            } else {
-                    System.out.println("Here is the last entry");
-                    header_names.remove();
-                    currentBucketCnt++;
-                    is_first_bucket_scan = true;
-                    return entry;
-
-            }
-
-           
+            } 
             
         } catch(Exception e) {
             e.printStackTrace();
