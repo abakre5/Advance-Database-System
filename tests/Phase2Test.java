@@ -571,7 +571,7 @@ class Ph2Driver extends TestDriver implements GlobalConst {
     }
 
 
-    public boolean HashFileTestFunctTest() {
+    public boolean  HashFileTestFunctTest(){
         System.out.println("-----------------------------------------------Reached----------------------------------------------------------\n");
         boolean status = OK;
 
@@ -675,7 +675,7 @@ class Ph2Driver extends TestDriver implements GlobalConst {
             } catch (Exception e) {
                 e.printStackTrace();
             }
-        } while (count <= 377);
+        } while (count <= 420);
 
         try {
             //hf.printindex();
@@ -685,36 +685,69 @@ class Ph2Driver extends TestDriver implements GlobalConst {
             e.printStackTrace();
         }
 
-        //Scanner
-        int elem_count = 0;
-        HashIndexFileScan hashScan = new HashUnclusteredFileScan();
 
-        try {
-            hashScan = (HashUnclusteredFileScan) IndexUtils.HashUnclusteredScan(hf);
-            hash.KeyDataEntry entry = hashScan.get_next();
-            while (entry != null) {
-                if (entry != null) {
-                    RID fetchRID = entry.data;
-                    //System.out.println("Output :"+fetchRID.pageNo.pid + " "+fetchRID.slotNo);
-                    Tuple t = dbHeapFile.getRecord(fetchRID);
-                    Tuple current_tuple = new Tuple(t.getTupleByteArray(), t.getOffset(), t.getLength());
-                    attrType = new AttrType[2];
-                    //short[] attrSize = new short[numAttribs];
-                    for (int i = 0; i < 2; ++i) {
-                        attrType[i] = new AttrType(AttrType.attrReal);
-                    }
-                    current_tuple.setHdr((short) 2, attrType, null);
-
-                    //System.out.println(current_tuple.getFloFld(1) + " " + current_tuple.getFloFld(2));
-                    elem_count++;
-                }
-                entry = hashScan.get_next();
+    //Scanner
+    int elem_count = 0;
+    HashIndexFileScan hashScan = new HashUnclusteredFileScan();
+    hash.KeyClass key = null;
+    try {
+    hashScan = (HashUnclusteredFileScan)IndexUtils.HashUnclusteredScan(hf);
+    hash.KeyDataEntry entry = hashScan.get_next();
+        while(entry!=null) {
+            if(entry!=null) {
+            RID fetchRID = entry.data;
+            System.out.println("\n\n Output :"+fetchRID.pageNo.pid + " "+fetchRID.slotNo);
+            Tuple t = dbHeapFile.getRecord(fetchRID);
+            Tuple current_tuple = new Tuple(t.getTupleByteArray(), t.getOffset(),t.getLength());
+            attrType = new AttrType[2];
+            //short[] attrSize = new short[numAttribs];
+            for (int i = 0; i < 2; ++i) {
+                attrType[i] = new AttrType(AttrType.attrReal);
             }
-            System.out.println("Total elements scanned " + elem_count);
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-        return true;
+            current_tuple.setHdr((short)2, attrType, null);
+
+            System.out.println(current_tuple.getFloFld(1) + " " + current_tuple.getFloFld(2));
+            key = new hash.FloatKey(current_tuple.getFloFld(1));
+            elem_count++;
+            entry = hashScan.get_next();
+        
+        System.out.println("Total elements scanned "+ elem_count);
+        System.out.println("\n\n");
+            
+        if (elem_count  == 100 || elem_count == 190 || elem_count == 755){
+            System.out.println("Testing delete");
+            boolean del = hf.delete(key);
+            if (del){
+                System.out.println("Delete: "+ key+" deleted successfully");
+            } else {
+                System.out.println("Delete: "+ key+" Could not be deleted successfully");
+            }
+           
+        } else {
+            System.out.println("Testing search");
+            Tuple tt = hf.search(key);
+
+            if(tt!=null) {
+                System.out.println("Found.......................................\n");
+                System.out.println(tt.getFloFld(1)+" "+tt.getFloFld(2));
+                //hf.printHeaderFile();
+            } else{
+                System.out.println("******************Not Found : Breaking ********************\n");
+                //hf.printHeaderFile();
+                System.out.println("..................Not Found.......................................\n");
+                //hf.printindex();
+                break;   
+            } 
+        } 
+          
+    } 
+}
+    // hf.printindex();
+    hf.printHeaderFile();
+} catch(Exception e) {
+        e.printStackTrace();
+    }
+    return true;
     }
 
     /* BTreeSortedSky operator test */

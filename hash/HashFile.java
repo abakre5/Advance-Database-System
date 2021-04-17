@@ -46,6 +46,17 @@ public class HashFile extends IndexFile implements GlobalConst {
     boolean secondTry = true;
 
 
+    //Constructor
+    public HashFile(String relationName,String hashFileName, int indexField, int keyType, Heapfile dbfile) throws IOException, HFException, HFDiskMgrException, HFBufMgrException,
+    InvalidTupleSizeException,InvalidSlotNumberException {
+
+        hashIndexName = hashFileName;
+        datafile = dbfile;
+        headerFile = new Heapfile(hashIndexName);
+
+
+    }
+
 
   
     //Constructor
@@ -428,6 +439,7 @@ public class HashFile extends IndexFile implements GlobalConst {
 
         int index_num = get_hash(keyValue);
         //System.out.println("Index Num: "+index_num);
+        populateMap();
         String bucket_file = map.get(index_num);
         Heapfile bucketFile = new Heapfile(bucket_file);
         
@@ -570,6 +582,37 @@ public class HashFile extends IndexFile implements GlobalConst {
     //Printing Index
 }
 
+    public void populateMap() throws IOException, InvalidTupleSizeException {
+        Scan scan = headerFile.openScan();
+        RID rid = new RID();
+        Tuple headerTuple = wrapperForHeader();
+        Tuple r = null;
+        do {
+
+            try {
+                r = (Tuple)scan.getNext(rid);
+                if(r!=null) {
+                    headerTuple = new Tuple(r.getTupleByteArray(), r.getOffset(), r.getLength());
+                    short[] attrSize = new short[1];
+        
+                    attrSize[0] = REC_LEN1;
+                    AttrType[] Ptypes = new AttrType[2];
+
+                    Ptypes[0] = new AttrType (AttrType.attrInteger);
+                    Ptypes[1] = new AttrType (AttrType.attrString);
+
+                    headerTuple.setHdr((short)2, Ptypes, attrSize);
+                    map.put(headerTuple.getIntFld(1), headerTuple.getStrFld(2));
+
+
+                } 
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        } while(r!=null);
+        
+    }
+
     public void printheapfile(String hf) throws HFBufMgrException,HFDiskMgrException,HFException,IOException, TupleUtilsException,InvalidRelation,FileScanException,FieldNumberOutOfBoundException {
         FileScan scan = getFileScan(hf);
         try {
@@ -668,6 +711,7 @@ public class HashFile extends IndexFile implements GlobalConst {
 
     } 
 
+    //DEBUG : Utility for printing headerfile contents
     public void  printHeaderFile() throws IOException, HFException, HFBufMgrException,HFDiskMgrException, InvalidTupleSizeException {
        
         Heapfile headerFile = new Heapfile(hashIndexName);
@@ -761,6 +805,16 @@ public class HashFile extends IndexFile implements GlobalConst {
                 boolean t = datafile.deleteRecord(rid);
                 if(t){
                     System.out.println("DEBUG: Record deleted successfully from datafile");
+                    double a = ((N)*n);
+                    a = total_records/a;        
+                    current_util = a;
+
+                    if(current_util < 0.20) {
+                        System.out.println("Triggering index shrink operation......");
+                        boolean shrink = triggerShrink();
+
+                    }
+
                     return true;
                 }
                 System.out.println("DEBUG: Record RID present in index but could not be deleted from data file");
@@ -912,7 +966,17 @@ public class HashFile extends IndexFile implements GlobalConst {
     
 
 
+    public boolean triggerShrink() throws IOException{
 
+        //Let's calculate how many buckets do we need to bring threshold to 60% if utilization has gone below 20%.
+        int buckets =(int) Math.ceil(total_records/(0.60*n));
+        System.out.println("Current number of buckets-> "+ num_buckets+1);        
+        System.out.println("Shrinking index to-> "+ buckets);
+
+        
+        
+        return true;
+    }
     public int get_hash(Float value) {  
         if(split) {
             System.out.println("Split hash function in action");
