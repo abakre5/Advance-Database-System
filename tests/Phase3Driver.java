@@ -177,7 +177,8 @@ public class Phase3Driver implements GlobalConst {
             String line;
             line = br.readLine();
             /* Get the number of attributes from first line of input data file */
-            numAttribs = Integer.parseInt(line.trim());
+            //System.out.println("Line one -> " + Integer.parseInt(line.split(",")[0]));
+            numAttribs = Integer.parseInt(line.split(",")[0]);
             System.out.println("Number of data attributes: " + numAttribs);
             attrTypes = new AttrType[numAttribs];
 
@@ -191,19 +192,22 @@ public class Phase3Driver implements GlobalConst {
             int numStringAttr = 0;
             for (int i = 0; i < numAttribs; ++i) {
                 schemaInfo[i] = br.readLine().trim();
-                attrInfo = schemaInfo[i].split("\\s+");
+                attrInfo = schemaInfo[i].split(",");
                 fieldNames[i] = attrInfo[0];
 
                 /* TBD: store table scehema info */
 
                 if (attrInfo[1].equalsIgnoreCase("INT")) {
                     attrTypes[i] = new AttrType(AttrType.attrInteger);
+                } else if(attrInfo[1].equalsIgnoreCase("FLOAT")) {
+                    attrTypes[i] = new AttrType(AttrType.attrReal);
                 } else {
                     attrTypes[i] = new AttrType(AttrType.attrString);
                     numStringAttr++;
                 }
             }
-            System.out.println("data" + Arrays.toString(schemaInfo));
+            System.out.println("data" + Arrays.toString(attrTypes));
+            System.out.println("Fields" + Arrays.toString(fieldNames));
 
             short[] strSizes = new short[numStringAttr];
             for (int i = 0; i < strSizes.length; ++i) {
@@ -320,13 +324,15 @@ public class Phase3Driver implements GlobalConst {
             int num_tuples = 0;
             while ((line = br.readLine()) != null) {
                 /* read each line from the file, create tuple, and insert into DB */
-                String row[] = line.trim().split("\\s+");
-                //System.out.println(Arrays.toString(row));
+                String row[] = line.trim().split(",");
+                System.out.println(Arrays.toString(row));
 
                 for (int i = 0; i < numAttribs; ++i) {
                     try {
                         if (attrTypes[i].attrType == AttrType.attrInteger) {
                             t.setIntFld(i + 1, Integer.parseInt(row[i]));
+                        } else if (attrTypes[i].attrType == AttrType.attrReal) {
+                            t.setFloFld(i + 1, Float.parseFloat(row[i]));
                         } else {
                             t.setStrFld(i + 1, row[i]);
                         }
@@ -833,7 +839,6 @@ public class Phase3Driver implements GlobalConst {
                         System.out.println("create_table: insufficent arguments");
                         break;
                     } else if (tokens.length == 6) {
-                        System.out.println("6 attr");
                         clustered = tokens[2];
                         index = tokens[3];
                         indexAttr = tokens[4];
