@@ -1,12 +1,14 @@
 package iterator;
 
 import bufmgr.PageNotReadException;
+import catalog.IndexDesc;
 import global.AttrType;
 import global.GlobalConst;
 import global.PageId;
 import global.RID;
 import heap.*;
 import index.IndexException;
+import tests.Phase3Utils;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -33,6 +35,7 @@ public class HashJoin extends Iterator {
     private String relation;
     private Scan joinScan;
     private ArrayList<Integer> oHashList, iHashList;
+    private Iterator inlj;
 
 
     public HashJoin(AttrType in1[],
@@ -93,8 +96,18 @@ public class HashJoin extends Iterator {
             throw new HashJoinException(e, "Create new heapfile failed.");
         }
 
-        if (false) {
-            // TODO: Check for hash index on both tuples -> use them for HashJoin
+        int joinFldInner = OutputFilter[0].operand2.symbol.offset;
+        int innerIndexCnt = 0;
+        IndexDesc[] innerIndexDescsList = null;
+        Phase3Utils.checkIndexesOnTable(relationName, len_in2, joinFldInner, innerIndexCnt, innerIndexDescsList);
+
+        if (innerIndexCnt > 0) {
+            try {
+                inlj = new IndexNestedLoopsJoins(in1, len_in1, t1_str_sizes, in2, len_in2, t2_str_sizes, amt_of_mem, am1, relationName,
+                        outFilter, rightFilter, proj_list, n_out_flds);
+            } catch (Exception e) {
+                throw new HashJoinException(e, "Create IndexNestedLoopJoin iterator failed");
+            }
         } else {
             try {
                 createInnerHashPartition();

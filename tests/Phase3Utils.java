@@ -1,9 +1,12 @@
 package tests;
 
 import bufmgr.PageNotReadException;
+import catalog.AttrDesc;
+import catalog.IndexDesc;
 import catalog.RelDesc;
 import global.AttrType;
 import global.ExtendedSystemDefs;
+import global.IndexType;
 import global.SystemDefs;
 import heap.*;
 import iterator.*;
@@ -59,5 +62,16 @@ public class Phase3Utils {
         }
 
         return new IteratorDesc(tableName, (short) numAttr, attrTypes, strSizes);
+    }
+
+    public static void checkIndexesOnTable(String relName, int nFlds, int attr, int indexCnt, IndexDesc[] indexDescList) {
+        AttrDesc[] attrDescs = new AttrDesc[nFlds];
+        try {
+            ExtendedSystemDefs.MINIBASE_ATTRCAT.getRelInfo(relName, nFlds, attrDescs);
+            String attrName = attrDescs[attr-1].attrName;
+            ExtendedSystemDefs.MINIBASE_INDCAT.getAttrIndexes(relName, attrName, indexCnt, indexDescList);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 }
