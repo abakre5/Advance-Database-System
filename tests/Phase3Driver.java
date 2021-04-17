@@ -1,23 +1,17 @@
 package tests;
 
-import java.io.*;
-import java.util.*;
-import java.lang.*;
-import java.time.*;
-
-import btree.BTreeFile;
-import btree.FloatKey;
-import btree.IndexFile;
 import bufmgr.PageNotReadException;
 import bufmgr.PagePinnedException;
 import catalog.*;
-import chainexception.ChainException;
-import diskmgr.Page;
 import diskmgr.PageCounter;
 import global.*;
 import heap.*;
 import iterator.*;
-import iterator.Iterator;
+
+import java.io.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 
 public class Phase3Driver implements GlobalConst {
 
@@ -364,6 +358,7 @@ public class Phase3Driver implements GlobalConst {
         }
         return status;
     }
+
     private static boolean createTable(String tableName, int indexType, int indexAttr, String filename) {
         boolean status = OK;
 
@@ -384,6 +379,7 @@ public class Phase3Driver implements GlobalConst {
 
         return status;
     }
+
     private static boolean insertIntoTable(String tableName, String fileName) {
         boolean status = readDataIntoHeapFile(tableName, fileName, false);
         if (status) {
@@ -407,6 +403,7 @@ public class Phase3Driver implements GlobalConst {
         }
         return status;
     }
+
     private static boolean deleteFromTable(String tableName, String fileName) {
         boolean status = OK;
         int numAttribs;
@@ -459,7 +456,7 @@ public class Phase3Driver implements GlobalConst {
             } catch (Exception e) {
                 status = FAIL;
                 e.printStackTrace();
-                return  status;
+                return status;
             }
 
             /*
@@ -535,15 +532,14 @@ public class Phase3Driver implements GlobalConst {
                 String row[] = line.trim().split("\\s+");
                 //System.out.println(Arrays.toString(row));
 
-                for (int i=0; i < numAttribs; ++i) {
+                for (int i = 0; i < numAttribs; ++i) {
                     try {
                         if (attrTypes[i].attrType == AttrType.attrInteger) {
                             t.setIntFld(i + 1, Integer.parseInt(row[i]));
                         } else {
                             t.setStrFld(i + 1, row[i]);
                         }
-                    }
-                    catch (Exception e) {
+                    } catch (Exception e) {
                         System.err.println("*** Heapfile error in Tuple.setFloFld() ***");
                         status = FAIL;
                         e.printStackTrace();
@@ -747,6 +743,7 @@ public class Phase3Driver implements GlobalConst {
         return status;
 
     }
+
     private static boolean createUnclusteredIndex(String tableName, int indexType, int indexAttr) {
         boolean status = OK;
         if (isTableInDB(tableName) == false) {
@@ -933,7 +930,7 @@ public class Phase3Driver implements GlobalConst {
                     String tableName = tokens[1];
                     String filename = tokens[2];
 
-                    boolean status = deleteFromTable(tableName, filename);
+                    boolean status = deleteDataFromTable(tableName, filename);
 
                     break;
                 }
@@ -978,10 +975,11 @@ public class Phase3Driver implements GlobalConst {
                 case "exit": {
                     return;
                 }
-                case "groupby":
+                case "groupby": {
                     System.out.println((java.util.Arrays.toString(tokens)));
                     performGroupBy(tokens);
                     break;
+                }
                 case "skyline":
                     System.out.println((java.util.Arrays.toString(tokens)));
                     performSkyline(tokens);
@@ -996,6 +994,22 @@ public class Phase3Driver implements GlobalConst {
                         break;
                     }
                     boolean status = performJoin(tokens);
+                    break;
+                }
+
+//    – TOPKJOIN HASH/NRA K OTABLENAME O J ATT NO O M ATT NO ITABLENAME I JATT NO I MATT NO NPAGES
+//[MATER OUTTABLENAME]
+                case "topkjoin": {
+                    System.out.println((java.util.Arrays.toString(tokens)));
+                    if (tokens.length < 10) {
+                        System.out.println("Some arguments are missing");
+                        break;
+                    }
+                    if (Integer.parseInt(tokens[2]) <= 0) {
+                        System.out.println("The value of k must be more than or equal to 1");
+                        break;
+                    }
+                    performTopK(tokens);
                     break;
                 }
                 default: {
@@ -1048,6 +1062,95 @@ public class Phase3Driver implements GlobalConst {
         }
     }
 
+    //    – TOPKJOIN HASH/NRA K OTABLENAME O J ATT NO O M ATT NO ITABLENAME I JATT NO I MATT NO NPAGES
+//[MATER OUTTABLENAME]
+    private static void performTopK(String[] tokens) {
+        boolean isHashBased = tokens[1].equalsIgnoreCase("HASH");
+        int k = Integer.parseInt(tokens[2]);
+        String outTableName = tokens[3];
+        int outJoinAttrNumber = Integer.parseInt(tokens[4]);
+        int outMergeAttrNumber = Integer.parseInt(tokens[5]);
+        String innerTableName = tokens[6];
+        int innerJoinAttrNumber = Integer.parseInt(tokens[7]);
+        int innerMergeAttrNumber = Integer.parseInt(tokens[8]);
+        int nPages = Integer.parseInt(tokens[9]);
+        String materialTableName = null;
+        if (tokens.length == 11){
+             materialTableName = tokens[10];
+        }
+        System.out.println("K : " + k + " \noutTableName = " + outTableName + " \noutJoinAttr = " + outJoinAttrNumber +
+                " \noutMergeAttr = " + outMergeAttrNumber
+                + " \ninnerTableName: " + innerTableName + " innerJoinAttr: " + innerJoinAttrNumber +
+                " \ninnerMergeAttr: " + innerMergeAttrNumber +
+                " \nnPages : " + nPages + " \nmaterialTableName : " + materialTableName);
+
+        IteratorDesc outIteratorDesc = null;
+        try {
+            outIteratorDesc = Phase3Utils.getTableItr(outTableName);
+        } catch (HFException | HFBufMgrException | HFDiskMgrException | InvalidTupleSizeException | FileScanException | TupleUtilsException | InvalidRelation | IOException | PredEvalException | JoinsException | FieldNumberOutOfBoundException | PageNotReadException | InvalidTypeException | WrongPermat | UnknowAttrType e) {
+            e.printStackTrace();
+        }
+
+
+        IteratorDesc innerIteratorDesc = null;
+        try {
+            innerIteratorDesc = Phase3Utils.getTableItr(innerTableName);
+        } catch (HFException | HFBufMgrException | HFDiskMgrException | InvalidTupleSizeException | FileScanException | TupleUtilsException | InvalidRelation | IOException | PredEvalException | JoinsException | FieldNumberOutOfBoundException | PageNotReadException | InvalidTypeException | WrongPermat | UnknowAttrType e) {
+            e.printStackTrace();
+        }
+
+        FldSpec outJoinAttr = new FldSpec(new RelSpec(RelSpec.outer), outJoinAttrNumber);
+        FldSpec outMrgAttr = new FldSpec(new RelSpec(RelSpec.outer), outMergeAttrNumber);
+        FldSpec innerJoinAttr = new FldSpec(new RelSpec(RelSpec.outer), innerJoinAttrNumber);
+        FldSpec innerMrgAttr = new FldSpec(new RelSpec(RelSpec.outer), innerMergeAttrNumber);
+        if (isHashBased){
+            System.out.println("Hash based top k join is performed : ");
+
+            try {
+                new HashJoin5a(outIteratorDesc.getAttrType(), outIteratorDesc.getNumAttr(), outIteratorDesc.getStrSizes(),
+                        outJoinAttr, outMrgAttr,
+                        innerIteratorDesc.getAttrType(), innerIteratorDesc.getNumAttr(), innerIteratorDesc.getStrSizes(),
+                        innerJoinAttr, innerMrgAttr,
+                        outTableName, innerTableName, k, nPages);
+
+            } catch (IOException | NestedLoopException | HashJoinException e) {
+                e.printStackTrace();
+            }
+        } else{
+            System.out.println("NRA based top k join algorithm is performed : ");
+            AttrType x = outIteratorDesc.getAttrType()[outJoinAttr.offset - 1];
+            if (x.attrType == AttrType.attrString){
+                System.out.println("Join Attribute is of String type");
+                try {
+                    new TopK_NRAJoinString(outIteratorDesc.getAttrType(), outIteratorDesc.getNumAttr(), outIteratorDesc.getStrSizes(),
+                            outJoinAttr, outMrgAttr,
+                            innerIteratorDesc.getAttrType(), innerIteratorDesc.getNumAttr(), innerIteratorDesc.getStrSizes(),
+                            innerJoinAttr, innerMrgAttr,
+                            outTableName, innerTableName, k, nPages);
+
+                } catch (IOException | FileScanException | InvalidRelation | TupleUtilsException | WrongPermat | InvalidTypeException | PageNotReadException | FieldNumberOutOfBoundException | PredEvalException | UnknowAttrType | InvalidTupleSizeException | JoinsException e) {
+                    e.printStackTrace();
+                }
+            } else {
+                try {
+                    new TopK_NRAJoin(outIteratorDesc.getAttrType(), outIteratorDesc.getNumAttr(), outIteratorDesc.getStrSizes(),
+                            outJoinAttr, outMrgAttr,
+                            innerIteratorDesc.getAttrType(), innerIteratorDesc.getNumAttr(), innerIteratorDesc.getStrSizes(),
+                            innerJoinAttr, innerMrgAttr,
+                            outTableName, innerTableName, k, nPages);
+
+                } catch (IOException | FileScanException | InvalidRelation | TupleUtilsException | WrongPermat | InvalidTypeException | PageNotReadException | FieldNumberOutOfBoundException | PredEvalException | UnknowAttrType | InvalidTupleSizeException | JoinsException e) {
+                    e.printStackTrace();
+                }
+            }
+
+        }
+
+
+
+
+    }
+
     private static void performGroupBy(String[] tokens) {
         /**
          * Collect arguments
@@ -1074,7 +1177,7 @@ public class Phase3Driver implements GlobalConst {
         RelSpec relSpec = new RelSpec(RelSpec.outer);
         FldSpec groupByAttrFldSpec = new FldSpec(relSpec, groupByAttr);
         FldSpec[] aggListFldSpec = new FldSpec[aggList.length];
-        for (int i = 0;i < aggListFldSpec.length;i++) {
+        for (int i = 0; i < aggListFldSpec.length; i++) {
             aggListFldSpec[i] = new FldSpec(relSpec, aggList[i]);
         }
 
@@ -1092,7 +1195,7 @@ public class Phase3Driver implements GlobalConst {
             try {
                 assert iteratorDesc != null;
                 GroupBywithHash groupBywithHash = new GroupBywithHash(iteratorDesc.getAttrType(),
-                        iteratorDesc.getNumAttr(), iteratorDesc.getStrSizes(), tableName, groupByAttrFldSpec, aggListFldSpec,aggType,
+                        iteratorDesc.getNumAttr(), iteratorDesc.getStrSizes(), tableName, groupByAttrFldSpec, aggListFldSpec, aggType,
                         iteratorDesc.getProjlist(), iteratorDesc.getNumAttr(), nPages, tableNameT);
                 groupBywithHash.getAggregateResult();
                 //groupBywithHash.close();
@@ -1107,19 +1210,19 @@ public class Phase3Driver implements GlobalConst {
     private static AggType getGroupByAggOperatorType(String aggOperator) {
         AggType aggType = null;
         switch (aggOperator) {
-            case "min" :
+            case "min":
                 aggType = new AggType(AggType.aggMin);
                 break;
-            case "max" :
+            case "max":
                 aggType = new AggType(AggType.aggMax);
                 break;
-            case "avg" :
+            case "avg":
                 aggType = new AggType(AggType.aggAvg);
                 break;
-            case "sky" :
+            case "sky":
                 aggType = new AggType(AggType.aggSkyline);
                 break;
-            default :
+            default:
                 System.out.println("Please enter a valid agg operator[MIN, MAX, AVG, SKY]");
                 break;
 
@@ -1130,12 +1233,11 @@ public class Phase3Driver implements GlobalConst {
     private static int[] getAggList(String aggListNonNormalized) {
         String[] aggListStr = aggListNonNormalized.split(",");
         int[] aggList = new int[aggListStr.length];
-        for (int i = 0;i < aggListStr.length;i++) {
+        for (int i = 0; i < aggListStr.length; i++) {
             aggList[i] = Short.parseShort(aggListStr[i]);
         }
         return aggList;
     }
-
 
 
     private static boolean deleteDataFromTable(String tableName, String filename) {
@@ -1271,7 +1373,7 @@ public class Phase3Driver implements GlobalConst {
         } catch (IOException e) {
             e.printStackTrace();
         }
-        int  deletionCount = 0;
+        int deletionCount = 0;
         tableFile = new Heapfile(tableName);
         for (RID ridToDelete : recordToBeDeleted) {
             tableFile.deleteRecord(ridToDelete);
@@ -1295,8 +1397,7 @@ public class Phase3Driver implements GlobalConst {
                 if (val != Integer.parseInt(row[i])) {
                     return false;
                 }
-            }
-            else if (attrs[i].attrType.attrType == AttrType.attrReal) {
+            } else if (attrs[i].attrType.attrType == AttrType.attrReal) {
                 float val = 0;
                 try {
                     val = temp.getFloFld(i + 1);

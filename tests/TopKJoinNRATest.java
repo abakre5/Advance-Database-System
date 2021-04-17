@@ -76,31 +76,31 @@ class JoinsDriver implements GlobalConst {
         boats = new Vector();
         reserves = new Vector();
 
-        sailors.addElement(new Sailor(1, "Bob Holloway", 90, 53.6));
-        sailors.addElement(new Sailor(2, "Susan Horowitz", 80, 34.2));
-        sailors.addElement(new Sailor(3, "Yannis Ioannidis", 78, 40.2));
-        sailors.addElement(new Sailor(4, "Deborah Joseph", 62, 39.8));
-        sailors.addElement(new Sailor(5, "Landwebber", 51, 56.7));
-        sailors.addElement(new Sailor(63, "James Larus", 49, 30.3));
-        sailors.addElement(new Sailor(64, "Barton Miller", 35, 43.7));
-        sailors.addElement(new Sailor(21, "David Parter", 21, 99.9));
-        sailors.addElement(new Sailor(69, "Raghu Ramakrishnan", 19, 37.1));
-        sailors.addElement(new Sailor(35, "Guri Sohi", 10, 42.1));
-        sailors.addElement(new Sailor(73, "Prasoon Tiwari", 8, 39.2));
-        sailors.addElement(new Sailor(39, "Anne Condon", 3, 30.3));
-        sailors.addElement(new Sailor(47, "Charles Fischer", 6, 46.3));
-        sailors.addElement(new Sailor(49, "James Goodman", 4, 50.3));
-        sailors.addElement(new Sailor(50, "Mark Hill", 5, 35.2));
-        sailors.addElement(new Sailor(75, "Mary Vernon", 7, 43.1));
-        sailors.addElement(new Sailor(79, "David Wood", 3, 39.2));
-        sailors.addElement(new Sailor(84, "Mark Smucker", 9, 25.3));
-        sailors.addElement(new Sailor(87, "Martin Reames", 10, 24.1));
-        sailors.addElement(new Sailor(10, "Mike Carey", 9, 40.3));
-        sailors.addElement(new Sailor(21, "David Dewitt", 10, 47.2));
-        sailors.addElement(new Sailor(29, "Tom Reps", 7, 39.1));
-        sailors.addElement(new Sailor(31, "Jeff Naughton", 5, 35.0));
-        sailors.addElement(new Sailor(35, "Miron Livny", 7, 37.6));
-        sailors.addElement(new Sailor(37, "Marv Solomon", 10, 48.9));
+        sailors.addElement(new Sailor(1, "1", 90, 53.6));
+        sailors.addElement(new Sailor(2, "2", 80, 34.2));
+        sailors.addElement(new Sailor(3, "3", 78, 40.2));
+        sailors.addElement(new Sailor(4, "4", 62, 39.8));
+        sailors.addElement(new Sailor(5, "5", 51, 56.7));
+//        sailors.addElement(new Sailor(63, "James Larus", 49, 30.3));
+//        sailors.addElement(new Sailor(64, "Barton Miller", 35, 43.7));
+//        sailors.addElement(new Sailor(21, "David Parter", 21, 99.9));
+//        sailors.addElement(new Sailor(69, "Raghu Ramakrishnan", 19, 37.1));
+//        sailors.addElement(new Sailor(35, "Guri Sohi", 10, 42.1));
+//        sailors.addElement(new Sailor(73, "Prasoon Tiwari", 8, 39.2));
+//        sailors.addElement(new Sailor(39, "Anne Condon", 3, 30.3));
+//        sailors.addElement(new Sailor(47, "Charles Fischer", 6, 46.3));
+//        sailors.addElement(new Sailor(49, "James Goodman", 4, 50.3));
+//        sailors.addElement(new Sailor(50, "Mark Hill", 5, 35.2));
+//        sailors.addElement(new Sailor(75, "Mary Vernon", 7, 43.1));
+//        sailors.addElement(new Sailor(79, "David Wood", 3, 39.2));
+//        sailors.addElement(new Sailor(84, "Mark Smucker", 9, 25.3));
+//        sailors.addElement(new Sailor(87, "Martin Reames", 10, 24.1));
+//        sailors.addElement(new Sailor(10, "Mike Carey", 9, 40.3));
+//        sailors.addElement(new Sailor(21, "David Dewitt", 10, 47.2));
+//        sailors.addElement(new Sailor(29, "Tom Reps", 7, 39.1));
+//        sailors.addElement(new Sailor(31, "Jeff Naughton", 5, 35.0));
+//        sailors.addElement(new Sailor(35, "Miron Livny", 7, 37.6));
+//        sailors.addElement(new Sailor(37, "Marv Solomon", 10, 48.9));
 
         boats.addElement(new Boats(1, "Onion", "white"));
         boats.addElement(new Boats(2, "Buckey", "red"));
@@ -109,22 +109,22 @@ class JoinsDriver implements GlobalConst {
         boats.addElement(new Boats(5, "Wisconsin", "red"));
 
 
-        reserves.addElement(new Reserves(5, 100, "05/10/95"));
-        reserves.addElement(new Reserves(2, 80, "05/11/95"));
-        reserves.addElement(new Reserves(100, 65, "05/11/95"));
-        reserves.addElement(new Reserves(3, 54, "05/12/95"));
-        reserves.addElement(new Reserves(4, 43, "05/13/95"));
-        reserves.addElement(new Reserves(69, 34, "05/12/95"));
-        reserves.addElement(new Reserves(70, 25, "05/14/95"));
-        reserves.addElement(new Reserves(21, 15, "05/16/95"));
-        reserves.addElement(new Reserves(57, 2, "05/10/95"));
-        reserves.addElement(new Reserves(35, 1, "05/15/95"));
+        reserves.addElement(new Reserves(5, 100, "5"));
+        reserves.addElement(new Reserves(2, 80, "2"));
+        reserves.addElement(new Reserves(100, 65, "1"));
+        reserves.addElement(new Reserves(3, 54, "3"));
+        reserves.addElement(new Reserves(4, 43, "4"));
+//        reserves.addElement(new Reserves(69, 34, "05/12/95"));
+//        reserves.addElement(new Reserves(70, 25, "05/14/95"));
+//        reserves.addElement(new Reserves(21, 15, "05/16/95"));
+//        reserves.addElement(new Reserves(57, 2, "05/10/95"));
+//        reserves.addElement(new Reserves(35, 1, "05/15/95"));
 
 
         boolean status = OK;
-        int numsailors = 25;
+        int numsailors = 5;
         int numsailors_attrs = 4;
-        int numreserves = 10;
+        int numreserves = 5;
         int numreserves_attrs = 3;
         int numboats = 5;
         int numboats_attrs = 3;
@@ -369,12 +369,12 @@ class JoinsDriver implements GlobalConst {
         Rsizes[0] = 15;
 
 
-        FldSpec joinAttr1 = new FldSpec(new RelSpec(RelSpec.outer), 1);
-        FldSpec joinAttr2 = new FldSpec(new RelSpec(RelSpec.outer), 1);
+        FldSpec joinAttr1 = new FldSpec(new RelSpec(RelSpec.outer), 2);
+        FldSpec joinAttr2 = new FldSpec(new RelSpec(RelSpec.outer), 3);
         FldSpec mrgAttr1 = new FldSpec(new RelSpec(RelSpec.outer), 3);
         FldSpec mrgAttr2 = new FldSpec(new RelSpec(RelSpec.outer), 2);
 
-        TopK_NRAJoin join = new TopK_NRAJoin(Stypes, 4, Ssizes, joinAttr1,
+        TopK_NRAJoinString join = new TopK_NRAJoinString(Stypes, 4, Ssizes, joinAttr1,
                 mrgAttr1, Rtypes, 3, Rsizes, joinAttr2, mrgAttr2, "sailors.in",
                 "reserves.in", 6, 100);
 
