@@ -30,13 +30,13 @@ public class GroupBywithHash {
     private final FldSpec[] projList;
     private final int nOutFields;
     private final int nPages;
-    private final Heapfile materHeapfile;
-    private final Heapfile dbHeapFile;
+    private Heapfile materHeapfile;
+    private Heapfile dbHeapFile;
 
     private HashFile hashFile;
     private final String materTableName;
 
-    private final String hashIndexName;
+    private String hashIndexName;
 
     private Heapfile hashBucketTuples;
     private FileScan scan;
@@ -72,7 +72,7 @@ public class GroupBywithHash {
         this.nOutFields = n_out_flds;
         this.nPages = n_pages;
         this.materTableName = tableNameT;
-        
+        this.materHeapfile = null;
         if (Phase3Utils.aggListContainsStringAttr(agg_list, in1)) {
             System.err.println("Aggregation attributes does not support String attribute!");
             return;
