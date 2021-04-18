@@ -258,6 +258,7 @@ public class NestedLoopsJoins extends Iterator {
                 if (inner != null)     // If this not the first time,
                 {
                     // close scan
+                    inner.closescan();
                     inner = null;
                 }
 
