@@ -20,21 +20,15 @@ public class HashFile extends IndexFile implements GlobalConst {
 
     short REC_LEN1 = 32;
     short REC_LEN2 = 160;
-    private int indexField;
-    private String relationName;
-    private Scan relationScan = null;
-    private int keyType;
     AttrType[] attrType;
     int numAttribs;
     boolean split = false;
-    boolean split_exists = false;
     int split_position = 0;
     double threshold = 0.75;
     int num_buckets;
     int n = 0;
     double current_util = 0.0;
     int total_records = 0;
-    boolean is_crossed = false;
     Map<Integer,String> map = new HashMap<Integer,String>();
    //Map<String, RID> FileRIDMap = new HashMap<String, RID>();
     Heapfile headerFile = null;
@@ -42,8 +36,10 @@ public class HashFile extends IndexFile implements GlobalConst {
     Heapfile datafile = null;
     String hashIndexName;
     int N;
-    boolean globalSplit = false;
+    int globalSplit = 0;
     boolean secondTry = true;
+    String metadataFile = null;
+
 
 
     //Constructor
@@ -53,11 +49,17 @@ public class HashFile extends IndexFile implements GlobalConst {
         hashIndexName = hashFileName;
         datafile = dbfile;
         headerFile = new Heapfile(hashIndexName);
+        metadataFile = metadataFile + "_" +hashFileName;
+        populateMap();
 
 
     }
 
-
+    //Constructor
+    public HashFile(String hashFileName) throws IOException,HFException,HFBufMgrException,HFBufMgrException,HFDiskMgrException{
+        hashIndexName = hashFileName;
+        headerFile = new Heapfile(hashIndexName);
+    }
   
     //Constructor
     public HashFile(String relationName,String hashFileName, int indexField, int keyType, FileScan scan, int num_records, Heapfile dbfile) throws IOException, HFException, HFDiskMgrException, HFBufMgrException,
@@ -68,6 +70,7 @@ public class HashFile extends IndexFile implements GlobalConst {
         hashIndexName = hashFileName;
         datafile = dbfile;
         headerFile = new Heapfile(hashIndexName);
+        metadataFile = metadataFile + "_" +hashFileName;
         System.out.println("Num of records = " + num_records);
         
         Tuple t = getWrapperForRID();
@@ -234,37 +237,115 @@ public class HashFile extends IndexFile implements GlobalConst {
         System.out.println(current_util);
         num_buckets--;
         System.out.println("Printing hash bucket 0");
-        // FileScan s =  null;
-        // Tuple tuple = null;
-        // try {
-        //     s = getFileScan("hash_buckets_0");
-        //     tuple = s.get_next();
-        // } catch (Exception e){
-        //     e.printStackTrace();
-        // }
 
-        // while(tuple!=null) {
-        //     System.out.println("tuple");
-        //     try{
-        //     System.out.println(tuple.getFloFld(1)+" "+ tuple.getIntFld(2)+ " "+tuple.getIntFld(3));
-        //     tuple = s.get_next();
-        //     } catch (Exception e) {
-        //         e.printStackTrace();
-        //     }
-            
-        // }
 
-       
-      
+        //Dump metadta
+        dumpMetadata(globalSplit, num_buckets, N, n, total_records, split_position);
 
+    
 
 	}
         
-    //Constructor
-    public HashFile(String hashFileName) throws IOException,HFException,HFBufMgrException,HFBufMgrException,HFDiskMgrException{
-        hashIndexName = hashFileName;
-        headerFile = new Heapfile(hashIndexName);
+    public void dumpMetadata(int globalSplit, int num_buckets, int hash_domain, 
+                                int tuples_per_page, int total_records, int split_position) throws IOException, HFDiskMgrException,HFBufMgrException,HFException {
+
+        Tuple metadataTuple = wrapperForMetadata();
+        AttrType[] Ptypes = new AttrType[6];
+  
+        Ptypes[0] = new AttrType (AttrType.attrInteger);
+        Ptypes[1] = new AttrType (AttrType.attrInteger);
+        Ptypes[2] = new AttrType (AttrType.attrInteger);
+        Ptypes[3] = new AttrType (AttrType.attrInteger);
+        Ptypes[4] = new AttrType (AttrType.attrInteger);
+        Ptypes[5] = new AttrType (AttrType.attrInteger);
+    
+        try {
+            metadataTuple.setHdr((short) 6,Ptypes, null);
+        }
+        catch (Exception e) {
+            System.err.println("*** error in Tuple.setHdr() ***");
+            e.printStackTrace();
+        }
+
+        try {
+            metadataTuple.setIntFld(1, globalSplit);
+            metadataTuple.setIntFld(2, num_buckets);
+            metadataTuple.setIntFld(3, hash_domain);
+            metadataTuple.setIntFld(4, tuples_per_page);
+            metadataTuple.setIntFld(5, total_records);
+            metadataTuple.setIntFld(6, split_position);
+        
+        } catch(Exception e){
+            e.printStackTrace();
+        }
+
+        Heapfile meta = new Heapfile(metadataFile);
+       
+        try {
+            meta.deleteFile();
+            meta = new Heapfile(metadataFile);
+            meta.insertRecord(metadataTuple.getTupleByteArray());
+            System.out.println("Dumped metadata file");
+        } catch(Exception e) {
+            e.printStackTrace();
+        }
+
+        
     }
+
+    public void printMetadataFile() throws IOException, HFBufMgrException, HFDiskMgrException, HFException, InvalidTupleSizeException {
+        Heapfile hf = new Heapfile(metadataFile);
+        Scan scan = hf.openScan();
+        RID rid = new RID();
+        Tuple metaTuple = wrapperForMetadata();
+        Tuple r = null;
+        do {
+            try {
+                r = (Tuple)scan.getNext(rid);
+                if(r!=null) {
+                    metaTuple = new Tuple(r.getTupleByteArray(), r.getOffset(), r.getLength());
+
+                    AttrType[] Ptypes = new AttrType[6];
+  
+                    Ptypes[0] = new AttrType (AttrType.attrInteger);
+                    Ptypes[1] = new AttrType (AttrType.attrInteger);
+                    Ptypes[2] = new AttrType (AttrType.attrInteger);
+                    Ptypes[3] = new AttrType (AttrType.attrInteger);
+                    Ptypes[4] = new AttrType (AttrType.attrInteger);
+                    Ptypes[5] = new AttrType (AttrType.attrInteger);
+                
+
+                    metaTuple.setHdr((short) 6,Ptypes, null);
+
+                    System.out.println("Metadata: "+ "globalSplit: "+  metaTuple.getIntFld(1));
+                    globalSplit = metaTuple.getIntFld(1);
+                    System.out.println("Local: "+ "globalSplit: "+  globalSplit);
+                    System.out.println("Metadata: "+ "num_buckets: "+  metaTuple.getIntFld(2));
+                    num_buckets = metaTuple.getIntFld(2);
+                    System.out.println("Local: "+ "num_buckets: "+  num_buckets);
+                    System.out.println("Metadata: "+ "hash domain: "+  metaTuple.getIntFld(3));
+                    N = metaTuple.getIntFld(3);
+                    System.out.println("Local: "+ "N: "+  N);
+                    System.out.println("Metadata: "+ "tuples per page: "+  metaTuple.getIntFld(4));
+                    n = metaTuple.getIntFld(4);
+                    System.out.println("Local: "+ "n: "+  n);
+                    System.out.println("Metadata: "+ "total records: "+  metaTuple.getIntFld(5));
+                    total_records = metaTuple.getIntFld(5);
+                    System.out.println("Local: "+ "total_records: "+  total_records);
+                    System.out.println("Metadata: "+ "splitposition: "+  metaTuple.getIntFld(6));
+                    split_position = metaTuple.getIntFld(6);
+                    System.out.println("Local: "+ "split_position: "+  split_position);
+
+                } 
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        } while(r!=null);
+        System.out.println("Printed metadata "+metadataFile);
+        
+    }
+
+    
 
     public HashUnclusteredFileScan new_scan() {
 
@@ -398,6 +479,40 @@ public class HashFile extends IndexFile implements GlobalConst {
 
     }
 
+    public Tuple wrapperForMetadata() {
+        //boolean globalSplit, int num_buckets, int hash_domain, int tuples_per_page, int total_records, int split_position
+         
+          AttrType[] Ptypes = new AttrType[6];
+  
+          Ptypes[0] = new AttrType (AttrType.attrInteger);
+          Ptypes[1] = new AttrType (AttrType.attrInteger);
+          Ptypes[2] = new AttrType (AttrType.attrInteger);
+          Ptypes[3] = new AttrType (AttrType.attrInteger);
+          Ptypes[4] = new AttrType (AttrType.attrInteger);
+          Ptypes[5] = new AttrType (AttrType.attrInteger);
+         
+  
+          Tuple metadata_tuple = new Tuple();
+          try {
+            metadata_tuple.setHdr((short) 6,Ptypes, null);
+          }
+          catch (Exception e) {
+              System.err.println("*** error in Tuple.setHdr() ***");
+              e.printStackTrace();
+          }
+  
+          int size = metadata_tuple.size();
+          metadata_tuple = new Tuple(size);
+          try {
+            metadata_tuple.setHdr((short) 6, Ptypes, null);
+          }
+          catch (Exception e) {
+              System.err.println("*** error in Tuple.setHdr() ***");
+              e.printStackTrace();
+          }
+  
+        return metadata_tuple;
+    }
     //PlaceHolders for delete/insert.
 
     public void insert(hash.KeyClass key, RID rid) throws IOException, FieldNumberOutOfBoundException, HFException, HFDiskMgrException, HFBufMgrException,
@@ -439,6 +554,7 @@ public class HashFile extends IndexFile implements GlobalConst {
 
         int index_num = get_hash(keyValue);
         //System.out.println("Index Num: "+index_num);
+
         populateMap();
         String bucket_file = map.get(index_num);
         Heapfile bucketFile = new Heapfile(bucket_file);
@@ -458,8 +574,7 @@ public class HashFile extends IndexFile implements GlobalConst {
             System.out.println("Target utilization has been crossed: "+current_util );
             crossed++;
             split = true;
-            globalSplit = true;
-            split_exists = true;
+            globalSplit = 1;
             //split_position++;
             num_buckets++;
             String FileName = "hash_buckets_"+num_buckets;
@@ -489,18 +604,11 @@ public class HashFile extends IndexFile implements GlobalConst {
             } catch (Exception e) {
                 e.printStackTrace();
             }
-            Scan bucket_scan = null;
-            String fname = map.get(split_position);
-            System.out.println("Trying to open : "+fname+ " to read");
-            System.out.println("Trying to open : "+fname+ " to read");
-
-            //System.out.println(fname);
-            //bucketFile = new Heapfile(fname);
 
             FileScan s =  null;
             Tuple tuple = null;
             try {
-                s = getFileScan(fname);
+                s = getFileScan(orig_File);
                 tuple = s.get_next();
             } catch (Exception e){
                 e.printStackTrace();
@@ -578,8 +686,8 @@ public class HashFile extends IndexFile implements GlobalConst {
         }
     }   
 
+    dumpMetadata(globalSplit, num_buckets, N, n, total_records, split_position);
 
-    //Printing Index
 }
 
     public void populateMap() throws IOException, InvalidTupleSizeException {
@@ -814,7 +922,7 @@ public class HashFile extends IndexFile implements GlobalConst {
                         boolean shrink = triggerShrink();
 
                     }
-
+                    dumpMetadata(globalSplit, num_buckets, N, n, total_records, split_position);
                     return true;
                 }
                 System.out.println("DEBUG: Record RID present in index but could not be deleted from data file");
@@ -856,7 +964,8 @@ public class HashFile extends IndexFile implements GlobalConst {
         Float keyValue = floatKey.getKey();
         System.out.println("Trying to find "+keyValue);
         Heapfile searchBucket = null;
-        if (globalSplit) {
+        if (globalSplit == 1) {
+            System.out.println("First!!");
             split = true;
         }
         int bucket = get_hash(keyValue);
@@ -878,7 +987,7 @@ public class HashFile extends IndexFile implements GlobalConst {
             if(rid == null && secondTry) {
                 if(secondTry) {
                     System.out.println("Trying in another bucket");
-                    globalSplit = false;
+                    globalSplit = 0;
                     split = false;
                     secondTry = false;
                     RID ridTup = searchIndex(key,isDelete);
@@ -893,7 +1002,7 @@ public class HashFile extends IndexFile implements GlobalConst {
 
                 if(!secondTry) {
                     secondTry = true;
-                    globalSplit = true;
+                    globalSplit = 1;
                     split = true;
                 }
                 System.out.println("RID is not null for "+ keyValue);

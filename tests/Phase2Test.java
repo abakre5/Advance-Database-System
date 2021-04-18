@@ -744,6 +744,7 @@ class Ph2Driver extends TestDriver implements GlobalConst {
 }
     // hf.printindex();
     hf.printHeaderFile();
+    hf.printMetadataFile();
 } catch(Exception e) {
         e.printStackTrace();
     }
