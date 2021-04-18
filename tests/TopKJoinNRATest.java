@@ -292,61 +292,73 @@ class JoinsDriver implements GlobalConst {
     public boolean runTests() {
         Disclaimer();
         try {
+            Query2();
             Query3();
-        } catch (IOException e) {
-            e.printStackTrace();
-        } catch (PageNotReadException e) {
-            e.printStackTrace();
-        } catch (WrongPermat wrongPermat) {
-            wrongPermat.printStackTrace();
-        } catch (JoinsException e) {
-            e.printStackTrace();
-        } catch (InvalidTypeException e) {
-            e.printStackTrace();
-        } catch (TupleUtilsException e) {
-            e.printStackTrace();
-        } catch (UnknowAttrType unknowAttrType) {
-            unknowAttrType.printStackTrace();
-        } catch (FileScanException e) {
-            e.printStackTrace();
-        } catch (PredEvalException e) {
-            e.printStackTrace();
-        } catch (InvalidTupleSizeException e) {
-            e.printStackTrace();
-        } catch (InvalidRelation invalidRelation) {
-            invalidRelation.printStackTrace();
-        } catch (FieldNumberOutOfBoundException e) {
+        } catch (IOException | PageNotReadException | WrongPermat | JoinsException | InvalidTypeException | TupleUtilsException | UnknowAttrType | FileScanException | PredEvalException | InvalidTupleSizeException | InvalidRelation | FieldNumberOutOfBoundException e) {
             e.printStackTrace();
         }
         System.out.print("Finished joins testing" + "\n");
         return true;
     }
 
-
-    private void Query3_CondExpr(CondExpr[] expr) {
-
-        expr[0].next = null;
-        expr[0].op = new AttrOperator(AttrOperator.aopEQ);
-        expr[0].type1 = new AttrType(AttrType.attrSymbol);
-        expr[0].operand1.symbol = new FldSpec(new RelSpec(RelSpec.outer), 1);
-        expr[0].type2 = new AttrType(AttrType.attrSymbol);
-        expr[0].operand2.symbol = new FldSpec(new RelSpec(RelSpec.innerRel), 1);
-        expr[1] = null;
-    }
-
-
-    public void Query3() throws IOException, PageNotReadException, WrongPermat, JoinsException, InvalidTypeException, TupleUtilsException, UnknowAttrType, FileScanException, PredEvalException, InvalidTupleSizeException, InvalidRelation, FieldNumberOutOfBoundException {
-        System.out.print("**********************Query3 strating *********************\n");
+    public void Query2() throws IOException, PageNotReadException, WrongPermat, JoinsException, InvalidTypeException, TupleUtilsException, UnknowAttrType, FileScanException, PredEvalException, InvalidTupleSizeException, InvalidRelation, FieldNumberOutOfBoundException {
+        System.out.print("**********************Query2 strating *********************\n");
+        System.out.print("Executing top K join for either INT or Float joinAttr\n");
         boolean status = OK;
 
         // Sailors, Boats, Reserves Queries.
 
-        System.out.print
-                ("Query: Find the names of sailors who have reserved a boat.\n\n"
-                        + "  SELECT S.sname\n"
-                        + "  FROM   Sailors S, Reserves R\n"
-                        + "  WHERE  S.sid = R.sid\n\n"
-                        + "(Tests FileScan, Projection, and SortMerge Join.)\n\n");
+//        System.out.print
+//                ("Query: Find the names of sailors who have reserved a boat.\n\n"
+//                        + "  SELECT S.sname\n"
+//                        + "  FROM   Sailors S, Reserves R\n"
+//                        + "  WHERE  S.sid = R.sid\n\n"
+//                        + "(Tests FileScan, Projection, and SortMerge Join.)\n\n");
+
+        Tuple t = new Tuple();
+        t = null;
+
+        AttrType[] Stypes = {
+                new AttrType(AttrType.attrInteger),
+                new AttrType(AttrType.attrString),
+                new AttrType(AttrType.attrInteger),
+                new AttrType(AttrType.attrReal)
+        };
+        short[] Ssizes = new short[1];
+        Ssizes[0] = 30;
+
+        AttrType[] Rtypes = {
+                new AttrType(AttrType.attrInteger),
+                new AttrType(AttrType.attrInteger),
+                new AttrType(AttrType.attrString),
+        };
+        short[] Rsizes = new short[1];
+        Rsizes[0] = 15;
+
+
+        FldSpec joinAttr1 = new FldSpec(new RelSpec(RelSpec.outer), 1);
+        FldSpec joinAttr2 = new FldSpec(new RelSpec(RelSpec.outer), 1);
+        FldSpec mrgAttr1 = new FldSpec(new RelSpec(RelSpec.outer), 3);
+        FldSpec mrgAttr2 = new FldSpec(new RelSpec(RelSpec.outer), 2);
+
+        TopK_NRAJoin join = new TopK_NRAJoin(Stypes, 4, Ssizes, joinAttr1,
+                mrgAttr1, Rtypes, 3, Rsizes, joinAttr2, mrgAttr2, "sailors.in",
+                "reserves.in", 6, 100);
+
+    }
+    public void Query3() throws IOException, PageNotReadException, WrongPermat, JoinsException, InvalidTypeException, TupleUtilsException, UnknowAttrType, FileScanException, PredEvalException, InvalidTupleSizeException, InvalidRelation, FieldNumberOutOfBoundException {
+        System.out.print("**********************Query3 strating *********************\n");
+        System.out.print("Executing top K with String as join attr");
+        boolean status = OK;
+
+        // Sailors, Boats, Reserves Queries.
+
+//        System.out.print
+//                ("Query: Find the names of sailors who have reserved a boat.\n\n"
+//                        + "  SELECT S.sname\n"
+//                        + "  FROM   Sailors S, Reserves R\n"
+//                        + "  WHERE  S.sid = R.sid\n\n"
+//                        + "(Tests FileScan, Projection, and SortMerge Join.)\n\n");
 
         Tuple t = new Tuple();
         t = null;

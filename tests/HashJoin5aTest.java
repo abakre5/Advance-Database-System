@@ -515,7 +515,7 @@ class JoinsDriver implements GlobalConst {
 
 }
 
-public class HashJoinTest5a {
+public class HashJoin5aTest {
     public static void main(String argv[]) {
         boolean sortstatus;
         //SystemDefs global = new SystemDefs("bingjiedb", 100, 70, null);

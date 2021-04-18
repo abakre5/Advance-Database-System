@@ -64,6 +64,14 @@ public class TopK_NRAJoinString {
         String joinAttributeValue2 = null;
         float mergeAttributeValue1 = 0;
         float mergeAttributeValue2 = 0;
+        FldSpec[] proj_list = new FldSpec[len_in1 + len_in2];
+//        System.out.println("con=ming till here ");
+        for (int i = 1; i <= len_in1; i++) {
+            proj_list[i - 1] = new FldSpec(new RelSpec(RelSpec.outer), i);
+        }
+        for (int i = 1; i <= len_in2; i++) {
+            proj_list[len_in1 + i - 1] = new FldSpec(new RelSpec(RelSpec.innerRel),  i);
+        }
 
         if (false) {
             // if given relation does not have clustered index then return zero
@@ -159,7 +167,7 @@ public class TopK_NRAJoinString {
                 tupleRIDRelation1 = relation1.get_next1();
                 tupleRIDRelation2 = relation2.get_next1();
 
-                System.out.println("Number of elements in the candidate list : " + topKCandidate.size());
+//                System.out.println("Number of elements in the candidate list : " + topKCandidate.size());
             }
 
             int counter = 1;
@@ -177,7 +185,7 @@ public class TopK_NRAJoinString {
                 }
                 Tuple rid_tuple = new Tuple(t1.getTupleByteArray(), t1.getOffset(), t1.getLength());
                 rid_tuple.setHdr((short) in1.length, in1, t1_str_sizes);
-                rid_tuple.print(in1);
+//                rid_tuple.print(in1);
 //                System.out.println("Printed tuple for t1 : "  + rid_tuple.getIntFld(1) + " " + rid_tuple.getStrFld(2) + " " + rid_tuple.getIntFld(3) + " " + rid_tuple.getFloFld(4));
                 Tuple t2 = new Tuple();
                 try {
@@ -192,9 +200,18 @@ public class TopK_NRAJoinString {
                 }
                 Tuple rid_tuple2 = new Tuple(t2.getTupleByteArray(), t2.getOffset(), t2.getLength());
                 rid_tuple2.setHdr((short) in2.length, in2, t2_str_sizes);
-                rid_tuple2.print(in2);
+//                rid_tuple2.print(in2);
 //                System.out.println("Printed tuple for tuple 2  : "  + rid_tuple2.getIntFld(1) + " " + rid_tuple2.getIntFld(2) + " " + rid_tuple2.getStrFld(3));
-
+                Tuple tuple = new Tuple();
+                AttrType[] temp = new AttrType[len_in1 + len_in2];
+                TupleUtils.setup_op_tuple(tuple, temp,
+                        in1, len_in1, in2, len_in2,
+                        t1_str_sizes, t2_str_sizes,
+                        proj_list, (len_in1+ len_in2));
+                Projection.Join(rid_tuple, in1,
+                        rid_tuple2, in2,
+                        tuple, proj_list, (len_in1+ len_in2));
+                tuple.print(temp);
                 if (counter == k) {
                     break;
                 }
