@@ -978,6 +978,7 @@ public class Phase3Driver implements GlobalConst {
                 case "groupby": {
                     System.out.println((java.util.Arrays.toString(tokens)));
                     performGroupBy(tokens);
+                    System.out.println("---------------------------------------------------------------------------------");
                     break;
                 }
                 case "skyline":
@@ -1161,8 +1162,12 @@ public class Phase3Driver implements GlobalConst {
         String aggListNonNormalized = tokens[4];
         String tableName = tokens[5];
         int nPages = Integer.parseInt(tokens[6]);
-        String isMater = tokens[7];
-        String tableNameT = tokens[8];
+        String isMater = "";
+        String tableNameT = "";
+        if (tokens.length > 7) {
+            isMater = tokens[7];
+            tableNameT = tokens[8];
+        }
 
         AggType aggType = getGroupByAggOperatorType(aggOperator);
         int[] aggList = getAggList(aggListNonNormalized);
@@ -1182,14 +1187,22 @@ public class Phase3Driver implements GlobalConst {
         }
 
         if (isSort) {
+            GroupBywithSort groupBywithSort = null;
             try {
                 assert iteratorDesc != null;
-                GroupBywithSort groupBywithSort = new GroupBywithSort(iteratorDesc.getAttrType(),
+                groupBywithSort = new GroupBywithSort(iteratorDesc.getAttrType(),
                         iteratorDesc.getNumAttr(), iteratorDesc.getStrSizes(), iteratorDesc.getScan(), groupByAttrFldSpec, aggListFldSpec,
                         aggType, iteratorDesc.getProjlist(), iteratorDesc.getNumAttr(), nPages, tableNameT);
                 groupBywithSort.getAggregateResult();
             } catch (Exception e) {
                 e.printStackTrace();
+            } finally {
+                try {
+                    assert groupBywithSort != null;
+                    groupBywithSort.close();
+                } catch (HFDiskMgrException | InvalidTupleSizeException | IOException | InvalidSlotNumberException | HFBufMgrException | FileAlreadyDeletedException e) {
+                    System.out.println("Warning ->  Error occurred while closing Group By with Sort operation -> " + e.getMessage());
+                }
             }
         } else {
             try {
@@ -1198,7 +1211,6 @@ public class Phase3Driver implements GlobalConst {
                         iteratorDesc.getNumAttr(), iteratorDesc.getStrSizes(), tableName, groupByAttrFldSpec, aggListFldSpec, aggType,
                         iteratorDesc.getProjlist(), iteratorDesc.getNumAttr(), nPages, tableNameT);
                 groupBywithHash.getAggregateResult();
-                //groupBywithHash.close();
             } catch (Exception e) {
                 e.printStackTrace();
             }
