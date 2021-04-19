@@ -1,11 +1,14 @@
 package iterator;
 
 import bufmgr.PageNotReadException;
+import catalog.*;
 import global.AttrType;
+import global.ExtendedSystemDefs;
 import global.GlobalConst;
 import global.RID;
 import heap.*;
 import index.IndexException;
+import tests.Phase3Utils;
 
 import java.io.IOException;
 import java.util.*;
@@ -196,9 +199,76 @@ public class NestedLoopsSky extends Iterator {
         for (int i = 1; i <= noOfColumns; i++) {
             Pprojection[i - 1] = new FldSpec(new RelSpec(RelSpec.outer), i);
         }
-        scan = new FileScan(relation, in1, new short[0],
+        scan = new FileScan(relation, in1, strSizes,
                 noOfColumns, noOfColumns, Pprojection, null);
         return scan;
+    }
+
+    public void printSkyline(String materTableName) throws IOException, HFException, HFBufMgrException, HFDiskMgrException, InvalidSlotNumberException, SpaceNotAvailableException, InvalidTupleSizeException, Catalogrelexists, Catalogmissparam, Catalognomem, RelCatalogException, Cataloghferror, Catalogdupattrs, Catalogioerror, FileAlreadyDeletedException {
+        Heapfile file = null;
+        attrInfo[] attrs = new attrInfo[noOfColumns];
+        if (checkToMaterialize(materTableName)) {
+            int SIZE_OF_INT = 4;
+            for (int i = 0; i < noOfColumns; ++i) {
+                attrs[i] = new attrInfo();
+                attrs[i].attrType = new AttrType(in1[i].attrType);
+                attrs[i].attrName = "Col" + i;
+                attrs[i].attrLen = (in1[i].attrType == AttrType.attrInteger) ? SIZE_OF_INT : 32;
+            }
+            file = new Heapfile(materTableName);
+        }
+        int count = 0;
+
+        Tuple tt = new Tuple();
+        try {
+            tt.setHdr(noOfColumns, in1, strSizes);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        int size = tt.size();
+
+        Tuple t = new Tuple(size);
+        try {
+            t.setHdr(noOfColumns, in1, strSizes);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        assert skylineItr != null;
+
+        try {
+            tt = skylineItr.get_next();
+            while (tt != null) {
+                t.tupleCopy(tt);
+                if (checkToMaterialize(materTableName)) {
+                    file.insertRecord(t.returnTupleByteArray());
+                } else {
+                    t.print(in1);
+                }
+                count++;
+                tt = skylineItr.get_next();
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        System.out.println("Skyline computation completed!");
+        System.out.println("No of skyline members -> " + count);
+        if (checkToMaterialize(materTableName)) {
+            try {
+                ExtendedSystemDefs.MINIBASE_RELCAT.createRel(materTableName, noOfColumns, attrs);
+            } catch (Exception e) {
+                System.err.println("Error occurred while creating materialized view!");
+                file.deleteFile();
+            }
+            System.out.println("Created materialize view! -> " + materTableName);
+        }
+        System.out.println("---------------------------------------------------------------------------------------------------------");
+    }
+
+    private boolean checkToMaterialize(String materTableName) {
+        return (materTableName != null && materTableName.length() > 0);
     }
 
     /**
