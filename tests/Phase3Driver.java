@@ -916,31 +916,41 @@ public class Phase3Driver implements GlobalConst {
             } catch(Exception e) {
                 e.printStackTrace();
             }
-          
+            
+            Tuple findEntry = new Tuple();
+            AttrType[] dataFormat = new AttrType[3];
+            dataFormat[0] = new AttrType(AttrType.attrString);
+            dataFormat[1] = new AttrType(AttrType.attrInteger);
+            dataFormat[2] = new AttrType(AttrType.attrInteger);
+            short[] strdatasize = new short[1];
+            strdatasize[0] = 32;
+            findEntry.setHdr((short)3, dataFormat, strdatasize);
+            findEntry.setStrFld(1, "6aaaaaaasss");
+            findEntry.setIntFld(2, 4);
+            findEntry.setIntFld(3, 1);
+
             writer.println("Search Test\n");
-            hf.printHeaderFile();
-            hf.printindex();
+            // hf.printHeaderFile();
+            // hf.printindex();
             //Tuple searchTup = hf.search(new StringKey("9aaaaaaaa"));
-            Tuple searchTup = hf.search(new IntegerKey(10));
+            Tuple searchTup = hf.search(findEntry);
             
             if(searchTup!=null) {
                         Tuple current_tuple = new Tuple(searchTup.getTupleByteArray(), searchTup.getOffset(),searchTup.getLength());
-                        AttrType[] dataFormat = new AttrType[3];
-                        dataFormat[0] = new AttrType(AttrType.attrString);
-                        dataFormat[1] = new AttrType(AttrType.attrInteger);
-                        dataFormat[2] = new AttrType(AttrType.attrInteger);
-                        short[] strdatasize = new short[1];
-                        strdatasize[0] = 32;
-
                         current_tuple.setHdr((short)3, dataFormat, strdatasize);
                         writer.println("Found Tuple");
+                        System.out.println("Found first matched tuple");
                         System.out.println(current_tuple.getStrFld(1)+" " + current_tuple.getIntFld(2)+ " " +current_tuple.getIntFld(3));
             }
-            boolean flag = hf.delete(new IntegerKey(18));
+            
+            boolean flag = hf.delete(findEntry);
             if(flag)
             {   
                 System.out.println("Deleted Successfully");
             }
+            //hf.printindex();
+            hf.printHeaderFile();
+            hf.printMetadataFile();
 
 
         } catch (Exception e){
@@ -1172,7 +1182,7 @@ public class Phase3Driver implements GlobalConst {
                 }
                 case "groupby": {
                     System.out.println((java.util.Arrays.toString(tokens)));
-                    //performGroupBy(tokens);
+                    performGroupBy(tokens);
                     break;
                 }
                 case "skyline":
