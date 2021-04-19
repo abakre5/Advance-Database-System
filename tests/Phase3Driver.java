@@ -1042,6 +1042,11 @@ public class Phase3Driver implements GlobalConst {
 
         switch (typeOfSkyline.toLowerCase()) {
             case "nls":
+                assert iteratorDesc != null;
+                NestedLoopsSky nestedLoopsSky = new NestedLoopsSky(iteratorDesc.getAttrType(), iteratorDesc.getNumAttr(),
+                        iteratorDesc.getStrSizes(), iteratorDesc.getScan(), tableName, prefList, prefList.length,nPages);
+                nestedLoopsSky.printSkyline(materTableName);
+                nestedLoopsSky.close();
                 break;
             case "bnls":
                 assert iteratorDesc != null;

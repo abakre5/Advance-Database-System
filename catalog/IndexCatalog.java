@@ -118,14 +118,17 @@ public class IndexCatalog extends Heapfile
             throw new Catalognomem(null, "Catalog: No Enough Memory!");
 
         // SCAN THE FILE
-
+        Tuple temp;
         while (true) {
             try {
-                tuple = pscan.getNext(rid);
-                if (tuple == null)
+                temp = pscan.getNext(rid);
+                if (temp == null)
                     throw new Catalogindexnotfound(null,
                             "Catalog: Index not Found!");
+                tuple.tupleCopy(temp);
                 read_tuple(tuple, indexes[count]);
+            } catch (Catalogindexnotfound e) {
+                throw e;
             } catch (Exception e4) {
                 throw new IndexCatalogException(e4, " read_tuple() failed");
             }
