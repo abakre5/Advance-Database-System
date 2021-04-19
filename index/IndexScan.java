@@ -304,6 +304,158 @@ public class IndexScan extends Iterator {
         return null;
     }
 
+    private TupleRIDPair get_next_btclusteredindex1()
+            throws IndexException,
+            UnknownKeyTypeException,
+            IOException {
+        btree.KeyDataEntry nextentry = null;
+        TupleRIDPair tupleRIDPair = null;
+        RID ridToReturn = new RID();
+        try
+        {
+            if(isPageCompleted)
+            {
+                nextentry = indScan.get_next();
+                if(nextentry == null)
+                {
+                    return null;
+                }
+            }
+        } catch (Exception e) {
+            throw new IndexException(e, "IndexScan.java: BTree error");
+        }
+
+        //TODO:Pawan check if there is need to skip the records
+        //while (nextentry != null)
+        {
+        
+            if(isPageCompleted)
+            {
+                PageId pageId = ((ClusteredLeafData) nextentry.data).getData();
+                //since page is entirely read, pin next page.
+                if(pageId == null)
+                {
+                    return null;
+                }
+
+                currentPageId.pid = pageId.pid;
+                RID datapageRid =  new RID();
+                try {
+                    SystemDefs.JavabaseBM.pinPage(pageId, (Page)currentPage, false);
+                    datapageRid = currentPage.firstRecord();
+                } catch (Exception e) {
+                    //  System.err.println("SCAN: Error in 1stdatapg 3 " + e);
+                    e.printStackTrace();
+                }
+
+                if(datapageRid!= null){
+                    currentRID = new RID();
+                    currentRID.pageNo.pid = datapageRid.pageNo.pid;
+                    currentRID.slotNo = datapageRid.slotNo;
+                }
+
+                //One entry in clustered index points to a page. first read all the tuples from
+                //already fetched page and then allow to read next entry from index
+                isPageCompleted = false;
+            }
+
+            try
+            {
+                tuple1 = currentPage.getRecord(currentRID);
+                ridToReturn.copyRid(currentRID);
+                currentRID = currentPage.nextRecord(currentRID);
+                if (currentRID == null)
+                {
+                    //unpin current page and set flag to fetch next page in index
+                    SystemDefs.JavabaseBM.unpinPage(currentPageId, false);
+                    isPageCompleted = true;
+                    currentPageId.pid = INVALID_PAGE;
+                }
+            } catch (Exception e) {
+                throw new IndexException(e, "IndexScan.java: getRecord failed");
+            }
+
+            try {
+                tuple1.setHdr((short) _noInFlds, _types, _s_sizes);
+            } catch (Exception e) {
+                throw new IndexException(e, "IndexScan.java: Heapfile error");
+            }
+
+            boolean eval;
+            try {
+                eval = PredEval.Eval(_selects, tuple1, null, _types, null);
+            } catch (Exception e) {
+                throw new IndexException(e, "IndexScan.java: Heapfile error");
+            }
+
+            if (eval) {
+                // need projection.java
+                try {
+                    Projection.Project(tuple1, _types, Jtuple, perm_mat, _noOutFlds);
+                } catch (Exception e) {
+                    throw new IndexException(e, "IndexScan.java: Heapfile error");
+                }
+                tupleRIDPair = new TupleRIDPair(tuple1, ridToReturn);
+                return tupleRIDPair;
+            }
+
+        }
+
+        return null;
+    }
+
+    public Tuple get_next() throws IndexException, UnknownKeyTypeException, IOException {
+
+       if(index.indexType == IndexType.B_ClusteredIndex){
+           return get_next_btclusteredindex();
+       }else if (index.indexType == IndexType.B_Index){
+           return get_next_btindex();
+       } else if(index.indexType == IndexType.Hash) {
+           return get_next_hashindex();
+       }
+
+        return null;
+    }
+
+    public TupleRIDPair get_next1() throws IndexException, UnknownKeyTypeException, IOException {
+
+        if(index.indexType == IndexType.B_ClusteredIndex){
+            return get_next_btclusteredindex1();
+        }
+
+        return null;
+    }
+
+    /**
+     * Cleaning up the index scan, does not remove either the original
+     * relation or the index from the database.
+     *
+     * @throws IndexException error from the lower layer
+     * @throws IOException    from the lower layer
+     */
+    public void close() throws IOException, IndexException {
+        if (!closeFlag) {
+            if (indScan instanceof BTFileScan) {
+                try {
+                    ((BTFileScan) indScan).DestroyBTreeFileScan();
+                } catch (Exception e) {
+                    throw new IndexException(e, "BTree error in destroying index scan.");
+                }
+            }
+
+            if(indScan instanceof BTClusteredFileScan){
+                try {
+                    ((BTClusteredFileScan) indScan).DestroyBTreeFileScan();
+                } catch (Exception e) {
+                    throw new IndexException(e, "BTree error in destroying index scan.");
+                }
+
+            }
+
+            closeFlag = true;
+        }
+    }
+
     private Tuple get_next_btclusteredindex()
             throws IndexException,
             UnknownKeyTypeException,
@@ -327,7 +479,7 @@ public class IndexScan extends Iterator {
         //TODO:Pawan check if there is need to skip the records
         //while (nextentry != null)
         {
-        
+
             if(isPageCompleted)
             {
                 PageId pageId = ((ClusteredLeafData) nextentry.data).getData();
@@ -400,49 +552,6 @@ public class IndexScan extends Iterator {
         }
 
         return null;
-    }
-
-    public Tuple get_next() throws IndexException, UnknownKeyTypeException, IOException {
-
-       if(index.indexType == IndexType.B_ClusteredIndex){
-           return get_next_btclusteredindex();
-       }else if (index.indexType == IndexType.B_Index){
-           return get_next_btindex();
-       } else if(index.indexType == IndexType.Hash) {
-           return get_next_hashindex();
-       }
-
-        return null;
-    }
-
-    /**
-     * Cleaning up the index scan, does not remove either the original
-     * relation or the index from the database.
-     *
-     * @throws IndexException error from the lower layer
-     * @throws IOException    from the lower layer
-     */
-    public void close() throws IOException, IndexException {
-        if (!closeFlag) {
-            if (indScan instanceof BTFileScan) {
-                try {
-                    ((BTFileScan) indScan).DestroyBTreeFileScan();
-                } catch (Exception e) {
-                    throw new IndexException(e, "BTree error in destroying index scan.");
-                }
-            }
-
-            if(indScan instanceof BTClusteredFileScan){
-                try {
-                    ((BTClusteredFileScan) indScan).DestroyBTreeFileScan();
-                } catch (Exception e) {
-                    throw new IndexException(e, "BTree error in destroying index scan.");
-                }
-
-            }
-
-            closeFlag = true;
-        }
     }
 
     public FldSpec[] perm_mat;
