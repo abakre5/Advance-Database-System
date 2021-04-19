@@ -2,12 +2,10 @@ package iterator;
 
 import bufmgr.PageNotReadException;
 import catalog.IndexDesc;
-import global.AttrType;
-import global.GlobalConst;
-import global.PageId;
-import global.RID;
+import global.*;
 import heap.*;
 import index.IndexException;
+import org.w3c.dom.Attr;
 import tests.Phase3Utils;
 
 import java.io.IOException;
@@ -99,16 +97,21 @@ public class HashJoin extends Iterator {
         int joinFldInner = OutputFilter[0].operand2.symbol.offset;
         int innerIndexCnt = 0;
         IndexDesc[] innerIndexDescsList = null;
-        Phase3Utils.checkIndexesOnTable(relationName, len_in2, joinFldInner, innerIndexCnt, innerIndexDescsList);
+//        Phase3Utils.checkIndexesOnTable(relationName, len_in2, joinFldInner, innerIndexCnt, innerIndexDescsList);
 
         if (innerIndexCnt > 0) {
-            try {
-                inlj = new IndexNestedLoopsJoins(in1, len_in1, t1_str_sizes, in2, len_in2, t2_str_sizes, amt_of_mem, am1, relationName,
-                        outFilter, rightFilter, proj_list, n_out_flds);
-            } catch (Exception e) {
-                throw new HashJoinException(e, "Create IndexNestedLoopJoin iterator failed");
+            IndexDesc joinIndexDesc = innerIndexDescsList[joinFldInner-1];
+            IndexType joinIndexType = joinIndexDesc.getAccessType();
+            if (joinIndexType.indexType == IndexType.Hash) {
+                try {
+                    inlj = new IndexNestedLoopsJoins(in1, len_in1, t1_str_sizes, in2, len_in2, t2_str_sizes, amt_of_mem, am1, relationName,
+                            outFilter, rightFilter, proj_list, n_out_flds);
+                } catch (Exception e) {
+                    throw new HashJoinException(e, "Create IndexNestedLoopJoin iterator failed");
+                }
             }
         } else {
+            inlj = null;
             try {
                 createInnerHashPartition();
                 createOuterHashPartition();
@@ -222,7 +225,7 @@ public class HashJoin extends Iterator {
         }
     }
 
-    private void performHashJoin() throws HashJoinException {
+    private void performHashJoin() throws HashJoinException, HFDiskMgrException, InvalidSlotNumberException, InvalidTupleSizeException, HFBufMgrException, IOException {
         // Pick corresponding buckets
         Heapfile joinFile = null;
         try {
@@ -239,7 +242,6 @@ public class HashJoin extends Iterator {
                     continue;
                 }
 
-                // Perform NLJ
                 FldSpec[] oProj = getProjection(in1_len);
 
                 FileScan outerScan = new FileScan(outerFileName, _in1, t1_str_sizescopy, (short) in1_len, in1_len, oProj, null);
@@ -250,11 +252,23 @@ public class HashJoin extends Iterator {
                         innerFileName, OutputFilter, RightFilter, perm_mat,
                         nOutFlds);
 
+                AttrType[] Jtypes = new AttrType[nOutFlds];
+                Tuple t = new Tuple();
+                TupleUtils.setup_op_tuple(t, Jtypes,
+                        _in1, in1_len, _in2, in2_len,
+                        t1_str_sizescopy, t2_str_sizescopy,
+                        perm_mat, nOutFlds);
+
                 Jtuple = nlj.get_next();
                 while (Jtuple != null) {
-                    joinFile.insertRecord(Jtuple.getTupleByteArray());
+                    t.tupleCopy(Jtuple);
+                    joinFile.insertRecord(t.getTupleByteArray());
                     Jtuple = nlj.get_next();
                 }
+
+                nlj.close();
+                outerScan.close();
+//                cntr++;
             }
         } catch (Exception e) {
             throw new HashJoinException(e, "Create new heapfile failed.");
@@ -297,6 +311,12 @@ public class HashJoin extends Iterator {
                 f = new Heapfile(fileName);
                 f.deleteFile();
             }
+
+            iHashList.clear();
+            iHashList = null;
+
+            f = new Heapfile("hashJoinFile.in");
+            f.deleteFile();
         } catch (Exception e) {
             throw new HashJoinException(e, "Create new heapfile failed.");
         }
