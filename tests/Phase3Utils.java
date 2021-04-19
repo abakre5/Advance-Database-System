@@ -56,6 +56,9 @@ public class Phase3Utils {
             attrTypes[i] = new AttrType(AttrType.attrNull);
         }
         short[] strSizes = new short[numAttr];
+        for (int i = 0;i < numAttr;i++) {
+            strSizes[i] = Phase3Utils.SIZE_OF_STRING;
+        }
 
         try {
             ExtendedSystemDefs.MINIBASE_ATTRCAT.getTupleStructure(tableName, numAttr, attrTypes, strSizes);
