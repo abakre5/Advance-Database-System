@@ -480,12 +480,13 @@ public class Phase3Driver implements GlobalConst {
         Tuple t = new Tuple();
         int numDelTuples = 0;
         List<Tuple> delTuples = new ArrayList<Tuple>();
+        String separator = ",";
 
         try (BufferedReader br = new BufferedReader(new FileReader(fileName))) {
             String line;
             line = br.readLine();
             /* Get the number of attributes from first line of input data file */
-            numAttribs = Integer.parseInt(line.trim());
+            numAttribs = Integer.parseInt(line.trim().split(separator)[0]);
             //System.out.println("Number of data attributes: " + numAttribs);
             attrTypes = new AttrType[numAttribs];
 
@@ -499,7 +500,7 @@ public class Phase3Driver implements GlobalConst {
             int numStringAttr = 0;
             for (int i = 0; i < numAttribs; ++i) {
                 schemaInfo[i] = br.readLine().trim();
-                attrInfo = schemaInfo[i].split("\\s+");
+                attrInfo = schemaInfo[i].split(separator);
                 fieldNames[i] = attrInfo[0];
 
                 if (attrInfo[1].equalsIgnoreCase("INT")) {
@@ -509,7 +510,8 @@ public class Phase3Driver implements GlobalConst {
                     numStringAttr++;
                 }
             }
-            System.out.println("delete_data_schema" + Arrays.toString(schemaInfo));
+            System.out.println("delete_data fields: " + Arrays.toString(fieldNames));
+            System.out.println("delete_data types: " + Arrays.toString(attrTypes));
 
             short[] strSizes = new short[numStringAttr];
             for (int i = 0; i < strSizes.length; ++i) {
@@ -595,7 +597,7 @@ public class Phase3Driver implements GlobalConst {
 
             while ((line = br.readLine()) != null) {
                 /* read each line from the file, create tuple, and insert into DB */
-                String row[] = line.trim().split("\\s+");
+                String row[] = line.trim().split(separator);
                 //System.out.println(Arrays.toString(row));
 
                 for (int i = 0; i < numAttribs; ++i) {
@@ -651,13 +653,13 @@ public class Phase3Driver implements GlobalConst {
                     numRowsDeleted++;
                 }
             }
+
+            //scan.closescan();
         } catch (Exception e) {
             System.err.println("*** error: " + e);
             e.printStackTrace();
             status = FAIL;
         }
-
-        scan.closescan();
 
         if (status && (numRowsDeleted != 0)) {
             /* flush pages to disk */
@@ -1463,22 +1465,11 @@ public class Phase3Driver implements GlobalConst {
 
     private static boolean deleteDataFromTable(String tableName, String filename) {
         boolean status = false;
-        try {
-            status = deleteData(tableName, filename);
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-        if (status) {
-            /* flush pages to disk */
-            try {
-                SystemDefs.JavabaseBM.flushAllPages();
-            } catch (PagePinnedException ignored) {
 
-            } catch (Exception e) {
-                System.err.println("*** error flushing pages to disk");
-                e.printStackTrace();
-                status = FAIL;
-            }
+        status = deleteFromTable(tableName, filename);
+
+        if (status) {
+            flushToDisk();
             System.out.println();
         }
         return status;
