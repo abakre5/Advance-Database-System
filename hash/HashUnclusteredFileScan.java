@@ -34,19 +34,25 @@ public class HashUnclusteredFileScan extends HashIndexFileScan implements Global
             return null;
         }
 
-        currentBucketName = header_names.peek();
-        //header_names.size();
-
-        System.out.println("Scanning Size "+header_names.size() +currentBucketName);
+       
     
         if(is_first_bucket_scan) {
         try {
+            while(bucketEntryCnt==0) {
+            currentBucketName = header_names.peek();
+                //header_names.size();
+            System.out.println("Scanning Size "+header_names.size() +currentBucketName);
             bucket = new Heapfile(currentBucketName);
             bucketEntryCnt = bucket.getRecCnt();
             System.out.println(currentBucketName + "has "+ bucketEntryCnt + "elements");
             bucket_scan = bucket.openScan();
             bucketRID = new RID();
             is_first_bucket_scan = false;
+            if(bucketEntryCnt == 0){
+                header_names.remove();
+            }
+            }
+            
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -57,21 +63,34 @@ public class HashUnclusteredFileScan extends HashIndexFileScan implements Global
         // This tuple corresponds to entry in a heap file.
         AttrType[] attrType = new AttrType[3];
         //short[] attrSize = new short[numAttribs];
-        attrType[0] = new AttrType(AttrType.attrReal);
-        attrType[1] = new AttrType(AttrType.attrInteger);
-        attrType[2] = new AttrType(AttrType.attrInteger);
+        attrType = hfile.attrs;
 
-        short[] attrSizes = new short[2];
-        attrSizes[0] = hfile.REC_LEN1;
-        attrSizes[1] = hfile.REC_LEN1;
+        short[] attrSizes;
+        attrSizes = hfile.attrSizes;
 
         try {
             ridTuple = bucket_scan.getNext(bucketRID);
             if(ridTuple!=null) {
-                ridTuple.setHdr((short)3, attrType, attrSizes);
+                
                 System.out.println("Bucket Entry Cnt "+ bucketEntryCnt);
                 bucketEntryCnt--;
-                entry.key = ridTuple.getFloFld(1);
+                System.out.println("Index Attr "+hfile.indexAttr);
+                if(hfile.indexkeyType == hfile.integerField) {
+                    attrType[0] = new AttrType (AttrType.attrInteger);
+                    attrType[1] = new AttrType (AttrType.attrInteger);
+                    attrType[2] = new AttrType (AttrType.attrInteger);
+                    
+                    ridTuple.setHdr((short)3, attrType, attrSizes);
+                    entry.key = new IntegerKey(ridTuple.getIntFld(1));
+                } else if (hfile.indexkeyType == hfile.stringField){
+                    attrType[0] = new AttrType (AttrType.attrString);
+                    attrType[1] = new AttrType (AttrType.attrInteger);
+                    attrType[2] = new AttrType (AttrType.attrInteger);
+
+                    ridTuple.setHdr((short)3, attrType, attrSizes);
+                    entry.key = new StringKey(ridTuple.getStrFld(1));
+                }
+                
                 RID insert_rid = new RID();
                 insert_rid.pageNo.pid = ridTuple.getIntFld(2);
                 insert_rid.slotNo = ridTuple.getIntFld(3);
