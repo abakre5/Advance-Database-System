@@ -5,7 +5,7 @@ public class KeyDataEntry {
         /**
      * key in the (key, data)
      */
-    public Float key;
+    public KeyClass key;
     /**
      * data in the (key, data)
      */
@@ -15,23 +15,31 @@ public class KeyDataEntry {
     /**
      * Class constructor.
      */
-    public KeyDataEntry(Float key, RID rid) {
+    public KeyDataEntry(Integer key, RID rid) {
         data = rid;
-        this.key = key;
+        this.key = new IntegerKey(key);
         };
+
+    public KeyDataEntry(String key, RID rid) {
+        data = rid;
+        this.key = new StringKey(key);
+    };
+        
     
     public KeyDataEntry() {
         
     }
       
     // //Constructor
-    // public KeyDataEntry(KeyClass key, DataClass data) {
-    //     if (key instanceof FloatKey){
-    //         this.key = new FloatKey(((FloatKey) key).getKey());
-    //     }
-    //    if (data instanceof UnclusteredHashData)
-    //         this.data = new UnclusteredHashData(((UnclusteredHashData) data).getData());
-    // }
+    public KeyDataEntry(KeyClass key, RID data) {
+        if (key instanceof IntegerKey){
+            this.key = new IntegerKey(((IntegerKey) key).getKey());
+        } else if (key instanceof StringKey)
+            this.key = new StringKey(((StringKey) key).getKey());  
+
+            this.data = data;
+    }
+
 
 
 
