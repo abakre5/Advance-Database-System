@@ -1116,7 +1116,7 @@ public class HashFile extends IndexFile implements GlobalConst {
                     current_util = a;
 
                     if(current_util < 0.20) {
-                        System.out.println("Triggering index shrink operation......");
+                        System.out.println("Triggering index shrink operation (TODO)......");
                         boolean shrink = triggerShrink();
 
                     }
