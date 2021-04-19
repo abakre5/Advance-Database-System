@@ -24,6 +24,10 @@ public class BTreeClusteredFile extends ClusteredIndexFile
     private static FileOutputStream fos;
     private static DataOutputStream trace;
 
+    private Heapfile heapfile;
+    private AttrType[] attrTypes;
+    private short[] attrSizes;
+
 
     /**
      * It causes a structured trace to be written to a
@@ -169,6 +173,7 @@ public class BTreeClusteredFile extends ClusteredIndexFile
          * - headerPage, headerPageId valid and pinned
          * - dbname contains a copy of the name of the database
          */
+
     }
 
 
@@ -211,6 +216,39 @@ public class BTreeClusteredFile extends ClusteredIndexFile
         }
 
         dbname = new String(filename);
+
+    }
+
+    public BTreeClusteredFile(String filename, int keytype,
+                              int keysize, int delete_fashion, String heapFileName, AttrType[] attributeTypes,
+                              short[] attributeSizes)
+            throws GetFileEntryException,
+            ConstructPageException,
+            IOException,
+            AddFileEntryException, HFDiskMgrException, HFBufMgrException, HFException {
+
+
+        headerPageId = get_file_entry(filename);
+        if (headerPageId == null) //file not exist
+        {
+            headerPage = new BTreeHeaderPage();
+            headerPageId = headerPage.getPageId();
+            add_file_entry(filename, headerPageId);
+            headerPage.set_magic0(MAGIC0);
+            headerPage.set_rootId(new PageId(INVALID_PAGE));
+            headerPage.set_keyType((short) keytype);
+            headerPage.set_maxKeySize(keysize);
+            headerPage.set_deleteFashion(delete_fashion);
+            headerPage.setType(NodeType.BTHEAD);
+        } else {
+            headerPage = new BTreeHeaderPage(headerPageId);
+        }
+
+        dbname = new String(filename);
+        //heapfile =  new Heapfile(heapFileName);
+        heapfile = null;
+        attrTypes = attributeTypes;
+        attrSizes = attributeSizes;
 
     }
 
@@ -1059,8 +1097,11 @@ public class BTreeClusteredFile extends ClusteredIndexFile
             // note that pageno/pageLeaf is still pinned;
             // scan will unpin it when done
         }
+        RID prev = new RID();
+        prev.copyRid(startrid);
 
         while (BT.keyCompare(curEntry.key, lo_key) < 0) {
+            //prev.copyRid(startrid);
             curEntry = pageLeaf.getNext(startrid);
             while (curEntry == null) { // have to go right
                 nextpageno = pageLeaf.getNextPage();
@@ -1075,6 +1116,11 @@ public class BTreeClusteredFile extends ClusteredIndexFile
 
                 curEntry = pageLeaf.getFirst(startrid);
             }
+        }
+
+        if(startrid != null && prev != null)
+        {
+            startrid.copyRid(prev);
         }
 
         return pageLeaf;
@@ -1296,7 +1342,7 @@ public class BTreeClusteredFile extends ClusteredIndexFile
                 // deletion of the rid.
 
                 if (leafPage.delEntry(new KeyDataEntry(key, pageId.pid))) {
-                    // successfully found <key, rid> on this page and deleted it.
+                    // successfully found <key, pid> on this page and deleted it.
 
 
                     if (trace != null) {
@@ -1709,6 +1755,7 @@ public class BTreeClusteredFile extends ClusteredIndexFile
 
         //this sets up scan at the starting position, ready for iteration
         scan.leafPage = findRunStart(lo_key, scan.curRid);
+
         return scan;
     }
 
@@ -1755,6 +1802,199 @@ public class BTreeClusteredFile extends ClusteredIndexFile
 
     }
 
+    public void SetHeapFile(Heapfile hf){
+        this.heapfile = hf;
+    }
+
+    public RID insertTuple(Tuple tuple, KeyClass key, int fieldNumber, int multiplier){
+        RID rid  = new RID();
+        PageId pageId = new PageId();
+
+        //Index is already created, find a page where insertion can be made
+        //TODO:Pawan some entries are getting inserted randomly on pages where space is available.
+        BTClusteredFileScan btClusteredFileScan = null;
+        try {
+            btClusteredFileScan = new_scan(key, null);
+            KeyDataEntry entry  = btClusteredFileScan.get_next();
+//            while (entry != null){
+//                PageId pagedId = ((ClusteredLeafData)entry.data).getData();
+//                System.out.println("Page no having records in range : " + pagedId);
+//                entry = btClusteredFileScan.get_next();
+//            }
+            if(entry == null){
+                btClusteredFileScan = new_scan(null, null);
+                entry  = btClusteredFileScan.get_next();
+            }
+            pageId = ((ClusteredLeafData)entry.data).getData();
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        if(pageId.pid == INVALID_PAGE)
+        {
+            //throw new PageNotFoundException("Invalid page number provided");
+        }
+
+        HFPage hfPage = new HFPage();
+        try
+        {
+            SystemDefs.JavabaseBM.pinPage(pageId, (Page)hfPage, false);
+            if(hfPage.available_space() >= tuple.size())
+            {
+                System.out.println("adding on existing page");
+                rid =  hfPage.insertRecord(tuple.getTupleByteArray());
+            }
+            else {
+                DataPageInfo dataPageInfo = new DataPageInfo();
+                HFPage pageToAttach= heapfile._newDatapage(dataPageInfo);
+
+                System.out.println("New page created " + pageToAttach.getCurPage().pid + " " +pageToAttach.available_space());
+
+                heapfile.add_page_entry(dataPageInfo);
+
+                Tuple temp = new Tuple(tuple.getTupleByteArray(), tuple.getOffset(), tuple.getLength());
+                temp.setHdr((short)attrTypes.length, attrTypes, attrSizes);
+
+                redistributeRecords(hfPage, pageToAttach, temp.size());
+
+                RID firstOnNew = pageToAttach.firstRecord();
+                Tuple t2 = pageToAttach.getRecord(firstOnNew);
+                Tuple temp2 = new Tuple(t2.getTupleByteArray(), t2.getOffset(), t2.getLength());
+                temp2.setHdr((short)attrTypes.length, attrTypes, attrSizes);
+
+                RID firstOnOld = hfPage.firstRecord();
+                Tuple t1 = hfPage.getRecord(firstOnOld);
+                Tuple temp1 = new Tuple(t1.getTupleByteArray(), t1.getOffset(), t1.getLength());
+                temp1.setHdr((short)attrTypes.length, attrTypes, attrSizes);
+
+
+                KeyClass key1 = BT.createKeyFromTupleField(temp1, attrTypes, fieldNumber, multiplier);
+                KeyClass key2 = BT.createKeyFromTupleField(temp2, attrTypes, fieldNumber, multiplier);
+
+                if(BT.keyCompare(key, key1) >= 0 && BT.keyCompare(key, key2) < 0)
+                {
+                    rid = hfPage.insertRecord(tuple.getTupleByteArray());
+                }else{
+                    rid = pageToAttach.insertRecord(tuple.getTupleByteArray());
+
+                }
+
+                //Now new page is created, Add this entry to Index
+                insert(new FloatKey(temp2.getFloFld(fieldNumber)), pageToAttach.getCurPage());
+                //SystemDefs.JavabaseBM.unpinPage(pageToAttach.getCurPage(), true);
+            }
+
+            SystemDefs.JavabaseBM.unpinPage(hfPage.getCurPage(), true);
+        } catch (Exception e)
+        {
+            e.printStackTrace();
+        }
+
+
+        return rid;
+    }
+
+    private boolean redistributeRecords(HFPage existingPage, HFPage newPage, int tupleSize) throws InvalidSlotNumberException,
+            IOException, InvalidTupleSizeException, InvalidTypeException, FieldNumberOutOfBoundException {
+        RID rid = existingPage.firstRecord();
+        Tuple temp = existingPage.getRecord(rid);
+
+
+        Tuple tuple = new Tuple(temp.getTupleByteArray(), temp.getOffset(), temp.getLength());
+        tuple.setHdr((short)attrTypes.length, attrTypes, attrSizes);
+
+        int totalTuples = (MINIBASE_PAGESIZE) / tupleSize;
+        int half = totalTuples / 2;
+        System.out.println("Total records "  + totalTuples +" half "+ half);
+
+        while (half > 0 && rid != null){
+            rid = existingPage.nextRecord(rid);
+            half--;
+        }
+
+        while(rid != null)
+        {
+            System.out.println("moving a tuple....");
+            tuple = existingPage.getRecord(rid);
+            newPage.insertRecord(tuple.getTupleByteArray());
+            existingPage.deleteRecord(rid);
+            rid = existingPage.nextRecord(rid);
+        }
+
+        //now records have been redistributed.
+        return true;
+    }
+
+    public boolean deleteTuple(RID rid)
+            throws HFDiskMgrException, HFException, HFBufMgrException, InvalidSlotNumberException, InvalidTupleSizeException, Exception
+    {
+        System.out.println("Deleting rid : " + rid.pageNo.pid + " slot " + rid.slotNo);
+        // Btree holds pointer to first key of the page. update in tree is required only if this
+        // key is deleted.
+        // delete this key from btree and add next record as key.
+        PageId pageId  = new PageId();
+        pageId.copyPageId(rid.pageNo);
+
+        HFPage hfPage = new HFPage();
+        Page pg = new Page();
+        try
+        {
+            SystemDefs.JavabaseBM.pinPage(pageId, (Page)hfPage, false);
+            RID currentRID = new RID();
+            currentRID = hfPage.firstRecord();
+            if(currentRID == null){
+                System.out.println("Invalid rid for first record");
+            }
+            if(currentRID.equals(rid))
+            {
+                Tuple record = hfPage.getRecord(currentRID);
+                Tuple firstRecord = new Tuple(record.getTupleByteArray(), record.getOffset(), record.getLength());
+                firstRecord.setHdr((short) attrTypes.length, attrTypes, attrSizes);
+                boolean b= Delete(new FloatKey(firstRecord.getFloFld(1)), hfPage.getCurPage());
+                if(!b){
+                    System.out.println("Failed to delete key from btree");
+                }
+
+                currentRID = hfPage.nextRecord(currentRID);
+                if(currentRID != null)
+                {
+                    //Need to update btree only if page has some records.
+                    Tuple t = hfPage.getRecord(currentRID);
+                    Tuple temp = new Tuple(t.getTupleByteArray(), t.getOffset(), t.getLength());
+                    temp.setHdr((short) attrTypes.length, attrTypes, attrSizes);
+                    //Now new page is created, Add this entry to Index
+                    insert(new FloatKey(temp.getFloFld(1)), hfPage.getCurPage());
+                    System.out.println("Inserting new key");
+                }
+            }
+
+            SystemDefs.JavabaseBM.unpinPage(hfPage.getCurPage(), true);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        //Delete from actual heap file
+        boolean status = heapfile.deleteRecord(rid);
+        return status;
+    }
+
+
+    public void printBTree(){
+        try {
+            BT.printBTree(this.getHeaderPage());
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    public void printAllLeafPages(){
+        try {
+            BT.printAllLeafPages(this.getHeaderPage());
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
 }
 
 
