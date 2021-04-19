@@ -36,20 +36,24 @@ public class HashUnclusteredFileScan extends HashIndexFileScan implements Global
 
        
     
-        if(is_first_bucket_scan) {
+        if(is_first_bucket_scan && !header_names.isEmpty()) {
         try {
             while(bucketEntryCnt==0) {
+                if(header_names.isEmpty()) {
+                    return null;
+                }
             currentBucketName = header_names.peek();
                 //header_names.size();
-            System.out.println("Scanning Size "+header_names.size() +currentBucketName);
+            //System.out.println("Scanning Size "+header_names.size() +currentBucketName);
             bucket = new Heapfile(currentBucketName);
             bucketEntryCnt = bucket.getRecCnt();
-            System.out.println(currentBucketName + "has "+ bucketEntryCnt + "elements");
+            //System.out.println(currentBucketName + "has "+ bucketEntryCnt + "elements");
             bucket_scan = bucket.openScan();
             bucketRID = new RID();
             is_first_bucket_scan = false;
             if(bucketEntryCnt == 0){
                 header_names.remove();
+
             }
             }
             
@@ -72,9 +76,9 @@ public class HashUnclusteredFileScan extends HashIndexFileScan implements Global
             ridTuple = bucket_scan.getNext(bucketRID);
             if(ridTuple!=null) {
                 
-                System.out.println("Bucket Entry Cnt "+ bucketEntryCnt);
+                //System.out.println("Bucket Entry Cnt "+ bucketEntryCnt);
                 bucketEntryCnt--;
-                System.out.println("Index Attr "+hfile.indexAttr);
+                //System.out.println("Index Attr "+hfile.indexAttr);
                 if(hfile.indexkeyType == hfile.integerField) {
                     attrType[0] = new AttrType (AttrType.attrInteger);
                     attrType[1] = new AttrType (AttrType.attrInteger);
@@ -99,6 +103,7 @@ public class HashUnclusteredFileScan extends HashIndexFileScan implements Global
                 if(bucketEntryCnt == 0) {
                     System.out.println("This is the last entry");
                     header_names.remove();
+                    
                     currentBucketCnt++;
                     bucketRID = new RID();
                     is_first_bucket_scan = true;
