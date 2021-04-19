@@ -14,12 +14,7 @@ import java.util.Arrays;
 import java.util.List;
 
 import btree.KeyDataEntry;
-import hash.HashFile;
-import hash.HashIndexFileScan;
-import hash.HashUnclusteredFileScan;
-import hash.IntegerKey;
-import hash.StringKey;
-import hash.UnclusteredHashData;
+import hash.*;
 import index.IndexUtils;
 public class Phase3Driver implements GlobalConst {
 
@@ -327,7 +322,7 @@ public class Phase3Driver implements GlobalConst {
             while ((line = br.readLine()) != null) {
                 /* read each line from the file, create tuple, and insert into DB */
                 String row[] = line.trim().split(",");
-                System.out.println(Arrays.toString(row));
+                //System.out.println(Arrays.toString(row));
 
                 for (int i = 0; i < numAttribs; ++i) {
                     try {
@@ -366,6 +361,69 @@ public class Phase3Driver implements GlobalConst {
         }
         return status;
     }
+    private static boolean createClusteredHashIndex(String tableName, int keyIndexAttr) {
+        boolean status = OK;
+        Heapfile relation = null;
+        Scan scan = null;
+        Tuple t = null;
+        RelDesc rec = new RelDesc();
+        AttrType[] attrTypes = null;
+        short[] sizeArr = null;
+        ClusteredHashFile chf = null;
+        try {
+            int numAttr = 0;
+            relation = new Heapfile(tableName);
+            ExtendedSystemDefs.MINIBASE_RELCAT.getInfo(tableName, rec);
+            numAttr = rec.getAttrCnt();
+            attrTypes = new AttrType[numAttr];
+            sizeArr = new short[numAttr];
+            ExtendedSystemDefs.MINIBASE_ATTRCAT.getTupleStructure(tableName, numAttr, attrTypes, sizeArr);
+            t = new Tuple();
+            t.setHdr((short) numAttr, attrTypes, sizeArr);
+            assert keyIndexAttr <= numAttr;
+            chf = new ClusteredHashFile(tableName, keyIndexAttr, attrTypes[keyIndexAttr - 1].attrType);
+        } catch (Exception e) {
+            System.err.println(e);
+            e.printStackTrace();
+        }
+
+        try {
+            Tuple temp = null;
+            RID rid = new RID();
+            RID indexRid = new RID();
+            scan = relation.openScan();
+            while ((temp = scan.getNext(rid)) != null) {
+                t.tupleCopy(temp);
+                chf.insert(t);
+            }
+        } catch (Exception e) {
+            System.err.println(e);
+            status = FAIL;
+        }
+        scan.closescan();
+        //relation.deleteFile();
+
+        /*
+        try {
+            ClusteredHashFileScan hs = new ClusteredHashFileScan(chf);
+            
+            Tuple temp = null;
+            RID rid = new RID();
+            int numTuples = 0;
+            while ((temp = hs.getNext(rid)) != null) {
+                t.tupleCopy(temp);
+                numTuples++;
+                printTuple(t, attrTypes);
+            }
+            System.err.println("number of tuples in hash index: " + numTuples);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return false;
+        }
+        */
+        
+        return status;
+    }
 
     private static boolean createTable(String tableName, int indexType, int indexAttr, String filename) {
         boolean status = OK;
@@ -378,7 +436,7 @@ public class Phase3Driver implements GlobalConst {
         if (indexType == IndexType.B_Index) {
 
         } else if (indexType == IndexType.Hash) {
-
+            createClusteredHashIndex(tableName, indexAttr);
         }
 
         /* flush pages to disk */
@@ -387,7 +445,7 @@ public class Phase3Driver implements GlobalConst {
 
         return status;
     }
-
+    
     private static boolean insertIntoTable(String tableName, String fileName) {
         boolean status = readDataIntoHeapFile(tableName, fileName, false);
         if (status) {

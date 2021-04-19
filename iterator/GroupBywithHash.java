@@ -87,8 +87,8 @@ public class GroupBywithHash {
         if (!ifIndexExistOnTheTable()) {
             try {
                 hashFile = new HashFile("", hashIndexName, group_by_attr.offset,
-                        new AttrType(attrType[groupByAttr.offset - 1].attrType).attrType,
-                        scan, dbHeapFile.getRecCnt(), dbHeapFile);
+                        attrType[groupByAttr.offset - 1].attrType,
+                        scan, dbHeapFile.getRecCnt(), dbHeapFile, attrType, strSize, noOfColumns);
             } catch (Exception e) {
                 System.err.println("Error occurred while creating Index.");
                 return;

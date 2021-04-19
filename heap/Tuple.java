@@ -4,6 +4,7 @@ package heap;
 
 import java.io.*;
 import java.lang.*;
+import java.util.Arrays;
 
 import global.*;
 
@@ -96,6 +97,17 @@ public class Tuple implements GlobalConst {
         tuple_length = size;
     }
 
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (!(o instanceof Tuple)) {
+            return false;
+        }
+        Tuple t = (Tuple) o;
+        return Arrays.equals(Arrays.copyOfRange(this.data, this.getOffset(), this.getLength()), Arrays.copyOfRange(t.data, this.getOffset(), this.getLength()));
+    }
     /**
      * Copy a tuple to the current tuple position
      * you must make sure the tuple lengths must be equal

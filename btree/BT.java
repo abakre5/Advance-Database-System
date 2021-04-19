@@ -38,6 +38,8 @@ import heap.*;
  * or the whole B+ tree structure or all leaf pages.
  */
 public class BT implements GlobalConst {
+    public static boolean OK = true;
+    public static boolean FAIL = false;
 
     /**
      * It compares two keys.
@@ -520,6 +522,90 @@ public class BT implements GlobalConst {
 
 
         SystemDefs.JavabaseBM.unpinPage(currentPageId, true/*dirty*/);
+    }
+
+    public static KeyClass createKeyFromTupleField(Tuple tuple, AttrType[] attrTypes, int fieldNumber, int multiplier) throws FieldNumberOutOfBoundException,IOException {
+        KeyClass key = null;
+
+        if(attrTypes[fieldNumber].attrType == AttrType.attrReal){
+            key = new FloatKey(tuple.getFloFld(fieldNumber) * multiplier);
+        }else if(attrTypes[fieldNumber].attrType == AttrType.attrInteger){
+            key = new IntegerKey(tuple.getIntFld(fieldNumber) * multiplier);
+        }else if(attrTypes[fieldNumber].attrType == AttrType.attrString){
+            key = new StringKey(tuple.getStrFld(fieldNumber));
+        }
+
+        return key;
+    }
+
+    public static boolean CreateClusteredIndex(Heapfile f, BTreeClusteredFile btf, AttrType[] attrTypes, short[] attrSize, int fieldNumber) throws InvalidTupleSizeException, IOException, InvalidTypeException {
+        boolean status = OK;
+        RID rid = new RID();
+        KeyClass key = null;
+        Tuple temp = null;
+        int prev = -1;
+
+        Scan scan = null;
+        scan = new Scan(f);
+
+        Tuple t = null;
+
+        try {
+            temp = scan.getNext(rid);
+        } catch (Exception e) {
+            status = FAIL;
+            e.printStackTrace();
+        }
+
+        while (temp != null)
+        {
+            if(temp != null )
+            {
+                t = new Tuple(temp.getTupleByteArray(), temp.getOffset(), temp.getLength());
+                t.setHdr((short) attrTypes.length, attrTypes, attrSize);
+            }
+
+            // insert first key from each page in index
+            if(prev != rid.pageNo.pid)
+            {
+                prev = rid.pageNo.pid;
+                if(t != null)
+                {
+                    try
+                    {
+                        key = BT.createKeyFromTupleField(t, attrTypes, 1, -1);
+                    } catch (Exception e)
+                    {
+                        status = FAIL;
+                        e.printStackTrace();
+                    }
+                    System.out.println("page no " + rid.pageNo.pid + " slot no " + rid.slotNo);
+
+                    try {
+                        btf.insert(key, new PageId(prev));
+                    } catch (Exception e) {
+                        status = FAIL;
+                        e.printStackTrace();
+                    }
+                }
+            }
+
+            try
+            {
+                temp = scan.getNext(rid);
+            }
+            catch (Exception e)
+            {
+                status = FAIL;
+                e.printStackTrace();
+            }
+
+            if(status == FAIL)
+            {
+                break;
+            }
+        }
+        return status;
     }
 } // end of BT
 
