@@ -278,6 +278,7 @@ public class AttrCatalog extends Heapfile
 
         // FILL ARRAYS WITH TYPE AND SIZE DATA
         for (x = 0, i = 0; i < attrCnt; i++) {
+            typeArray[i] = new AttrType(AttrType.attrNull);
             typeArray[i].attrType = attrs[i].attrType.attrType;
             //System.err.println("i=" + i + " " + typeArray[i]);
             if (attrs[i].attrType.attrType == AttrType.attrString) {
