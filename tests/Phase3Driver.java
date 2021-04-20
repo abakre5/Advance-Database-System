@@ -812,6 +812,49 @@ public class Phase3Driver implements GlobalConst {
 
     }
 
+    private static boolean openExistingUnclusteredIndex(String tableName, int indexType, int indexAttr) {
+        try {
+            int num_records = 1999;
+            Heapfile dbHeapFile = new Heapfile(tableName);
+            IteratorDesc iteratorDesc = Phase3Utils.getTableItr(tableName);
+            HashFile hf = null;
+            hf = new HashFile(tableName,"hashIndex", 1, AttrType.attrString, num_records, dbHeapFile, iteratorDesc.getAttrType(), iteratorDesc.getStrSizes(),iteratorDesc.getNumAttr());
+            hf.printMetadataFile();
+            
+            
+            Tuple findEntry = new Tuple();
+            AttrType[] dataFormat = new AttrType[3];
+            dataFormat[0] = new AttrType(AttrType.attrString);
+            dataFormat[1] = new AttrType(AttrType.attrInteger);
+            dataFormat[2] = new AttrType(AttrType.attrInteger);
+            short[] strdatasize = new short[1];
+            strdatasize[0] = 32;
+            findEntry.setHdr((short)3, dataFormat, strdatasize);
+            findEntry.setStrFld(1, "9aaaaaaaa");
+            findEntry.setIntFld(2, 4);
+            findEntry.setIntFld(3, 10);
+
+            System.out.println("Search Test\n");
+            //hf.printHeaderFile();
+            //hf.printindex();
+            //Tuple searchTup = hf.search(new StringKey("9aaaaaaaa"));
+            Tuple searchTup = hf.search(findEntry);
+            
+            if(searchTup!=null) {
+                        Tuple current_tuple = new Tuple(searchTup.getTupleByteArray(), searchTup.getOffset(),searchTup.getLength());
+                        current_tuple.setHdr((short)3, dataFormat, strdatasize);
+                        System.out.println("Found first matched tuple again");
+                        System.out.println(current_tuple.getStrFld(1)+" " + current_tuple.getIntFld(2)+ " " +current_tuple.getIntFld(3));
+            }
+
+
+
+        } catch(Exception e) {
+            e.printStackTrace();
+        }
+        return true;
+    }
+
     private static boolean createUnclusteredIndex(String tableName, int indexType, int indexAttr) {
         boolean status = OK;
         PrintWriter writer = null;
@@ -948,7 +991,7 @@ public class Phase3Driver implements GlobalConst {
             }
             //hf.printindex();
             //hf.printHeaderFile();
-            hf.printMetadataFile();
+            //hf.printMetadataFile();
             // hf.printHeaderFile();
 
 
@@ -1167,7 +1210,8 @@ public class Phase3Driver implements GlobalConst {
                     int indexType = indexTypeStr.equalsIgnoreCase("btree") ? IndexType.B_Index : IndexType.Hash;
                     int indexAttr = Integer.parseInt(indexAttrStr);
                     createUnclusteredIndex(tableName, indexType, indexAttr);
-
+                    System.out.println("Check existing hash\\n");
+                    openExistingUnclusteredIndex(tableName, indexType, indexAttr);
                     break;
                 }
                 case "prev": {

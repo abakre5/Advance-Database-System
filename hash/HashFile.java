@@ -58,15 +58,36 @@ public class HashFile extends IndexFile implements GlobalConst {
 
 
     //Constructor
-    public HashFile(String relationName,String hashFileName, int indexField, int keyType, Heapfile dbfile) throws IOException, HFException, HFDiskMgrException, HFBufMgrException,
+    public HashFile(String relationName,String hashFileName, int indexField, int keyType,int num_records, Heapfile dbfile, AttrType[] attributeTypes, short[] AttrSize, int numAttr) throws IOException, HFException, HFDiskMgrException, HFBufMgrException,
     InvalidTupleSizeException,InvalidSlotNumberException {
-
+         /* This should not be hardcoded, received wrong AttrTypes from Hash file Iterator*/
+         AttrType[] dataFormat = new AttrType[3];
+         dataFormat[0] = new AttrType(AttrType.attrString);
+         dataFormat[1] = new AttrType(AttrType.attrInteger);
+         dataFormat[2] = new AttrType(AttrType.attrInteger);
+         short[] strdatasize = new short[1];
+         strdatasize[0] = 32;
+ 
+ 
+         attrs = dataFormat;
+         attrSizes = strdatasize;
+         indexkeyType = keyType;
+         numAttribs = 3;
+         indexAttr = indexField;
+         try{
+             DBScan = getDBFileScan(relationName);
+         } catch(Exception e){
+             e.printStackTrace();
+         }
+         
         hashIndexName = hashFileName;
         datafile = dbfile;
         headerFile = new Heapfile(hashIndexName);
         metadataFile = metadataFile + "_" +hashFileName;
         indexAttr = indexField ;
         populateMap();
+        //Loads the metadata file as well.
+        printMetadataFile();
 
 
     }
