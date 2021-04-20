@@ -10,6 +10,8 @@ public class IndexType {
     public static final int B_Index = 1;
     public static final int Hash = 2;
     public static final int B_ClusteredIndex = 3;
+    public static final int Clustered_Hash = 4;
+
 
     public int indexType;
 
@@ -43,6 +45,8 @@ public class IndexType {
                 return "Hash";
             case B_ClusteredIndex:
                 return  "B_ClusteredIndex";
+            case Clustered_Hash:
+                return "Hash_ClusteredIndex";
         }
         return ("Unexpected IndexType " + indexType);
     }
@@ -58,6 +62,8 @@ public class IndexType {
                 return "_Hash_";
             case B_ClusteredIndex:
                 return  "_B_ClusteredIndex_";
+            case Clustered_Hash:
+                return "_Hash_ClusteredIndex_";
         }
         return ("Unexpected IndexType " + type);
     }

@@ -369,7 +369,7 @@ public class Phase3Driver implements GlobalConst {
             if (indexType == IndexType.B_ClusteredIndex) {
                 createClusteredBtreeIndex(tableName, indexAttr);
                 //Phase3Utils.insertIndexEntry(tableName, indexAttr, indexType);
-            } else if (indexType == IndexType.Hash) {
+            } else if (indexType == IndexType.Clustered_Hash) {
                 createClusteredHashIndex(tableName, indexAttr);
                 Phase3Utils.insertIndexEntry(tableName, indexAttr, indexType);
             }
@@ -442,6 +442,11 @@ public class Phase3Driver implements GlobalConst {
         
         return status;
     }
+
+
+
+
+
 
     private static boolean createClusteredBtreeIndex(String tableName, int keyIndexAttr) {
         boolean status = OK;
@@ -895,25 +900,40 @@ public class Phase3Driver implements GlobalConst {
 
     private static boolean openExistingUnclusteredIndex(String tableName, int indexType, int indexAttr) {
         try {
-            int num_records = 1999;
-            Heapfile dbHeapFile = new Heapfile(tableName);
-            IteratorDesc iteratorDesc = Phase3Utils.getTableItr(tableName);
+            
+            Tuple t = null;
             HashFile hf = null;
-            hf = new HashFile(tableName,"hashIndex", 1, AttrType.attrString, num_records, dbHeapFile, iteratorDesc.getAttrType(), iteratorDesc.getStrSizes(),iteratorDesc.getNumAttr());
+            RelDesc rec = new RelDesc();
+            AttrType[] attrTypes = null;
+            short[] sizeArr = null;
+            String indexFile = Phase3Utils.getUnclusteredHashIndexName(tableName, indexAttr);
+            System.out.println("Unclustered Hash Index file name :" + indexFile);
+            System.out.println("Index Field "+ indexAttr);
+            try {
+            IteratorDesc iteratorDesc = Phase3Utils.getTableItr(tableName);
+            Heapfile dbHeapFile = new Heapfile(tableName);
+            int num_records = dbHeapFile.getRecCnt();
+            System.out.println("Records:-> "+ num_records);
+            
+            int numAttr = 0;
+            ExtendedSystemDefs.MINIBASE_RELCAT.getInfo(tableName, rec);
+            numAttr = rec.getAttrCnt();
+            attrTypes = new AttrType[numAttr];
+            sizeArr = new short[numAttr];
+
+            ExtendedSystemDefs.MINIBASE_ATTRCAT.getTupleStructure(tableName, numAttr, attrTypes, sizeArr);
+            t = new Tuple();
+            t.setHdr((short) numAttr, attrTypes, sizeArr);
+
+            assert indexAttr <= numAttr;
+            
+
+            int indexAttrType = attrTypes[indexAttr-1].attrType;
+            hf = new HashFile(tableName,indexFile, indexAttr, indexAttrType, num_records, dbHeapFile, iteratorDesc.getAttrType(), iteratorDesc.getStrSizes(),iteratorDesc.getNumAttr());
             hf.printMetadataFile();
             
             
-            Tuple findEntry = new Tuple();
-            AttrType[] dataFormat = new AttrType[3];
-            dataFormat[0] = new AttrType(AttrType.attrString);
-            dataFormat[1] = new AttrType(AttrType.attrInteger);
-            dataFormat[2] = new AttrType(AttrType.attrInteger);
-            short[] strdatasize = new short[1];
-            strdatasize[0] = 32;
-            findEntry.setHdr((short)3, dataFormat, strdatasize);
-            findEntry.setStrFld(1, "9aaaaaaaa");
-            findEntry.setIntFld(2, 4);
-            findEntry.setIntFld(3, 10);
+       
 
             System.out.println("Scanning test again\n");
             
@@ -923,14 +943,15 @@ public class Phase3Driver implements GlobalConst {
             try {
             hashScan = (HashUnclusteredFileScan)IndexUtils.HashUnclusteredScan(hf);
            
-            hash.KeyDataEntry entry = hashScan.get_next();
+                    hash.KeyDataEntry entry = hashScan.get_next();
                 while(entry!=null) {
                     if(entry!=null) {
                     RID fetchRID = entry.data;
-                    Tuple t = dbHeapFile.getRecord(fetchRID);
-                    Tuple current_tuple = new Tuple(t.getTupleByteArray(), t.getOffset(),t.getLength());
+                    //System.out.println("RID "+ fetchRID.pageNo + ":"+fetchRID.slotNo);
+                    // Tuple tt = dbHeapFile.getRecord(fetchRID);
+                    // Tuple current_tuple = new Tuple(tt.getTupleByteArray(), tt.getOffset(),tt.getLength());
 
-                    current_tuple.setHdr((short)3, dataFormat, strdatasize);
+                    // current_tuple.setHdr((short)3, dataFormat, strdatasize);
                     elem_count++;
                     entry = hashScan.get_next();
                 
@@ -943,31 +964,45 @@ public class Phase3Driver implements GlobalConst {
             e.printStackTrace();
         }
 
+            // Tuple findEntry = new Tuple();
+            // AttrType[] dataFormat = new AttrType[3];
+            // dataFormat[0] = new AttrType(AttrType.attrString);
+            // dataFormat[1] = new AttrType(AttrType.attrInteger);
+            // dataFormat[2] = new AttrType(AttrType.attrInteger);
+            // short[] strdatasize = new short[1];
+            // strdatasize[0] = 32;
+            // findEntry.setHdr((short)3, dataFormat, strdatasize);
+            // findEntry.setStrFld(1, "9aaaaaaaa");
+            // findEntry.setIntFld(2, 4);
+            // findEntry.setIntFld(3, 10);
 
-            System.out.println("Search Test\n");
+            //System.out.println("Search Test\n");
             //hf.printHeaderFile();
             //hf.printindex();
             //Tuple searchTup = hf.search(new StringKey("9aaaaaaaa"));
-            Tuple searchTup = hf.search(findEntry);
+            // Tuple searchTup = hf.search(findEntry);
             
-            if(searchTup!=null) {
-                        Tuple current_tuple = new Tuple(searchTup.getTupleByteArray(), searchTup.getOffset(),searchTup.getLength());
-                        current_tuple.setHdr((short)3, dataFormat, strdatasize);
-                        System.out.println("Found first matched tuple again");
-                        System.out.println(current_tuple.getStrFld(1)+" " + current_tuple.getIntFld(2)+ " " +current_tuple.getIntFld(3));
-            }
+            // if(searchTup!=null) {
+            //             Tuple current_tuple = new Tuple(searchTup.getTupleByteArray(), searchTup.getOffset(),searchTup.getLength());
+            //             current_tuple.setHdr((short)3, dataFormat, strdatasize);
+            //             System.out.println("Found first matched tuple again");
+            //             System.out.println(current_tuple.getStrFld(1)+" " + current_tuple.getIntFld(2)+ " " +current_tuple.getIntFld(3));
+            // }
 
-            boolean flag = hf.delete(findEntry);
-            if(flag)
-            {   
-                System.out.println("Deleted Successfully");
-            }
+            // boolean flag = hf.delete(findEntry);
+            // if(flag)
+            // {   
+            //     System.out.println("Deleted Successfully");
+            // }
 
 
             hf.printMetadataFile();
         } catch(Exception e) {
             e.printStackTrace();
         }
+    } catch(Exception e) {
+        e.printStackTrace();;
+    }
         return true;
     }
 
@@ -988,127 +1023,153 @@ public class Phase3Driver implements GlobalConst {
         if (indexType == IndexType.B_Index) {
             //ExtendedSystemDefs.MINIBASE_INDCAT.addIndex();
         } else {
-            int num_records = 1999;
-  
-            try{
+
+            Tuple t = null;
+            HashFile hf = null;
+            RelDesc rec = new RelDesc();
+            AttrType[] attrTypes = null;
+            short[] sizeArr = null;
+            String indexFile = Phase3Utils.getUnclusteredHashIndexName(tableName, indexAttr);
+            System.out.println("Unclustered Hash Index file name :" + indexFile);
+            System.out.println("Index Field "+ indexAttr);
+            try {
             IteratorDesc iteratorDesc = Phase3Utils.getTableItr(tableName);
             Heapfile dbHeapFile = new Heapfile(tableName);
-            HashFile hf = null;
-            hf = new HashFile(tableName,"hashIndex", 1, AttrType.attrString, iteratorDesc.getScan(), num_records, dbHeapFile, iteratorDesc.getAttrType(), iteratorDesc.getStrSizes(),iteratorDesc.getNumAttr());
+            int num_records = dbHeapFile.getRecCnt();
+            System.out.println("Records:-> "+ num_records);
+            
+            int numAttr = 0;
+            ExtendedSystemDefs.MINIBASE_RELCAT.getInfo(tableName, rec);
+            numAttr = rec.getAttrCnt();
+            attrTypes = new AttrType[numAttr];
+            sizeArr = new short[numAttr];
+
+            ExtendedSystemDefs.MINIBASE_ATTRCAT.getTupleStructure(tableName, numAttr, attrTypes, sizeArr);
+            t = new Tuple();
+            t.setHdr((short) numAttr, attrTypes, sizeArr);
+
+            assert indexAttr <= numAttr;
+            
+            hf = new HashFile(tableName,indexFile, indexAttr, attrTypes[indexAttr-1].attrType, iteratorDesc.getScan(), num_records, dbHeapFile, iteratorDesc.getAttrType(), iteratorDesc.getStrSizes(),iteratorDesc.getNumAttr());
             System.out.println("Created unclustered hash index");
-            System.out.println("Starting insert test");
+            hf.printHeaderFile();
+            System.out.println("----------------End----------------");
 
-            FileScan scan = iteratorDesc.getScan();
-            TupleRIDPair record;
-            Tuple data = new Tuple();
-            RID rid = null;
-            int ii = 0;
-            int count = 0;
+            // System.out.println("Starting insert test");
+
+            // FileScan scan = iteratorDesc.getScan();
+            // TupleRIDPair record;
+            // Tuple data = new Tuple();
+            // RID rid = null;
+            // int ii = 0;
+            // int count = 0;
 
 
-            do {
+            // do {
                 
-                    try {
-                        data.setHdr((short) iteratorDesc.getNumAttr(), iteratorDesc.getAttrType(), iteratorDesc.getStrSizes());
-                    } catch (Exception e) {
-                        e.printStackTrace();
-                    }
-                    data.setStrFld(1, "a"+count);
-                    data.setIntFld(2, count*2);
-                    data.setIntFld(3, count*3);
+            //         try {
+            //             data.setHdr((short) iteratorDesc.getNumAttr(), iteratorDesc.getAttrType(), iteratorDesc.getStrSizes());
+            //         } catch (Exception e) {
+            //             e.printStackTrace();
+            //         }
+            //         data.setStrFld(1, "a"+count);  //a1
+            //         data.setIntFld(2, count*2);    //2
+            //         data.setIntFld(3, count*3);    //3
     
-                    rid = dbHeapFile.insertRecord(data.getTupleByteArray());
+            //         rid = dbHeapFile.insertRecord(data.getTupleByteArray());
     
-                    hf.insert(new hash.StringKey(data.getStrFld(1)), rid);
-                    //hf.insert(new hash.IntegerKey(data.getIntFld(2)), rid);
-                    count++;
-                    System.out.println("Inserted phase 3 "+ data.getIntFld(2));
+            //         //hf.insert(new hash.StringKey(data.getStrFld(1)), rid);
+            //         hf.insert(new hash.IntegerKey(data.getIntFld(2)), rid);
+            //         count++;
+            //         System.out.println("Inserted phase 3 "+ data.getIntFld(2));
     
                
-            } while (count <= 40);
+            // } while (count <= 40);
             
             
-            System.out.println("Inserted "+ count+" tuples");
+            // System.out.println("Inserted "+ count+" tuples");
             
-            //hf.printMetadataFile();
-            ///hf.printHeaderFile();
+        //     //hf.printMetadataFile();
+        //     ///hf.printHeaderFile();
 
-                System.out.println("\n\n====Scanner starting");
-                try {
-                    writer = new PrintWriter("scan_output_log"+Math.random(), "UTF-8");
-                } catch (Exception e) {
-                   e.printStackTrace();
-                }
+            //         System.out.println("\n\nScanner starting");
+            //     try {
+            //         writer = new PrintWriter("scan_output_log"+Math.random(), "UTF-8");
+            //     } catch (Exception e) {
+            //        e.printStackTrace();
+            //     }
                
-                int elem_count = 0;
-                HashIndexFileScan hashScan = new HashUnclusteredFileScan();
-                hash.KeyClass key = null;
-                try {
-                hashScan = (HashUnclusteredFileScan)IndexUtils.HashUnclusteredScan(hf);
+            //     int elem_count = 0;
+            //     HashIndexFileScan hashScan = new HashUnclusteredFileScan();
+            //     hash.KeyClass key = null;
+            //     try {
+            //     hashScan = (HashUnclusteredFileScan)IndexUtils.HashUnclusteredScan(hf);
                
-                hash.KeyDataEntry entry = hashScan.get_next();
-                    while(entry!=null) {
-                        if(entry!=null) {
-                        RID fetchRID = entry.data;
-                        Tuple t = dbHeapFile.getRecord(fetchRID);
-                        Tuple current_tuple = new Tuple(t.getTupleByteArray(), t.getOffset(),t.getLength());
-                        AttrType[] dataFormat = new AttrType[3];
-                        dataFormat[0] = new AttrType(AttrType.attrString);
-                        dataFormat[1] = new AttrType(AttrType.attrInteger);
-                        dataFormat[2] = new AttrType(AttrType.attrInteger);
-                        short[] strdatasize = new short[1];
-                        strdatasize[0] = 32;
+            //     hash.KeyDataEntry entry = hashScan.get_next();
+            //         while(entry!=null) {
+            //             if(entry!=null) {
+            //             RID fetchRID = entry.data;
+                       
+            //             t = dbHeapFile.getRecord(fetchRID);
+            //             Tuple current_tuple = new Tuple(t.getTupleByteArray(), t.getOffset(),t.getLength());
+            //             AttrType[] dataFormat = new AttrType[3];
+            //             dataFormat[0] = new AttrType(AttrType.attrString);
+            //             dataFormat[1] = new AttrType(AttrType.attrInteger);
+            //             dataFormat[2] = new AttrType(AttrType.attrInteger);
+            //             short[] strdatasize = new short[1];
+            //             strdatasize[0] = 32;
 
-                        current_tuple.setHdr((short)3, dataFormat, strdatasize);
-                        elem_count++;
-                        entry = hashScan.get_next();
+            //             current_tuple.setHdr((short)3, dataFormat, strdatasize);
+            //             elem_count++;
+            //             //System.out.println("Tup "+ current_tuple.getStrFld(1) + ":"+ current_tuple.getIntFld(2)+":"+current_tuple.getIntFld(3));
+            //             entry = hashScan.get_next();
                     
                     
-                    System.out.println("\n\n");
-                    }
-                }
-                System.out.println("Total elements scanned "+ elem_count);
-            } catch(Exception e) {
-                e.printStackTrace();
-            }
-           // hf.printHeaderFile();
+            //         System.out.println("\n\n");
+            //         }
+            //     }
+            //     System.out.println("Total elements scanned "+ elem_count);
+            // } catch(Exception e) {
+            //     e.printStackTrace();
+            // }
+        // hf.printHeaderFile();
 
 
-            Tuple findEntry = new Tuple();
-            AttrType[] dataFormat = new AttrType[3];
-            dataFormat[0] = new AttrType(AttrType.attrString);
-            dataFormat[1] = new AttrType(AttrType.attrInteger);
-            dataFormat[2] = new AttrType(AttrType.attrInteger);
-            short[] strdatasize = new short[1];
-            strdatasize[0] = 32;
-            findEntry.setHdr((short)3, dataFormat, strdatasize);
-            findEntry.setStrFld(1, "9aaaaaaaa");
-            findEntry.setIntFld(2, 4);
-            findEntry.setIntFld(3, 10);
+            // Tuple findEntry = new Tuple();
+            // AttrType[] dataFormat = new AttrType[3];
+            // dataFormat[0] = new AttrType(AttrType.attrString);
+            // dataFormat[1] = new AttrType(AttrType.attrInteger);
+            // dataFormat[2] = new AttrType(AttrType.attrInteger);
+            // short[] strdatasize = new short[1];
+            // strdatasize[0] = 32;
+            // findEntry.setHdr((short)3, dataFormat, strdatasize);
+            // findEntry.setStrFld(1, "9aaaaaaaa");
+            // findEntry.setIntFld(2, 4);
+            // findEntry.setIntFld(3, 10);
 
-            System.out.println("Search Test\n");
-            //hf.printHeaderFile();
-            //hf.printindex();
-            //Tuple searchTup = hf.search(new StringKey("9aaaaaaaa"));
-            Tuple searchTup = hf.search(findEntry);
-            
-            if(searchTup!=null) {
-                        Tuple current_tuple = new Tuple(searchTup.getTupleByteArray(), searchTup.getOffset(),searchTup.getLength());
-                        current_tuple.setHdr((short)3, dataFormat, strdatasize);
-                        writer.println("Found Tuple");
-                        System.out.println("Found first matched tuple");
-                        System.out.println(current_tuple.getStrFld(1)+" " + current_tuple.getIntFld(2)+ " " +current_tuple.getIntFld(3));
-            }
-            
-            boolean flag = hf.delete(findEntry);
-            if(flag)
-            {   
-                System.out.println("Deleted Successfully again");
-            }
-            //hf.printindex();
-            //hf.printHeaderFile();
-            //hf.printMetadataFile();
+            // System.out.println("Search Test\n");
             // hf.printHeaderFile();
+            // hf.printindex();
+            //Tuple searchTup = hf.search(new StringKey("9aaaaaaaa"));
+            // Tuple searchTup = hf.search(findEntry);
+            
+            // if(searchTup!=null) {
+            //             Tuple current_tuple = new Tuple(searchTup.getTupleByteArray(), searchTup.getOffset(),searchTup.getLength());
+            //             current_tuple.setHdr((short)3, dataFormat, strdatasize);
+            //             writer.println("Found Tuple");
+            //             System.out.println("Found first matched tuple");
+            //             System.out.println(current_tuple.getStrFld(1)+" " + current_tuple.getIntFld(2)+ " " +current_tuple.getIntFld(3));
+            // }
+            
+            // boolean flag = hf.delete(findEntry);
+            // if(flag)
+            // {   
+            //     System.out.println("Deleted Successfully");
+            // }
+        //     //hf.printindex();
+        //     //hf.printHeaderFile();
+                hf.printMetadataFile();
+        //     // hf.printHeaderFile();
 
 
         } catch (Exception e){
@@ -1241,7 +1302,7 @@ public class Phase3Driver implements GlobalConst {
 
                     if (clustered.equalsIgnoreCase("clustered")) {
                         filename = new String(datafile);
-                        indexType = index.equalsIgnoreCase("btree") ? IndexType.B_ClusteredIndex : IndexType.Hash;
+                        indexType = index.equalsIgnoreCase("btree") ? IndexType.B_ClusteredIndex : IndexType.Clustered_Hash;
                         indexKeyAttr = Integer.parseInt(indexAttr);
                     }
                     status = createTable(tableName, indexType, indexKeyAttr, filename);
@@ -1325,8 +1386,11 @@ public class Phase3Driver implements GlobalConst {
                     int indexType = indexTypeStr.equalsIgnoreCase("btree") ? IndexType.B_Index : IndexType.Hash;
                     int indexAttr = Integer.parseInt(indexAttrStr);
                     createUnclusteredIndex(tableName, indexType, indexAttr);
-                    System.out.println("Check existing hash\\n");
-                    openExistingUnclusteredIndex(tableName, indexType, indexAttr);
+                    Phase3Utils.insertIndexEntry(tableName, indexAttr, indexType);
+                    
+                    //Following code is just to check whether insert index entry works or not!
+                    //System.out.println("Check existing hash\\n");
+                    //openExistingUnclusteredIndex(tableName, indexType, indexAttr);
 
                     break;
                 }

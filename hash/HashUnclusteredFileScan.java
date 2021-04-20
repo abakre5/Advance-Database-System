@@ -47,7 +47,10 @@ public class HashUnclusteredFileScan extends HashIndexFileScan implements Global
             //System.out.println("Scanning Size "+header_names.size() +currentBucketName);
             bucket = new Heapfile(currentBucketName);
             bucketEntryCnt = bucket.getRecCnt();
-            //System.out.println(currentBucketName + "has "+ bucketEntryCnt + "elements");
+            if(bucketEntryCnt!=0) {
+                System.out.println(currentBucketName + " ======="+ bucketEntryCnt + "elements");
+            }
+        
             bucket_scan = bucket.openScan();
             bucketRID = new RID();
             is_first_bucket_scan = false;
@@ -67,7 +70,6 @@ public class HashUnclusteredFileScan extends HashIndexFileScan implements Global
         // This tuple corresponds to entry in a heap file.
         AttrType[] attrType = new AttrType[3];
         //short[] attrSize = new short[numAttribs];
-        attrType = hfile.attrs;
 
         short[] attrSizes;
         attrSizes = hfile.attrSizes;
@@ -98,6 +100,7 @@ public class HashUnclusteredFileScan extends HashIndexFileScan implements Global
                 RID insert_rid = new RID();
                 insert_rid.pageNo.pid = ridTuple.getIntFld(2);
                 insert_rid.slotNo = ridTuple.getIntFld(3);
+                //System.out.println("PID:SLOT "+insert_rid.pageNo.pid+":"+insert_rid.slotNo);
                 entry.data = new RID(insert_rid.pageNo,insert_rid.slotNo);
                 
                 if(bucketEntryCnt == 0) {

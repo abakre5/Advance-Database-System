@@ -283,6 +283,19 @@ public class Phase3Utils {
         return isIndex;
     }
 
+    public static String getUnclusteredHashIndexName(String tableName, int attrNo)
+    {
+        String indexName = tableName + IndexType.getStringForType(IndexType.Hash) + Integer.toString(attrNo);
+        return indexName;
+    }
+
+    
+    public static String getUnclusteredHashHeapName(String tableName, int attrNo)
+    {
+        String heapFileName = tableName + IndexType.getStringForType(IndexType.Hash) + Integer.toString(attrNo) + "_data";
+        return heapFileName;
+    }
+
     public static String getClusteredBtreeIndexName(String tableName, int attrNo)
     {
         String indexName = tableName + IndexType.getStringForType(IndexType.B_ClusteredIndex) + Integer.toString(attrNo);
