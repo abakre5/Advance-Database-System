@@ -12,6 +12,8 @@ import java.io.File;
 import java.io.IOException;
 import java.util.List;
 
+import static tests.Phase3Driver.STR_SIZE;
+
 public class Phase3Utils {
 
     public final static int SIZE_OF_INT = 3;
@@ -100,6 +102,7 @@ public class Phase3Utils {
         attrs[1].attrLen = (attrType[aggList[0].offset - 1].attrType == AttrType.attrInteger) ? Phase3Utils.SIZE_OF_INT : Phase3Utils.SIZE_OF_STRING;
         return attrs;
     }
+
 
     public static boolean createMaterializedView(String materTableName) {
         if (materTableName == "")
@@ -365,4 +368,22 @@ public class Phase3Utils {
         }
         return indexScan;
     }
+
+    public static void createOutputTable(String outputTable, String[] fieldNames, AttrType[] jtypes, int nJoinAttr) throws Exception {
+        try {
+            int SIZE_OF_INT = 8;
+            attrInfo[] attrs = new attrInfo[nJoinAttr];
+
+            for (int i = 0; i < nJoinAttr; ++i) {
+                attrs[i] = new attrInfo();
+                attrs[i].attrType = new AttrType(jtypes[i].attrType);
+                attrs[i].attrName = fieldNames[i];
+                attrs[i].attrLen = (jtypes[i].attrType == AttrType.attrInteger || jtypes[i].attrType == AttrType.attrReal) ? SIZE_OF_INT : STR_SIZE;
+            }
+            ExtendedSystemDefs.MINIBASE_RELCAT.createRel(outputTable, nJoinAttr, attrs);
+        } catch (Exception e) {
+            throw new Exception("Create output table failed: ", e);
+        }
+    }
+
 }

@@ -1,8 +1,10 @@
 package iterator;
 
 import bufmgr.PageNotReadException;
+import catalog.*;
 import diskmgr.PageCounter;
 import global.AttrType;
+import global.ExtendedSystemDefs;
 import global.RID;
 import global.TupleOrder;
 import heap.*;
@@ -263,6 +265,48 @@ public class SortFirstSky extends Iterator {
     @Override
     public void close() throws IOException, JoinsException, SortException, IndexException {
         outer.close();
+    }
+
+
+    private boolean checkToMaterialize(String materTableName) {
+        return (materTableName != null && materTableName.length() > 0);
+    }
+
+    public void printSkyline(String materTableName) throws IOException, HFException, HFBufMgrException, HFDiskMgrException, InvalidSlotNumberException, SpaceNotAvailableException, InvalidTupleSizeException, Catalogrelexists, Catalogmissparam, Catalognomem, RelCatalogException, Cataloghferror, Catalogdupattrs, Catalogioerror, FileAlreadyDeletedException {
+        Heapfile file = null;
+        attrInfo[] attrs = new attrInfo[noOfColumns];
+        if (checkToMaterialize(materTableName)) {
+            int SIZE_OF_INT = 4;
+            for (int i = 0; i < noOfColumns; ++i) {
+                attrs[i] = new attrInfo();
+                attrs[i].attrType = new AttrType(attrTypes[i].attrType);
+                attrs[i].attrName = "Col" + i;
+                attrs[i].attrLen = (attrTypes[i].attrType == AttrType.attrInteger) ? SIZE_OF_INT : 32;
+            }
+            file = new Heapfile(materTableName);
+        }
+        int count = 0;
+        for (Tuple tuple : skyline) {
+            if (checkToMaterialize(materTableName)) {
+                file.insertRecord(tuple.returnTupleByteArray());
+            } else {
+                tuple.print(attrTypes);
+            }
+            count++;
+        }
+
+        System.out.println("Skyline computation completed!");
+        System.out.println("No of skyline members -> " + count);
+        if (checkToMaterialize(materTableName)) {
+            try {
+                ExtendedSystemDefs.MINIBASE_RELCAT.createRel(materTableName, noOfColumns, attrs);
+            } catch (Exception e) {
+                System.err.println("Error occurred while creating materialized view!");
+                file.deleteFile();
+            }
+            System.out.println("Created materialize view! -> " + materTableName);
+        }
+        System.out.println("---------------------------------------------------------------------------------------------------------");
     }
 
 }

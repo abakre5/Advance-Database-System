@@ -343,7 +343,7 @@ class JoinsDriver implements GlobalConst {
 
         TopK_NRAJoin join = new TopK_NRAJoin(Stypes, 4, Ssizes, joinAttr1,
                 mrgAttr1, Rtypes, 3, Rsizes, joinAttr2, mrgAttr2, "sailors.in",
-                "reserves.in", 6, 100);
+                "reserves.in", 6, 100, "");
 
     }
     public void Query3() throws IOException, PageNotReadException, WrongPermat, JoinsException, InvalidTypeException, TupleUtilsException, UnknowAttrType, FileScanException, PredEvalException, InvalidTupleSizeException, InvalidRelation, FieldNumberOutOfBoundException {
@@ -388,7 +388,7 @@ class JoinsDriver implements GlobalConst {
 
         TopK_NRAJoinString join = new TopK_NRAJoinString(Stypes, 4, Ssizes, joinAttr1,
                 mrgAttr1, Rtypes, 3, Rsizes, joinAttr2, mrgAttr2, "sailors.in",
-                "reserves.in", 6, 100);
+                "reserves.in", 6, 100 , "");
 
     }
 

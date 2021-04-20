@@ -3,10 +3,7 @@ package iterator;
 import bufmgr.PageNotReadException;
 import global.AttrType;
 import global.RID;
-import heap.FieldNumberOutOfBoundException;
-import heap.InvalidTupleSizeException;
-import heap.InvalidTypeException;
-import heap.Tuple;
+import heap.*;
 
 import java.io.IOException;
 import java.util.*;
@@ -34,8 +31,11 @@ public class TopK_NRAJoinString {
     boolean relation1TuplePartOfCandidateList = false;
     boolean relation2TuplePartOfCandidateList = false;
     boolean containsDuplicates = false;
+    Heapfile materialisedTable = null;
+    String materialisedTableName = "";
 
-    public TopK_NRAJoinString(AttrType[] in1, int len_in1, short[] t1_str_sizes, FldSpec joinAttr1, FldSpec mergeAttr1, AttrType[] in2, int len_in2, short[] t2_str_sizes, FldSpec joinAttr2, FldSpec mergeAttr2, String relationName1, String relationName2, int k, int n_pages) throws IOException, PageNotReadException, WrongPermat, JoinsException, InvalidTypeException, TupleUtilsException, UnknowAttrType, FileScanException, PredEvalException, InvalidTupleSizeException, InvalidRelation, FieldNumberOutOfBoundException {
+
+    public TopK_NRAJoinString(AttrType[] in1, int len_in1, short[] t1_str_sizes, FldSpec joinAttr1, FldSpec mergeAttr1, AttrType[] in2, int len_in2, short[] t2_str_sizes, FldSpec joinAttr2, FldSpec mergeAttr2, String relationName1, String relationName2, int k, int n_pages, String materialisedTableName) throws IOException, PageNotReadException, WrongPermat, JoinsException, InvalidTypeException, TupleUtilsException, UnknowAttrType, FileScanException, PredEvalException, InvalidTupleSizeException, InvalidRelation, FieldNumberOutOfBoundException {
         this.in1 = in1;
         this.len_in1 = len_in1;
         this.t1_str_sizes = t1_str_sizes;
@@ -50,6 +50,15 @@ public class TopK_NRAJoinString {
         this.relationName2 = relationName2;
         this.k = k;
         this.n_pages = n_pages;
+        if(!materialisedTableName.equals("")){
+            try {
+                this.materialisedTableName = materialisedTableName;
+                this.materialisedTable  = new Heapfile(materialisedTableName);
+            } catch (HFException | HFBufMgrException | HFDiskMgrException e) {
+                System.out.println("File creation for materialised file failed.");
+                e.printStackTrace();
+            }
+        }
         try {
             computeKJoin();
         } catch (Exception e) {
@@ -211,7 +220,11 @@ public class TopK_NRAJoinString {
                 Projection.Join(rid_tuple, in1,
                         rid_tuple2, in2,
                         tuple, proj_list, (len_in1+ len_in2));
-                tuple.print(temp);
+                if (materialisedTable!= null){
+                    materialisedTable.insertRecord(tuple.getTupleByteArray());
+                } else {
+                    tuple.print(temp);
+                }
                 if (counter == k) {
                     break;
                 }

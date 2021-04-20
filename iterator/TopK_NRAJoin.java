@@ -1,9 +1,13 @@
 package iterator;
 
 import bufmgr.PageNotReadException;
+import catalog.AttrDesc;
+import catalog.Catalogindexnotfound;
 import global.AttrType;
+import global.ExtendedSystemDefs;
 import global.RID;
 import heap.*;
+import index.IndexScan;
 
 import java.io.IOException;
 import java.util.*;
@@ -31,8 +35,11 @@ public class TopK_NRAJoin {
     boolean relation1TuplePartOfCandidateList = false;
     boolean relation2TuplePartOfCandidateList = false;
     boolean containsDuplicates = false;
-
-    public TopK_NRAJoin(AttrType[] in1, int len_in1, short[] t1_str_sizes, FldSpec joinAttr1, FldSpec mergeAttr1, AttrType[] in2, int len_in2, short[] t2_str_sizes, FldSpec joinAttr2, FldSpec mergeAttr2, String relationName1, String relationName2, int k, int n_pages) throws IOException, PageNotReadException, WrongPermat, JoinsException, InvalidTypeException, TupleUtilsException, UnknowAttrType, FileScanException, PredEvalException, InvalidTupleSizeException, InvalidRelation, FieldNumberOutOfBoundException {
+    Heapfile materialisedTable = null;
+    String materialisedTableName = "";
+    IndexScan indexScan;
+    IndexScan indexScan1;
+    public TopK_NRAJoin(AttrType[] in1, int len_in1, short[] t1_str_sizes, FldSpec joinAttr1, FldSpec mergeAttr1, AttrType[] in2, int len_in2, short[] t2_str_sizes, FldSpec joinAttr2, FldSpec mergeAttr2, String relationName1, String relationName2, int k, int n_pages, String materialisedTableName, IndexScan indexScan, IndexScan indexScan1) throws IOException, PageNotReadException, WrongPermat, JoinsException, InvalidTypeException, TupleUtilsException, UnknowAttrType, FileScanException, PredEvalException, InvalidTupleSizeException, InvalidRelation, FieldNumberOutOfBoundException {
         this.in1 = in1;
         this.len_in1 = len_in1;
         this.t1_str_sizes = t1_str_sizes;
@@ -47,6 +54,50 @@ public class TopK_NRAJoin {
         this.relationName2 = relationName2;
         this.k = k;
         this.n_pages = n_pages;
+        this.indexScan = indexScan;
+        this.indexScan1 = indexScan1;
+        if(!materialisedTableName.equals("")){
+            try {
+                this.materialisedTableName = materialisedTableName;
+                this.materialisedTable  = new Heapfile(materialisedTableName);
+//                 attrInfo[] attrs = Phase3Utils.getAttrInfoGroupBy(attrType, groupByAttr, aggList);
+//                 Phase3Utils.createTable(materialisedTableName, len_in1 + len_in2, );
+            } catch (HFException | HFBufMgrException | HFDiskMgrException e) {
+                System.out.println("File creation for materialised file failed.");
+                e.printStackTrace();
+            }
+        }
+        try {
+            computeKJoin();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    public TopK_NRAJoin(AttrType[] in1, int len_in1, short[] t1_str_sizes, FldSpec joinAttr1, FldSpec mergeAttr1, AttrType[] in2, int len_in2, short[] t2_str_sizes, FldSpec joinAttr2, FldSpec mergeAttr2, String relationName1, String relationName2, int k, int n_pages, String materialisedTableName) throws IOException, PageNotReadException, WrongPermat, JoinsException, InvalidTypeException, TupleUtilsException, UnknowAttrType, FileScanException, PredEvalException, InvalidTupleSizeException, InvalidRelation, FieldNumberOutOfBoundException {
+        this.in1 = in1;
+        this.len_in1 = len_in1;
+        this.t1_str_sizes = t1_str_sizes;
+        this.joinAttr1 = joinAttr1;
+        this.mergeAttr1 = mergeAttr1;
+        this.in2 = in2;
+        this.len_in2 = len_in2;
+        this.t2_str_sizes = t2_str_sizes;
+        this.joinAttr2 = joinAttr2;
+        this.mergeAttr2 = mergeAttr2;
+        this.relationName1 = relationName1;
+        this.relationName2 = relationName2;
+        this.k = k;
+        this.n_pages = n_pages;
+        if(!materialisedTableName.equals("")){
+            try {
+                this.materialisedTableName = materialisedTableName;
+                this.materialisedTable  = new Heapfile(materialisedTableName);
+            } catch (HFException | HFBufMgrException | HFDiskMgrException e) {
+                System.out.println("File creation for materialised file failed.");
+                e.printStackTrace();
+            }
+        }
         try {
             computeKJoin();
         } catch (Exception e) {
@@ -55,7 +106,9 @@ public class TopK_NRAJoin {
     }
 
     private void computeKJoin() throws Exception {
+//        IndexScan relation1 = indexScan;
         FileScan relation1 = getFileScan(relationName1, (short) len_in1, in1, t1_str_sizes);
+//        IndexScan relation2 = indexScan1;
         FileScan relation2 = getFileScan(relationName2, (short) len_in2, in2, t2_str_sizes);
         float joinAttributeValue1 = 0;
         float joinAttributeValue2 = 0;
@@ -70,6 +123,8 @@ public class TopK_NRAJoin {
         for (int i = 1; i <= len_in2; i++) {
             proj_list[len_in1 + i - 1] = new FldSpec(new RelSpec(RelSpec.innerRel),  i);
         }
+
+
 
         if (false) {
             // if given relation does not have clustered index then return zero
@@ -225,21 +280,19 @@ public class TopK_NRAJoin {
                 Projection.Join(rid_tuple, in1,
                         rid_tuple2, in2,
                         tuple, proj_list, (len_in1+ len_in2));
-                tuple.print(temp);
+                if (materialisedTable!= null){
+                    materialisedTable.insertRecord(tuple.getTupleByteArray());
+                } else {
+                    tuple.print(temp);
+                }
                 if (counter == k) {
                     break;
                 }
                 counter++;
             }
         }
-    }
-
-    private void printTuple(Tuple t) throws Exception {
-        int num_fields = t.noOfFlds();
-        for (int i = 0; i < num_fields; ++i) {
-            System.out.printf("%f ", t.getFloFld(i + 1));
-        }
-        System.out.println("");
+        relation1.close();
+        relation2.close();
     }
 
     public void updateTopKCandidateIndexList(int index, float[] lowerBound, float[] upperBound) {
@@ -360,5 +413,30 @@ public class TopK_NRAJoin {
         scan = new FileScan(relationName, attrTypes, stringSizes,
                 noOfColumns, noOfColumns, pProjection, null);
         return scan;
+    }
+
+    public void  printTableHeader(String tableName, int numAttr){
+        AttrDesc[] attrs = new AttrDesc[numAttr];
+        try {
+            int numAttrCat = ExtendedSystemDefs.MINIBASE_ATTRCAT.getRelInfo(tableName, 0, attrs);
+            /* if number of attributes from datafile doesn't match catalog */
+            if (numAttrCat != numAttr) {
+                System.err.println("*** error: schema datafile and relation schema mismatch");
+            }
+        } catch (Catalogindexnotfound e) {
+            System.err.printf("*** error relation '%s' mismatch\n", tableName);
+        } catch (Exception e) {
+            System.err.println("*** error " + e);
+            e.printStackTrace();
+        }
+        System.out.println();
+        int pos = 0;
+        for (int i = 0; pos < numAttr; ++i) {
+            i = i % numAttr;
+            if (attrs[i].attrPos - 1 == pos) {
+                System.out.printf("%-20s", attrs[i].attrName);
+                ++pos;
+            }
+        }
     }
 }
