@@ -1769,6 +1769,11 @@ public class Phase3Driver implements GlobalConst {
                 tt = joinItr.get_next();
             }
 
+            // Persist the output table to disk
+            if (outputTable != null) {
+                flushToDisk();
+            }
+
             System.out.println("\nNumber of joined rows: "+cnt);
         } catch (Exception e) {
             e.printStackTrace();
