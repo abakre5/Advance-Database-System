@@ -7,6 +7,7 @@ import java.lang.Math;
 
 import javax.management.relation.InvalidRelationTypeException;
 
+import catalog.RelDesc;
 import hash.FloatKey;
 import iterator.*;
 import diskmgr.*;
@@ -20,6 +21,7 @@ public class ClusteredHashFile  implements GlobalConst {
     /* class constants */
     private static final int MAGICWORD = 0xDEAD;
 
+    String          relationName;
     String          hashIndexName;
     int             keyAttrIndex;
     int             keyType;
@@ -43,6 +45,7 @@ public class ClusteredHashFile  implements GlobalConst {
                  InvalidTupleSizeException,InvalidSlotNumberException {
         
 
+        this.relationName = RelationName;
         this.hashIndexName = getIndexName(RelationName, KeyAttrIdx);
         this.headerFile = new Heapfile(getIndexHdrFileName(RelationName, KeyAttrIdx));
         this.keyAttrIndex = KeyAttrIdx;
@@ -189,6 +192,48 @@ public class ClusteredHashFile  implements GlobalConst {
             throw e;
         }
         return status;
+    }
+
+    public void printKeys() {
+        Scan scan = null;
+        Tuple t = null;
+        AttrType[] attrTypes = null;
+        short[] strSizes = null;
+        try {
+            int numAttribs;
+            RelDesc rec = new RelDesc();
+            ExtendedSystemDefs.MINIBASE_RELCAT.getInfo(this.relationName, rec);
+            numAttribs = rec.getAttrCnt();
+            attrTypes = new AttrType[numAttribs];
+            strSizes = new short[numAttribs];
+
+            ExtendedSystemDefs.MINIBASE_ATTRCAT.getTupleStructure(this.relationName, numAttribs, attrTypes, strSizes);
+            t = new Tuple();
+            t.setHdr((short)numAttribs, attrTypes, strSizes);
+        } catch (Exception e) {
+            System.err.println("*** error fetching catalog info");
+            return;
+        }
+        Tuple temp;
+        RID rid = new RID();
+        KeyClass key = null;
+        try {
+            for (int bucketIdx = 0; bucketIdx < this.numBuckets; ++bucketIdx) {
+                scan = this.buckets[bucketIdx].openScan();
+                while ((temp = scan.getNext(rid)) != null) {
+                    t.tupleCopy(temp);
+                    if (this.keyType == AttrType.attrInteger) {
+                        key = new IntKey(t.getIntFld(this.keyAttrIndex));
+                    } else {
+                        key = new StrKey(t.getStrFld(this.keyAttrIndex));
+                    }
+                    System.out.println(key);
+                }
+
+            }
+        } catch (Exception e) {
+            System.err.println(e);
+        }
     }
 
     private int getBucketIndex(KeyClass value) {
