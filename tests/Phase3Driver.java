@@ -1744,6 +1744,9 @@ public class Phase3Driver implements GlobalConst {
                 String[] fieldNames = new String[nJoinAttr];
                 for (int i=0; i<nOuterAttr; i++) {
                     fieldNames[i] = outerTableName+"."+outerAttrs[i].attrName;
+                }
+
+                for (int i=0; i<nInnerAttr; i++) {
                     fieldNames[nOuterAttr+i] = innerTableName+"."+innerAttrs[i].attrName;
                 }
 
