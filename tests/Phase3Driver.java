@@ -2,6 +2,8 @@ package tests;
 
 import btree.BT;
 import btree.BTreeClusteredFile;
+import btree.BTreeFile;
+import btree.FloatKey;
 import bufmgr.PageNotReadException;
 import bufmgr.PagePinnedException;
 import catalog.*;
@@ -1190,6 +1192,116 @@ public class Phase3Driver implements GlobalConst {
         return true;
     }
 
+    private static boolean createUnclusteredBtreeIndex(String tableName, int indexAttr)
+    {
+        boolean status = OK;
+        Tuple t = null;
+        BTreeFile btf = null;
+        Scan heapfile_scan  = null;
+        RelDesc rec = new RelDesc();
+        AttrType[] attrTypes = null;
+        short[] sizeArr = null;
+        Heapfile dbHeapFile = null;
+        String indexFile = Phase3Utils.getUnClusteredBtreeIndexName(tableName, indexAttr);
+        System.out.println("Unclustered btree Index file name :" + indexFile);
+        System.out.println("Index Field "+ indexAttr);
+        try {
+            IteratorDesc iteratorDesc = Phase3Utils.getTableItr(tableName);
+            dbHeapFile = new Heapfile(tableName);
+            int num_records = dbHeapFile.getRecCnt();
+            System.out.println("Records:-> " + num_records);
+
+            int numAttr = 0;
+            ExtendedSystemDefs.MINIBASE_RELCAT.getInfo(tableName, rec);
+            numAttr = rec.getAttrCnt();
+            attrTypes = new AttrType[numAttr];
+            sizeArr = new short[numAttr];
+
+            ExtendedSystemDefs.MINIBASE_ATTRCAT.getTupleStructure(tableName, numAttr, attrTypes, sizeArr);
+            t = new Tuple();
+            t.setHdr((short) numAttr, attrTypes, sizeArr);
+
+            assert indexAttr <= numAttr;
+
+            btf = new BTreeFile(indexFile, attrTypes[indexAttr-1].attrType, STR_SIZE, 1);
+            System.out.println("Created unclustered btree index");
+        }catch (Exception e){
+            e.printStackTrace();
+        }
+
+        RID rid = new RID();
+        btree.KeyClass key = null;
+
+        Tuple temp;
+
+        try {
+
+            heapfile_scan = dbHeapFile.openScan();
+            while ((temp = heapfile_scan.getNext(rid)) != null)
+            {
+                temp.setHdr((short)attrTypes.length, attrTypes, sizeArr);
+                key = BT.createKeyFromTupleField(temp, attrTypes, sizeArr, indexAttr, 1);
+                btf.insert(key, rid);
+            }
+
+
+        } catch (Exception e) {
+            status = FAIL;
+            e.printStackTrace();
+        }
+
+        return status;
+    }
+
+    private static boolean printUnclusteredBtreeIndex(String tableName, int indexAttr)
+    {
+        boolean status = OK;
+        Tuple t = null;
+        BTreeFile btf = null;
+        Scan heapfile_scan  = null;
+        RelDesc rec = new RelDesc();
+        AttrType[] attrTypes = null;
+        short[] sizeArr = null;
+        Heapfile dbHeapFile = null;
+        String indexFile = Phase3Utils.getUnClusteredBtreeIndexName(tableName, indexAttr);
+        System.out.println("Unclustered btree Index file name :" + indexFile);
+        System.out.println("Index Field "+ indexAttr);
+        try {
+            IteratorDesc iteratorDesc = Phase3Utils.getTableItr(tableName);
+            dbHeapFile = new Heapfile(tableName);
+            int num_records = dbHeapFile.getRecCnt();
+            System.out.println("Records:-> " + num_records);
+
+            int numAttr = 0;
+            ExtendedSystemDefs.MINIBASE_RELCAT.getInfo(tableName, rec);
+            numAttr = rec.getAttrCnt();
+            attrTypes = new AttrType[numAttr];
+            sizeArr = new short[numAttr];
+
+            ExtendedSystemDefs.MINIBASE_ATTRCAT.getTupleStructure(tableName, numAttr, attrTypes, sizeArr);
+            t = new Tuple();
+            t.setHdr((short) numAttr, attrTypes, sizeArr);
+
+            assert indexAttr <= numAttr;
+
+            btf = new BTreeFile(indexFile);
+            System.out.println("Created unclustered btree index");
+        }catch (Exception e){
+            e.printStackTrace();
+        }
+
+        try {
+            BT.printBTree(btf.getHeaderPage());
+            BT.printAllLeafPages(btf.getHeaderPage());
+        } catch (Exception e) {
+            status = FAIL;
+            e.printStackTrace();
+        }
+
+        return status;
+    }
+
+
     private static boolean createUnclusteredIndex(String tableName, int indexType, int indexAttr) {
         boolean status = OK;
         PrintWriter writer = null;
@@ -1201,10 +1313,11 @@ public class Phase3Driver implements GlobalConst {
  
         if (isTableInDB(tableName) == false) {
             System.err.println("*** error: relation " + tableName + " not found in DB");
-            return FAIL;
+            return  FAIL;
         }
 
         if (indexType == IndexType.B_Index) {
+            createUnclusteredBtreeIndex(tableName, indexAttr);
             //ExtendedSystemDefs.MINIBASE_INDCAT.addIndex();
         } else if(indexType == IndexType.Hash){
 
@@ -1610,6 +1723,14 @@ public class Phase3Driver implements GlobalConst {
 
                     } else if(!Phase3Utils.isIndexExists(tableName, indexAttr, new IndexType(IndexType.Hash) )){
                         System.out.println("No unclustered hash index");
+
+                    }
+
+                    if(Phase3Utils.isIndexExists(tableName, indexAttr, new IndexType(IndexType.B_Index) )) {
+                        printUnclusteredBtreeIndex(tableName, indexAttr);
+
+                    } else if(!Phase3Utils.isIndexExists(tableName, indexAttr, new IndexType(IndexType.B_Index) )){
+                        System.out.println("No unclustered btree index");
 
                     }
                     break;
