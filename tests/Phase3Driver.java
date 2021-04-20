@@ -474,7 +474,7 @@ public class Phase3Driver implements GlobalConst {
             t.setHdr((short) numAttr, attrTypes, sizeArr);
 
             assert keyIndexAttr <= numAttr;
-            btf = new BTreeClusteredFile(indexFile, attrTypes[keyIndexAttr].attrType, STR_SIZE, 1, sortedHeapFile, attrTypes, sizeArr,keyIndexAttr, multiplier);
+            btf = new BTreeClusteredFile(indexFile, attrTypes[keyIndexAttr-1].attrType, STR_SIZE, 1, sortedHeapFile, attrTypes, sizeArr,keyIndexAttr, multiplier);
         } catch (Exception e) {
             System.err.println(e);
             e.printStackTrace();
