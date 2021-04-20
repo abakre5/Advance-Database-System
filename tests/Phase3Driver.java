@@ -834,6 +834,35 @@ public class Phase3Driver implements GlobalConst {
             findEntry.setIntFld(2, 4);
             findEntry.setIntFld(3, 10);
 
+            System.out.println("Scanning test again\n");
+            
+            int elem_count = 0;
+            HashIndexFileScan hashScan = new HashUnclusteredFileScan();
+            hash.KeyClass key = null;
+            try {
+            hashScan = (HashUnclusteredFileScan)IndexUtils.HashUnclusteredScan(hf);
+           
+            hash.KeyDataEntry entry = hashScan.get_next();
+                while(entry!=null) {
+                    if(entry!=null) {
+                    RID fetchRID = entry.data;
+                    Tuple t = dbHeapFile.getRecord(fetchRID);
+                    Tuple current_tuple = new Tuple(t.getTupleByteArray(), t.getOffset(),t.getLength());
+
+                    current_tuple.setHdr((short)3, dataFormat, strdatasize);
+                    elem_count++;
+                    entry = hashScan.get_next();
+                
+                
+                System.out.println("\n\n");
+                }
+            }
+            System.out.println("Total elements scanned again "+ elem_count);
+        } catch(Exception e) {
+            e.printStackTrace();
+        }
+
+
             System.out.println("Search Test\n");
             //hf.printHeaderFile();
             //hf.printindex();
@@ -847,8 +876,14 @@ public class Phase3Driver implements GlobalConst {
                         System.out.println(current_tuple.getStrFld(1)+" " + current_tuple.getIntFld(2)+ " " +current_tuple.getIntFld(3));
             }
 
+            boolean flag = hf.delete(findEntry);
+            if(flag)
+            {   
+                System.out.println("Deleted Successfully");
+            }
 
 
+            hf.printMetadataFile();
         } catch(Exception e) {
             e.printStackTrace();
         }
@@ -987,7 +1022,7 @@ public class Phase3Driver implements GlobalConst {
             boolean flag = hf.delete(findEntry);
             if(flag)
             {   
-                System.out.println("Deleted Successfully");
+                System.out.println("Deleted Successfully again");
             }
             //hf.printindex();
             //hf.printHeaderFile();

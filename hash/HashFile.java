@@ -60,6 +60,13 @@ public class HashFile extends IndexFile implements GlobalConst {
     //Constructor
     public HashFile(String relationName,String hashFileName, int indexField, int keyType,int num_records, Heapfile dbfile, AttrType[] attributeTypes, short[] AttrSize, int numAttr) throws IOException, HFException, HFDiskMgrException, HFBufMgrException,
     InvalidTupleSizeException,InvalidSlotNumberException {
+
+        //Logger for storing input path. (Scanning input relation) (Issue : Logger exits before code)
+        try {
+            writer = new PrintWriter("Input_data_entry_log"+Math.random(), "UTF-8");
+       } catch (Exception e) {
+           e.printStackTrace();
+       }
          /* This should not be hardcoded, received wrong AttrTypes from Hash file Iterator*/
          AttrType[] dataFormat = new AttrType[3];
          dataFormat[0] = new AttrType(AttrType.attrString);
@@ -89,6 +96,7 @@ public class HashFile extends IndexFile implements GlobalConst {
         //Loads the metadata file as well.
         printMetadataFile();
 
+   
 
     }
 
