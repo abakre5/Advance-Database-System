@@ -1875,8 +1875,8 @@ public class BTreeClusteredFile extends ClusteredIndexFile
                 temp1.setHdr((short)attrTypes.length, attrTypes, attrSizes);
 
 
-                KeyClass key1 = BT.createKeyFromTupleField(temp1, attrTypes, fieldNumber, multiplier);
-                KeyClass key2 = BT.createKeyFromTupleField(temp2, attrTypes, fieldNumber, multiplier);
+                KeyClass key1 = BT.createKeyFromTupleField(temp1, attrTypes, attrSizes,fieldNumber, multiplier);
+                KeyClass key2 = BT.createKeyFromTupleField(temp2, attrTypes, attrSizes, fieldNumber, multiplier);
 
                 if(BT.keyCompare(key, key1) >= 0 && BT.keyCompare(key, key2) < 0)
                 {
@@ -1970,7 +1970,7 @@ public class BTreeClusteredFile extends ClusteredIndexFile
                     Tuple temp = new Tuple(t.getTupleByteArray(), t.getOffset(), t.getLength());
                     temp.setHdr((short) attrTypes.length, attrTypes, attrSizes);
 
-                    KeyClass key = BT.createKeyFromTupleField(temp, attrTypes, indexField, multiplier);
+                    KeyClass key = BT.createKeyFromTupleField(temp, attrTypes, attrSizes, indexField, multiplier);
                     //Now new page is created, Add this entry to Index
                     insert(new FloatKey(temp.getFloFld(1)), hfPage.getCurPage());
                     System.out.println("Inserting new key");

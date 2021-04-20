@@ -335,7 +335,7 @@ public class BT implements GlobalConst {
                             (FloatKey) entry.key + ",  " + (ClusteredLeafData) entry.data + " )");
                 if (keyType == AttrType.attrString)
                     System.out.println(i + " (key, [pageNo]):   (" +
-                            (StringKey) entry.key + ",  " + (ClusteredLeafData) entry.data);
+                            (StringKey) entry.key + ",  " + (ClusteredLeafData) entry.data +" )");
 
                 i++;
             }
@@ -524,15 +524,18 @@ public class BT implements GlobalConst {
         SystemDefs.JavabaseBM.unpinPage(currentPageId, true/*dirty*/);
     }
 
-    public static KeyClass createKeyFromTupleField(Tuple tuple, AttrType[] attrTypes, int fieldNumber, int multiplier) throws FieldNumberOutOfBoundException,IOException {
+    public static KeyClass createKeyFromTupleField(Tuple t, AttrType[] attrTypes, short[] attrSizes, int fieldNumber, int multiplier) throws FieldNumberOutOfBoundException, IOException, InvalidTupleSizeException, InvalidTypeException {
         KeyClass key = null;
 
+        Tuple temp = new Tuple(t.getTupleByteArray(), t.getOffset(), t.getLength());
+        temp.setHdr((short) attrTypes.length, attrTypes, attrSizes);
+
         if(attrTypes[fieldNumber].attrType == AttrType.attrReal){
-            key = new FloatKey(tuple.getFloFld(fieldNumber) * multiplier);
+            key = new FloatKey(temp.getFloFld(fieldNumber) * multiplier);
         }else if(attrTypes[fieldNumber].attrType == AttrType.attrInteger){
-            key = new IntegerKey(tuple.getIntFld(fieldNumber) * multiplier);
+            key = new IntegerKey(temp.getIntFld(fieldNumber) * multiplier);
         }else if(attrTypes[fieldNumber].attrType == AttrType.attrString){
-            key = new StringKey(tuple.getStrFld(fieldNumber));
+            key = new StringKey(temp.getStrFld(fieldNumber));
         }
 
         return key;
@@ -573,13 +576,14 @@ public class BT implements GlobalConst {
                 {
                     try
                     {
-                        key = BT.createKeyFromTupleField(t, attrTypes, fieldNumber, multiplier);
+                        key = BT.createKeyFromTupleField(t, attrTypes, attrSize, fieldNumber, multiplier);
                     } catch (Exception e)
                     {
                         status = FAIL;
                         e.printStackTrace();
                     }
                     //System.out.println("page no " + rid.pageNo.pid + " slot no " + rid.slotNo);
+                    //System.out.println("inserting key" + key);
 
                     try {
                         btf.insert(key, new PageId(prev));

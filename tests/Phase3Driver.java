@@ -8,6 +8,7 @@ import catalog.*;
 import diskmgr.PageCounter;
 import global.*;
 import heap.*;
+import index.IndexScan;
 import iterator.*;
 
 import java.io.*;
@@ -365,8 +366,9 @@ public class Phase3Driver implements GlobalConst {
 
         if (createRel) {
             /* code to create clustered btree/hash index */
-            if (indexType == IndexType.B_Index) {
-
+            if (indexType == IndexType.B_ClusteredIndex) {
+                createClusteredBtreeIndex(tableName, indexAttr);
+                //Phase3Utils.insertIndexEntry(tableName, indexAttr, indexType);
             } else if (indexType == IndexType.Hash) {
                 createClusteredHashIndex(tableName, indexAttr);
                 Phase3Utils.insertIndexEntry(tableName, indexAttr, indexType);
@@ -444,7 +446,6 @@ public class Phase3Driver implements GlobalConst {
     private static boolean createClusteredBtreeIndex(String tableName, int keyIndexAttr) {
         boolean status = OK;
         Heapfile relation = null;
-        Scan scan = null;
         Tuple t = null;
         RelDesc rec = new RelDesc();
         AttrType[] attrTypes = null;
@@ -453,10 +454,9 @@ public class Phase3Driver implements GlobalConst {
         String indexFile = Phase3Utils.getClusteredBtreeIndexName(tableName, keyIndexAttr);
         String sortedHeapFile = Phase3Utils.getClusteredBtreeHeapName(tableName, keyIndexAttr);
         System.out.println("Btree Clustered Index file name :" + indexFile);
-        int multiplier = 1;
+        int multiplier = -1;
         try {
             int numAttr = 0;
-            relation = new Heapfile(tableName);
             ExtendedSystemDefs.MINIBASE_RELCAT.getInfo(tableName, rec);
             numAttr = rec.getAttrCnt();
             attrTypes = new AttrType[numAttr];
@@ -475,7 +475,7 @@ public class Phase3Driver implements GlobalConst {
         Heapfile sortedFile = null;
 
         try{
-            sortedFile = Phase3Utils.sortHeapFile(tableName,sortedHeapFile, keyIndexAttr, attrTypes,sizeArr, new TupleOrder(multiplier == -1 ? TupleOrder.Descending : TupleOrder.Ascending), STR_SIZE);
+            sortedFile = Phase3Utils.sortHeapFile(tableName, sortedHeapFile, keyIndexAttr, attrTypes,sizeArr, new TupleOrder(multiplier == -1 ? TupleOrder.Descending : TupleOrder.Ascending), STR_SIZE);
         }catch(Exception e){
             e.printStackTrace();
         }
@@ -485,15 +485,30 @@ public class Phase3Driver implements GlobalConst {
         }catch(Exception e){
             e.printStackTrace();
         }
+//      Scanning method for clustered btree index
+//      Refer getClusteredBtreeHeapName and getClusteredBtreeHeapName for generating names of clustered index and
+//      data file
+//        try
+//        {
+//            btf.printBTree();
+//            btf.printAllLeafPages();
+//
+//            IndexScan scan = Phase3Utils.getBtreeClusteredIndexScan(tableName, attrTypes, sizeArr, keyIndexAttr);
+//            Tuple temp = scan.get_next();
+//            while(temp!= null)
+//            {
+//                t = new Tuple(temp.getTupleByteArray(),temp.getOffset(), temp.getLength());
+//                t.setHdr((short) attrTypes.length, attrTypes, sizeArr);
+//                printTuple(t,attrTypes);
+//                temp = scan.get_next();
+//            }
+//
+//        } catch (Exception e) {
+//            System.err.println(e);
+//            status = FAIL;
+//        }
 
-        try
-        {
-            btf.printBTree();
-            btf.printAllLeafPages();
-        } catch (Exception e) {
-            System.err.println(e);
-            status = FAIL;
-        }
+
 
         return status;
     }

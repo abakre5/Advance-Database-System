@@ -4,6 +4,7 @@ import bufmgr.PageNotReadException;
 import catalog.*;
 import global.*;
 import heap.*;
+import index.IndexScan;
 import iterator.*;
 import org.w3c.dom.Attr;
 
@@ -292,7 +293,7 @@ public class Phase3Utils {
     }
 
     public static Heapfile sortHeapFile(String fileToSort, String sortedFile, int sortAttr,
-                                        AttrType[] attrTypes, short[] strSize, TupleOrder order, int recordlen)
+                                        AttrType[] attrTypes, short[] strSizes, TupleOrder order, int recordlen)
             throws IOException, FileScanException, TupleUtilsException, InvalidRelation, SortException
     {
         FldSpec[] projections = new FldSpec[attrTypes.length];
@@ -306,10 +307,10 @@ public class Phase3Utils {
         int SORTPGNUM = 100;
         Heapfile hfSorted = getHeapFileInstance(sortedFile);
 
-        FileScan fileScan = new FileScan(fileToSort, attrTypes, strSize, (short)attrTypes.length, attrTypes.length,
+        FileScan fileScan = new FileScan(fileToSort, attrTypes, strSizes, (short)attrTypes.length, attrTypes.length,
                     projections, null);
 
-        Sort sortIterator = new Sort(attrTypes, (short) attrTypes.length, strSize, fileScan, sortAttr, order, recordlen, SORTPGNUM);
+        Sort sortIterator = new Sort(attrTypes, (short) attrTypes.length, strSizes, fileScan, sortAttr, order, recordlen, SORTPGNUM);
 
         Tuple t = null;
         try
@@ -317,7 +318,9 @@ public class Phase3Utils {
             t = sortIterator.get_next();
             while (t!= null)
             {
-                hfSorted.insertRecord(t.getTupleByteArray());
+                Tuple temp = new Tuple(t.getTupleByteArray(), t.getOffset(), t.getLength());
+                temp.setHdr((short) attrTypes.length, attrTypes, strSizes);
+                hfSorted.insertRecord(temp.getTupleByteArray());
                 t= sortIterator.get_next();
             }
         } catch(Exception e)
@@ -341,5 +344,25 @@ public class Phase3Utils {
         }
 
         return hf;
+    }
+
+    public static IndexScan getBtreeClusteredIndexScan(String relationName, AttrType[] attrTypes, short[] attrSizes, int indexField){
+
+        String indexFile  = Phase3Utils.getClusteredBtreeIndexName(relationName, indexField);
+        IndexScan indexScan = null;
+
+        FldSpec[] projections = new FldSpec[attrTypes.length];
+        RelSpec rel = new RelSpec(RelSpec.outer);
+        for(int fieldNumber = 1; fieldNumber <= attrTypes.length; fieldNumber++)
+        {
+            projections[fieldNumber-1] = new FldSpec(rel, fieldNumber);
+        }
+
+        try {
+            indexScan = new IndexScan(new IndexType(IndexType.B_ClusteredIndex), null, indexFile, attrTypes, attrSizes, attrTypes.length,attrTypes.length, projections,null,indexField,false);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return indexScan;
     }
 }
