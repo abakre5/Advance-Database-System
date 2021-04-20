@@ -1,5 +1,6 @@
 package iterator;
 
+import bufmgr.BufMgr;
 import bufmgr.PageNotReadException;
 import catalog.*;
 import global.AggType;
@@ -9,6 +10,7 @@ import global.TupleOrder;
 import heap.*;
 import tests.Phase3Utils;
 
+import java.io.File;
 import java.io.IOException;
 
 /**
@@ -19,7 +21,7 @@ public class GroupBywithSort {
     private final AttrType[] attrType;
     private final short noOfColumns;
     private final short[] strSize;
-    private final Iterator itr;
+    private final FileScan itr;
     private final FldSpec groupByAttr;
     private final FldSpec[] aggList;
     private final AggType aggType;
@@ -51,8 +53,8 @@ public class GroupBywithSort {
      * @throws Exception
      */
     public GroupBywithSort(AttrType[] in1, int len_in1, short[] t1_str_sizes,
-                           Iterator am1, FldSpec group_by_attr, FldSpec[] agg_list,
-                           AggType agg_type, FldSpec[] proj_list, int n_out_flds, int n_pages, String materTableName) throws Exception {
+                           FileScan am1, FldSpec group_by_attr, FldSpec[] agg_list,
+                           AggType agg_type, FldSpec[] proj_list, int n_out_flds, int n_pages, String materTableName, String relationName) throws Exception {
         this.attrType = in1;
         this.noOfColumns = (short) len_in1;
         this.strSize = t1_str_sizes;
@@ -73,26 +75,27 @@ public class GroupBywithSort {
         }
         this.materHeapfile = new Heapfile(materTableName);
 
-        //if (!isRelationSortedOnGroupByAttr()) {
+        if (!isRelationSortedOnGroupByAttr(relationName)) {
             System.out.println("Sorting Relation based on group by Attr.");
             Tuple t = null;
             sortRelation();
             System.out.println("Sorting finished!");
-        //} else {
-//            System.out.println("Relation is already sorted on Group By Attr.");
-//            scan = (FileScan) itr;
-        //}
+        } else {
+            System.out.println("Relation is already sorted on Group By Attr.");
+            scan = itr;
+        }
     }
     /**
      *
      * @return
      * @throws Exception
      */
-    private boolean isRelationSortedOnGroupByAttr() throws Exception {
-        Tuple curr = itr.get_next();
+    private boolean isRelationSortedOnGroupByAttr(String relationName) throws Exception {
+        FileScan sortItr = new FileScan(relationName, attrType, strSize, noOfColumns, noOfColumns, projList, null);
+        Tuple curr = sortItr.get_next();
         while (curr != null) {
             curr = new Tuple(curr);
-            Tuple next = itr.get_next();
+            Tuple next = sortItr.get_next();
             if (next != null) {
                 next = new Tuple(next);
                 int isT1GreaterThanT2 = TupleUtils.CompareTupleWithTuple(attrType[groupByAttr.offset], curr, groupByAttr.offset, next, groupByAttr.offset);
@@ -102,6 +105,7 @@ public class GroupBywithSort {
             }
             curr = next;
         }
+        sortItr.close();
         return true;
     }
 
@@ -120,6 +124,8 @@ public class GroupBywithSort {
             while ((tuple = sortedRelation.get_next()) != null) {
                 sortedTuples.insertRecord(new Tuple(tuple).returnTupleByteArray());
             }
+            scan = new FileScan(SortedRelationName, attrType, strSize,
+                    noOfColumns, noOfColumns, projList, null);
         } catch (Exception e) {
             System.out.println("Error occurred while sorting -> " + e.getMessage());
             e.printStackTrace();
@@ -135,8 +141,6 @@ public class GroupBywithSort {
      */
     public void getAggregateResult() {
         try {
-        scan = new FileScan(SortedRelationName, attrType, strSize,
-                noOfColumns, noOfColumns, projList, null);
         System.out.println("Computing " + aggType.toString() + " ...");
             switch (aggType.aggType) {
                 case AggType.aggMax:
@@ -163,7 +167,6 @@ public class GroupBywithSort {
         } finally {
             System.out.println("Done computing group by operation!");
             scan.close();
-            //Phase3Utils.writeToDisk();
         }
     }
 
@@ -374,12 +377,15 @@ public class GroupBywithSort {
     private void getAvg() throws IOException, InvalidTypeException, PageNotReadException, JoinsException, PredEvalException, WrongPermat, UnknowAttrType, InvalidTupleSizeException, FieldNumberOutOfBoundException, TupleUtilsException, SpaceNotAvailableException, HFException, HFBufMgrException, InvalidSlotNumberException, HFDiskMgrException, Catalogrelexists, Catalogmissparam, Catalognomem, RelCatalogException, Cataloghferror, Catalogdupattrs, Catalogioerror {
 
         attrInfo[] attrs = Phase3Utils.getAttrInfoGroupBy(attrType, groupByAttr, aggList);
+        attrs[1].attrType = new AttrType(AttrType.attrReal);
         Phase3Utils.createTable(materTableName, 2, attrs);
 
+        AttrType[] groupByAttrTypes = Phase3Utils.getGroupByAttrTypes(attrs);
+
         if (attrType[groupByAttr.offset - 1].attrType == AttrType.attrInteger) {
-            computeAvgGroupByAttrInt(attrType);
+            computeAvgGroupByAttrInt(groupByAttrTypes);
         } else {
-            computeAvgGroupByAttrString(attrType);
+            computeAvgGroupByAttrString(groupByAttrTypes);
         }
 
 
@@ -534,6 +540,10 @@ public class GroupBywithSort {
                 previousGroupByAttrValue = groupByAttrValue;
             }
 
+            if (scan != null) {
+                scan.close();
+            }
+
             FileScan scan = new FileScan("SkylineComputation.in", attrType, strSize, noOfColumns, noOfColumns, projList, null);
             BlockNestedLoopsSky blockNestedLoopsSky = new BlockNestedLoopsSky(attrType, noOfColumns, strSize, scan, "SkylineComputation.in", prefList, prefList.length, nPages);
             if (Phase3Utils.createMaterializedView(materTableName)) {
@@ -588,6 +598,10 @@ public class GroupBywithSort {
                 previousGroupByAttrValue = groupByAttrValue;
             }
 
+            if (scan != null) {
+                scan.close();
+            }
+
             FileScan scan = new FileScan("SkylineComputation.in", attrType, strSize, noOfColumns, noOfColumns, projList, null);
             BlockNestedLoopsSky blockNestedLoopsSky = new BlockNestedLoopsSky(attrType, noOfColumns, strSize, scan, "SkylineComputation.in", prefList, prefList.length, nPages);
             if (Phase3Utils.createMaterializedView(materTableName)) {
@@ -614,7 +628,9 @@ public class GroupBywithSort {
      * @throws Exception
      */
     public void close() throws HFDiskMgrException, InvalidTupleSizeException, IOException, InvalidSlotNumberException, FileAlreadyDeletedException, HFBufMgrException {
-        sortedTuples.deleteFile();
+        if (sortedTuples != null) {
+            sortedTuples.deleteFile();
+        }
     }
 
 }

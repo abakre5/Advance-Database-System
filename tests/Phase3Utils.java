@@ -8,7 +8,9 @@ import global.IndexType;
 import global.SystemDefs;
 import heap.*;
 import iterator.*;
+import org.w3c.dom.Attr;
 
+import java.io.File;
 import java.io.IOException;
 import java.util.List;
 
@@ -17,6 +19,14 @@ public class Phase3Utils {
     public final static int SIZE_OF_INT = 3;
     public final static int SIZE_OF_STRING = 32;
     public final static String GROUP_BY_ATTR_STRING_INITIALIZER = "INITIALIZER_GROUP_BY_ATTR";
+
+    private final static String INDEX_META_DATA_FILE = "INDEXMETADATAFILE";
+    private final static AttrType[] attrTypesIndexMetaData =
+            {new AttrType(AttrType.attrString), new AttrType(AttrType.attrInteger), new AttrType(AttrType.attrString)};
+
+
+    private final static short[] strSizesIndexMetaData = {SIZE_OF_STRING, SIZE_OF_STRING};
+
 
     public static void writeToDisk() {
         try {
@@ -68,17 +78,6 @@ public class Phase3Utils {
         }
 
         return new IteratorDesc(tableName, (short) numAttr, attrTypes, strSizes);
-    }
-
-    public static void checkIndexesOnTable(String relName, int nFlds, int attr, int indexCnt, IndexDesc[] indexDescList) {
-        AttrDesc[] attrDescs = new AttrDesc[nFlds];
-        try {
-            ExtendedSystemDefs.MINIBASE_ATTRCAT.getRelInfo(relName, nFlds, attrDescs);
-            String attrName = attrDescs[attr-1].attrName;
-            ExtendedSystemDefs.MINIBASE_INDCAT.getAttrIndexes(relName, attrName, indexCnt, indexDescList);
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
     }
 
     public static boolean aggListContainsStringAttr(FldSpec[] agg_list, AttrType[] type) {
@@ -165,10 +164,12 @@ public class Phase3Utils {
             } else {
                 t.setFloFld(1, groupByAttrValue);
             }
-            if (aggAttrType.attrType == AttrType.attrInteger) {
+            if (aggAttrType.attrType == AttrType.attrReal) {
+                t.setFloFld(2, aggVal);
+            } else if (aggAttrType.attrType == AttrType.attrInteger) {
                 t.setIntFld(2, (int) aggVal);
             } else {
-                t.setFloFld(2, aggVal);
+                throw new TupleUtilsException("String is not supported as an agg list  attr");
             }
         } catch (Exception e) {
             e.printStackTrace();
@@ -192,10 +193,13 @@ public class Phase3Utils {
             }
 
             t.setStrFld(1, groupByAttrValue);
-            if (aggAttrType.attrType == AttrType.attrInteger) {
+            if (aggAttrType.attrType == AttrType.attrReal) {
+                System.out.println("Adding float -> " +  aggVal);
+                t.setFloFld(2, aggVal);
+            } else if (aggAttrType.attrType == AttrType.attrInteger) {
                 t.setIntFld(2, (int) aggVal);
             } else {
-                t.setFloFld(2, aggVal);
+                throw new TupleUtilsException("String is not supported as an agg list  attr");
             }
         } catch (Exception e) {
             e.printStackTrace();
@@ -217,5 +221,64 @@ public class Phase3Utils {
         for (Tuple tuple : tuples) {
             tuple.print(groupByAttrTypes);
         }
+    }
+
+    public static void checkIndexesOnTable(String relName, int nFlds, int attr, int indexCnt, IndexDesc[] indexDescList) {
+        AttrDesc[] attrDescs = new AttrDesc[nFlds];
+        try {
+            ExtendedSystemDefs.MINIBASE_ATTRCAT.getRelInfo(relName, nFlds, attrDescs);
+            String attrName = attrDescs[attr-1].attrName;
+            ExtendedSystemDefs.MINIBASE_INDCAT.getAttrIndexes(relName, attrName, indexCnt, indexDescList);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+
+    public static void insertIndexEntry(String relationName, int attrIndex, int indexTypeInt) {
+        try {
+            Heapfile file = new Heapfile(INDEX_META_DATA_FILE);
+            Tuple tuple = new Tuple();
+            tuple.setHdr((short) 3, attrTypesIndexMetaData, strSizesIndexMetaData);
+            int size = tuple.size();
+            tuple = new Tuple(size);
+            tuple.setHdr((short) 3, attrTypesIndexMetaData, strSizesIndexMetaData);
+            tuple.setStrFld(1, relationName);
+            tuple.setIntFld(2, attrIndex);
+            tuple.setStrFld(3, new IndexType(indexTypeInt).toString());
+            file.insertRecord(tuple.returnTupleByteArray());
+            System.out.println("Index inserted successfully in the catalog");
+        } catch (Exception e) {
+            System.err.println("*** Error occurred while inserting index to catalog");
+        }
+
+    }
+
+    public static boolean isIndexExists(String relationName, int attrIndex, IndexType indexType) {
+        FileScan indexMetaDataFileScan = null;
+        boolean isIndex = false;
+        try {
+            FldSpec[] proj_list = new FldSpec[3];
+            for (int i = 0; i < 3; i++) {
+                proj_list[i] = new FldSpec(new RelSpec(RelSpec.outer), i + 1);
+            }
+
+            indexMetaDataFileScan = new FileScan(INDEX_META_DATA_FILE, attrTypesIndexMetaData, strSizesIndexMetaData, (short) 3, 3, proj_list, null);
+            Tuple tuple;
+            while ((tuple = indexMetaDataFileScan.get_next()) != null) {
+                if (tuple.getStrFld(1).equals(relationName) && tuple.getIntFld(2) == attrIndex && tuple.getStrFld(3).equals(indexType.toString())) {
+                    isIndex = true;
+                    break;
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("*** Error occurred while search for index in index catalog");
+            e.printStackTrace();
+        } finally {
+            if (indexMetaDataFileScan != null) {
+                indexMetaDataFileScan.close();
+            }
+        }
+        return isIndex;
     }
 }

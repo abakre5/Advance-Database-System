@@ -7,6 +7,7 @@ import global.AttrType;
 import global.RID;
 import hash.HashFile;
 import hash.HashIndexFileScan;
+import hash.HashUnclusteredFileScan;
 import heap.*;
 import index.IndexUtils;
 import tests.Phase3Utils;
@@ -84,9 +85,10 @@ public class GroupBywithHash {
         System.out.println("Attr type no: " + in1.length);
         System.out.println("Project No : " + proj_list.length);
         scan = new FileScan(tableName, attrType, strSize, noOfColumns, noOfColumns, proj_list, null);
-        if (!ifIndexExistOnTheTable()) {
+        //if (!ifIndexExistOnTheTable()) {
             try {
-                hashFile = new HashFile("", hashIndexName, group_by_attr.offset,
+                System.out.println("Testttttttttttttttttttttttttttttttttttttttttttt");
+                hashFile = new HashFile(tableName, hashIndexName, group_by_attr.offset,
                         attrType[groupByAttr.offset - 1].attrType,
                         scan, dbHeapFile.getRecCnt(), dbHeapFile, attrType, strSize, noOfColumns);
             } catch (Exception e) {
@@ -94,10 +96,10 @@ public class GroupBywithHash {
                 return;
             }
             System.out.println("Hash Index created on group by attr -> " + groupByAttr.offset);
-        } else {
+        /*} else {
             hashFile = new HashFile(hashIndexName);
             System.out.println("Reusing hash index created on group by attr -> " + groupByAttr.offset);
-        }
+        }*/
     }
 
     private boolean ifIndexExistOnTheTable() {
@@ -120,7 +122,7 @@ public class GroupBywithHash {
      */
     public void getAggregateResult() throws IOException, InvalidTypeException, WrongPermat, JoinsException, PredEvalException, UnknowAttrType, PageNotReadException, InvalidTupleSizeException, FieldNumberOutOfBoundException, FileScanException, TupleUtilsException, InvalidRelation {
         try {
-            hashScan = IndexUtils.HashUnclusteredScan(hashFile);
+            hashScan = (HashUnclusteredFileScan) IndexUtils.HashUnclusteredScan(hashFile);
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -151,7 +153,6 @@ public class GroupBywithHash {
         } finally {
             System.out.println("Done computing group by operation!");
             scan.close();
-            //Phase3Utils.writeToDisk();
         }
     }
 
@@ -186,7 +187,7 @@ public class GroupBywithHash {
             RID fetchRID = entry.data;
             tuple = dbHeapFile.getRecord(fetchRID);
             tuple = new Tuple(tuple.getTupleByteArray(), tuple.getOffset(), tuple.getLength());
-            tuple.setHdr(noOfColumns, attrType, null);
+            tuple.setHdr(noOfColumns, attrType, strSize);
             int index = groupByAttr.offset;
             groupByAttrValue = Phase3Utils.getAttrVal(tuple, index, attrType[index - 1]);
             if (previousGroupByAttrValue == Float.MIN_VALUE) {
@@ -237,7 +238,7 @@ public class GroupBywithHash {
             RID fetchRID = entry.data;
             tuple = dbHeapFile.getRecord(fetchRID);
             tuple = new Tuple(tuple.getTupleByteArray(), tuple.getOffset(), tuple.getLength());
-            tuple.setHdr(noOfColumns, attrType, null);
+            tuple.setHdr(noOfColumns, attrType, strSize);
             int index = groupByAttr.offset;
             groupByAttrValue = Phase3Utils.getAttrValString(tuple, index, attrType[index - 1]);
             if (previousGroupByAttrValue.equals(Phase3Utils.GROUP_BY_ATTR_STRING_INITIALIZER)) {
@@ -300,7 +301,7 @@ public class GroupBywithHash {
             RID fetchRID = entry.data;
             tuple = dbHeapFile.getRecord(fetchRID);
             tuple = new Tuple(tuple.getTupleByteArray(), tuple.getOffset(), tuple.getLength());
-            tuple.setHdr(noOfColumns, attrType, null);
+            tuple.setHdr(noOfColumns, attrType, strSize);
             int index = groupByAttr.offset;
             groupByAttrValue = Phase3Utils.getAttrVal(tuple, index, attrType[index - 1]);
             if (previousGroupByAttrValue == Float.MAX_VALUE) {
@@ -341,7 +342,7 @@ public class GroupBywithHash {
             RID fetchRID = entry.data;
             tuple = dbHeapFile.getRecord(fetchRID);
             tuple = new Tuple(tuple.getTupleByteArray(), tuple.getOffset(), tuple.getLength());
-            tuple.setHdr(noOfColumns, attrType, null);
+            tuple.setHdr(noOfColumns, attrType, strSize);
             int index = groupByAttr.offset;
             groupByAttrValue = Phase3Utils.getAttrValString(tuple, index, attrType[index - 1]);
             if (previousGroupByAttrValue.equals(Phase3Utils.GROUP_BY_ATTR_STRING_INITIALIZER)) {
@@ -404,7 +405,7 @@ public class GroupBywithHash {
             RID fetchRID = entry.data;
             tuple = dbHeapFile.getRecord(fetchRID);
             tuple = new Tuple(tuple.getTupleByteArray(), tuple.getOffset(), tuple.getLength());
-            tuple.setHdr(noOfColumns, attrType, null);
+            tuple.setHdr(noOfColumns, attrType, strSize);
             int index = groupByAttr.offset;
             groupByAttrValue = Phase3Utils.getAttrVal(tuple, index, this.attrType[index - 1]);
             if (previousGroupByAttrValue == Float.MAX_VALUE) {
@@ -447,7 +448,7 @@ public class GroupBywithHash {
             RID fetchRID = entry.data;
             tuple = dbHeapFile.getRecord(fetchRID);
             tuple = new Tuple(tuple.getTupleByteArray(), tuple.getOffset(), tuple.getLength());
-            tuple.setHdr(noOfColumns, attrType, null);
+            tuple.setHdr(noOfColumns, attrType, strSize);
             int index = groupByAttr.offset;
             groupByAttrValue = Phase3Utils.getAttrValString(tuple, index, this.attrType[index - 1]);
             if (previousGroupByAttrValue.equals(Phase3Utils.GROUP_BY_ATTR_STRING_INITIALIZER)) {
@@ -532,7 +533,7 @@ public class GroupBywithHash {
             RID fetchRID = entry.data;
             tuple = dbHeapFile.getRecord(fetchRID);
             tuple = new Tuple(tuple.getTupleByteArray(), tuple.getOffset(), tuple.getLength());
-            tuple.setHdr(noOfColumns, attrType, null);
+            tuple.setHdr(noOfColumns, attrType, strSize);
             int index = groupByAttr.offset;
             float groupByAttrValue = Phase3Utils.getAttrVal(tuple, index, attrType[index - 1]);
             if (previousGroupByAttrValue == Float.MAX_VALUE) {
@@ -584,7 +585,7 @@ public class GroupBywithHash {
             RID fetchRID = entry.data;
             tuple = dbHeapFile.getRecord(fetchRID);
             tuple = new Tuple(tuple.getTupleByteArray(), tuple.getOffset(), tuple.getLength());
-            tuple.setHdr(noOfColumns, attrType, null);
+            tuple.setHdr(noOfColumns, attrType, strSize);
             int index = groupByAttr.offset;
             String groupByAttrValue = Phase3Utils.getAttrValString(tuple, index, attrType[index - 1]);
             if (previousGroupByAttrValue.equals(Phase3Utils.GROUP_BY_ATTR_STRING_INITIALIZER)) {

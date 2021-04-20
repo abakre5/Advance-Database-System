@@ -12,8 +12,8 @@ import java.io.*;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Objects;
 
-import btree.KeyDataEntry;
 import hash.*;
 import index.IndexUtils;
 public class Phase3Driver implements GlobalConst {
@@ -161,7 +161,7 @@ public class Phase3Driver implements GlobalConst {
         return true;
     }
 
-    private static boolean readDataIntoHeapFile(String tableName, String filename, boolean createRel) {
+    private static boolean readDataIntoHeapFile(String tableName, String filename, boolean createRel, int indexType, int indexAttr) {
         int numAttribs;
         AttrType[] attrTypes;
         boolean status = OK;
@@ -169,7 +169,7 @@ public class Phase3Driver implements GlobalConst {
         RID rid;
 
         System.out.println(new File(filename).getAbsoluteFile());
-
+        String[] fieldNames = null;
         try (BufferedReader br = new BufferedReader(new FileReader(filename))) {
             String line;
             line = br.readLine();
@@ -183,7 +183,7 @@ public class Phase3Driver implements GlobalConst {
              * attrInfo[0] = attribute NAME
              * attrInfo[1] - attribute TYPE (STR/INT)
              */
-            String[] fieldNames = new String[numAttribs];
+            fieldNames = new String[numAttribs];
             String[] attrInfo;
             schemaInfo = new String[numAttribs];
             int numStringAttr = 0;
@@ -359,8 +359,22 @@ public class Phase3Driver implements GlobalConst {
             status = FAIL;
             e.printStackTrace();
         }
+
+
+        if (createRel) {
+            /* code to create clustered btree/hash index */
+            if (indexType == IndexType.B_Index) {
+
+            } else if (indexType == IndexType.Hash) {
+                createClusteredHashIndex(tableName, indexAttr);
+                Phase3Utils.insertIndexEntry(tableName, indexAttr, indexType);
+            }
+        }
+
+
         return status;
     }
+
     private static boolean createClusteredHashIndex(String tableName, int keyIndexAttr) {
         boolean status = OK;
         Heapfile relation = null;
@@ -428,16 +442,11 @@ public class Phase3Driver implements GlobalConst {
     private static boolean createTable(String tableName, int indexType, int indexAttr, String filename) {
         boolean status = OK;
 
-        status = readDataIntoHeapFile(tableName, filename, true);
+        status = readDataIntoHeapFile(tableName, filename, true, indexType, indexAttr);
         if (status == FAIL) {
             return status;
         }
-        /* code to create clustered btree/hash index */
-        if (indexType == IndexType.B_Index) {
 
-        } else if (indexType == IndexType.Hash) {
-            createClusteredHashIndex(tableName, indexAttr);
-        }
 
         /* flush pages to disk */
         status = flushToDisk();
@@ -447,7 +456,7 @@ public class Phase3Driver implements GlobalConst {
     }
     
     private static boolean insertIntoTable(String tableName, String fileName) {
-        boolean status = readDataIntoHeapFile(tableName, fileName, false);
+        boolean status = readDataIntoHeapFile(tableName, fileName, false, -1, -1);
         if (status) {
             /* flush pages to disk */
             status = flushToDisk();
@@ -827,12 +836,19 @@ public class Phase3Driver implements GlobalConst {
         if (indexType == IndexType.B_Index) {
             //ExtendedSystemDefs.MINIBASE_INDCAT.addIndex();
         } else {
-            int num_records=1999;
+            int num_records = 1999;
   
             try{
             IteratorDesc iteratorDesc = Phase3Utils.getTableItr(tableName);
             Heapfile dbHeapFile = new Heapfile(tableName);
             HashFile hf = null;
+                /**
+                 *
+                 *
+                 * HASH
+                 *
+                 *
+                 */
             hf = new HashFile(tableName,"hashIndex", 2, AttrType.attrInteger, iteratorDesc.getScan(), num_records, dbHeapFile, iteratorDesc.getAttrType(), iteratorDesc.getStrSizes(),iteratorDesc.getNumAttr());
             System.out.println("Created unclustered hash index");
             System.out.println("Starting insert test");
@@ -1169,6 +1185,7 @@ public class Phase3Driver implements GlobalConst {
                     int indexAttr = Integer.parseInt(indexAttrStr);
                     createUnclusteredIndex(tableName, indexType, indexAttr);
 
+
                     break;
                 }
                 case "prev": {
@@ -1183,6 +1200,8 @@ public class Phase3Driver implements GlobalConst {
                 case "groupby": {
                     System.out.println((java.util.Arrays.toString(tokens)));
                     performGroupBy(tokens);
+                    Phase3Utils.writeToDisk();
+                    System.out.println("---------------------------------------------------------------------------------");
                     break;
                 }
                 case "skyline":
@@ -1259,6 +1278,7 @@ public class Phase3Driver implements GlobalConst {
                 assert materTableName != null;
                 blockNestedLoopsSky.printSkyline(materTableName);
                 blockNestedLoopsSky.close();
+                iteratorDesc.getScan().close();
                 break;
             case "SFS":
                 break;
@@ -1401,7 +1421,7 @@ public class Phase3Driver implements GlobalConst {
                 assert iteratorDesc != null;
                 groupBywithSort = new GroupBywithSort(iteratorDesc.getAttrType(),
                         iteratorDesc.getNumAttr(), iteratorDesc.getStrSizes(), iteratorDesc.getScan(), groupByAttrFldSpec, aggListFldSpec,
-                        aggType, iteratorDesc.getProjlist(), iteratorDesc.getNumAttr(), nPages, tableNameT);
+                        aggType, iteratorDesc.getProjlist(), iteratorDesc.getNumAttr(), nPages, tableNameT, tableName);
                 groupBywithSort.getAggregateResult();
             } catch (Exception e) {
                 e.printStackTrace();
