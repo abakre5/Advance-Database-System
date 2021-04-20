@@ -538,7 +538,7 @@ public class BT implements GlobalConst {
         return key;
     }
 
-    public static boolean CreateClusteredIndex(Heapfile f, BTreeClusteredFile btf, AttrType[] attrTypes, short[] attrSize, int fieldNumber) throws InvalidTupleSizeException, IOException, InvalidTypeException {
+    public static boolean CreateClusteredIndex(Heapfile f, BTreeClusteredFile btf, AttrType[] attrTypes, short[] attrSize, int fieldNumber, int multiplier) throws InvalidTupleSizeException, IOException, InvalidTypeException {
         boolean status = OK;
         RID rid = new RID();
         KeyClass key = null;
@@ -573,13 +573,13 @@ public class BT implements GlobalConst {
                 {
                     try
                     {
-                        key = BT.createKeyFromTupleField(t, attrTypes, 1, -1);
+                        key = BT.createKeyFromTupleField(t, attrTypes, fieldNumber, multiplier);
                     } catch (Exception e)
                     {
                         status = FAIL;
                         e.printStackTrace();
                     }
-                    System.out.println("page no " + rid.pageNo.pid + " slot no " + rid.slotNo);
+                    //System.out.println("page no " + rid.pageNo.pid + " slot no " + rid.slotNo);
 
                     try {
                         btf.insert(key, new PageId(prev));

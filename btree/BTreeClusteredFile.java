@@ -27,7 +27,8 @@ public class BTreeClusteredFile extends ClusteredIndexFile
     private Heapfile heapfile;
     private AttrType[] attrTypes;
     private short[] attrSizes;
-
+    private int indexField;
+    private int multiplier;
 
     /**
      * It causes a structured trace to be written to a
@@ -167,6 +168,8 @@ public class BTreeClusteredFile extends ClusteredIndexFile
 
         headerPage = new BTreeHeaderPage(headerPageId);
         dbname = new String(filename);
+        indexField = 1;
+        multiplier = 1;
         /*
          *
          * - headerPageId is the PageId of this BTreeFile's header page;
@@ -216,12 +219,14 @@ public class BTreeClusteredFile extends ClusteredIndexFile
         }
 
         dbname = new String(filename);
+        indexField = 1;
+        multiplier = 1;
 
     }
 
     public BTreeClusteredFile(String filename, int keytype,
                               int keysize, int delete_fashion, String heapFileName, AttrType[] attributeTypes,
-                              short[] attributeSizes)
+                              short[] attributeSizes, int fieldNumber, int keyMultiplier)
             throws GetFileEntryException,
             ConstructPageException,
             IOException,
@@ -249,7 +254,8 @@ public class BTreeClusteredFile extends ClusteredIndexFile
         heapfile = null;
         attrTypes = attributeTypes;
         attrSizes = attributeSizes;
-
+        indexField = fieldNumber;
+        multiplier = keyMultiplier;
     }
 
     /**
@@ -1963,6 +1969,8 @@ public class BTreeClusteredFile extends ClusteredIndexFile
                     Tuple t = hfPage.getRecord(currentRID);
                     Tuple temp = new Tuple(t.getTupleByteArray(), t.getOffset(), t.getLength());
                     temp.setHdr((short) attrTypes.length, attrTypes, attrSizes);
+
+                    KeyClass key = BT.createKeyFromTupleField(temp, attrTypes, indexField, multiplier);
                     //Now new page is created, Add this entry to Index
                     insert(new FloatKey(temp.getFloFld(1)), hfPage.getCurPage());
                     System.out.println("Inserting new key");

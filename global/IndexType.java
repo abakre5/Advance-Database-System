@@ -46,4 +46,19 @@ public class IndexType {
         }
         return ("Unexpected IndexType " + indexType);
     }
+
+    public static String getStringForType(int type) {
+
+        switch (type) {
+            case None:
+                return "_None_";
+            case B_Index:
+                return "_B_Index_";
+            case Hash:
+                return "_Hash_";
+            case B_ClusteredIndex:
+                return  "_B_ClusteredIndex_";
+        }
+        return ("Unexpected IndexType " + type);
+    }
 }

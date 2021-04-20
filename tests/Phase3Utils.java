@@ -2,10 +2,7 @@ package tests;
 
 import bufmgr.PageNotReadException;
 import catalog.*;
-import global.AttrType;
-import global.ExtendedSystemDefs;
-import global.IndexType;
-import global.SystemDefs;
+import global.*;
 import heap.*;
 import iterator.*;
 import org.w3c.dom.Attr;
@@ -280,5 +277,69 @@ public class Phase3Utils {
             }
         }
         return isIndex;
+    }
+
+    public static String getClusteredBtreeIndexName(String tableName, int attrNo)
+    {
+        String indexName = tableName + IndexType.getStringForType(IndexType.B_ClusteredIndex) + Integer.toString(attrNo);
+        return indexName;
+    }
+
+    public static String getClusteredBtreeHeapName(String tableName, int attrNo)
+    {
+        String heapFileName = tableName + IndexType.getStringForType(IndexType.B_ClusteredIndex) + Integer.toString(attrNo) + "_data";
+        return heapFileName;
+    }
+
+    public static Heapfile sortHeapFile(String fileToSort, String sortedFile, int sortAttr,
+                                        AttrType[] attrTypes, short[] strSize, TupleOrder order, int recordlen)
+            throws IOException, FileScanException, TupleUtilsException, InvalidRelation, SortException
+    {
+        FldSpec[] projections = new FldSpec[attrTypes.length];
+        RelSpec rel = new RelSpec(RelSpec.outer);
+        for(int fieldNumber = 1; fieldNumber <= attrTypes.length; fieldNumber++)
+        {
+            projections[fieldNumber-1] = new FldSpec(rel, fieldNumber);
+        }
+
+        //TODO:Pawan check if this needs to be updated according to data
+        int SORTPGNUM = 100;
+        Heapfile hfSorted = getHeapFileInstance(sortedFile);
+
+        FileScan fileScan = new FileScan(fileToSort, attrTypes, strSize, (short)attrTypes.length, attrTypes.length,
+                    projections, null);
+
+        Sort sortIterator = new Sort(attrTypes, (short) attrTypes.length, strSize, fileScan, sortAttr, order, recordlen, SORTPGNUM);
+
+        Tuple t = null;
+        try
+        {
+            t = sortIterator.get_next();
+            while (t!= null)
+            {
+                hfSorted.insertRecord(t.getTupleByteArray());
+                t= sortIterator.get_next();
+            }
+        } catch(Exception e)
+        {
+            e.printStackTrace();
+        }
+
+        sortIterator.close();
+        return hfSorted;
+    }
+
+    public static Heapfile getHeapFileInstance(String heapfileName)
+    {
+        Heapfile hf = null;
+        try
+        {
+            hf = new Heapfile(heapfileName);
+        } catch (Exception e) {
+            System.err.println("*** Failed to heap file instance ***");
+            e.printStackTrace();
+        }
+
+        return hf;
     }
 }

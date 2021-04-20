@@ -1,5 +1,7 @@
 package tests;
 
+import btree.BT;
+import btree.BTreeClusteredFile;
 import bufmgr.PageNotReadException;
 import bufmgr.PagePinnedException;
 import catalog.*;
@@ -439,6 +441,63 @@ public class Phase3Driver implements GlobalConst {
         return status;
     }
 
+    private static boolean createClusteredBtreeIndex(String tableName, int keyIndexAttr) {
+        boolean status = OK;
+        Heapfile relation = null;
+        Scan scan = null;
+        Tuple t = null;
+        RelDesc rec = new RelDesc();
+        AttrType[] attrTypes = null;
+        short[] sizeArr = null;
+        BTreeClusteredFile btf = null;
+        String indexFile = Phase3Utils.getClusteredBtreeIndexName(tableName, keyIndexAttr);
+        String sortedHeapFile = Phase3Utils.getClusteredBtreeHeapName(tableName, keyIndexAttr);
+        System.out.println("Btree Clustered Index file name :" + indexFile);
+        int multiplier = 1;
+        try {
+            int numAttr = 0;
+            relation = new Heapfile(tableName);
+            ExtendedSystemDefs.MINIBASE_RELCAT.getInfo(tableName, rec);
+            numAttr = rec.getAttrCnt();
+            attrTypes = new AttrType[numAttr];
+            sizeArr = new short[numAttr];
+
+            ExtendedSystemDefs.MINIBASE_ATTRCAT.getTupleStructure(tableName, numAttr, attrTypes, sizeArr);
+            t = new Tuple();
+            t.setHdr((short) numAttr, attrTypes, sizeArr);
+
+            assert keyIndexAttr <= numAttr;
+            btf = new BTreeClusteredFile(indexFile, attrTypes[keyIndexAttr].attrType, STR_SIZE, 1, sortedHeapFile, attrTypes, sizeArr,keyIndexAttr, multiplier);
+        } catch (Exception e) {
+            System.err.println(e);
+            e.printStackTrace();
+        }
+        Heapfile sortedFile = null;
+
+        try{
+            sortedFile = Phase3Utils.sortHeapFile(tableName,sortedHeapFile, keyIndexAttr, attrTypes,sizeArr, new TupleOrder(multiplier == -1 ? TupleOrder.Descending : TupleOrder.Ascending), STR_SIZE);
+        }catch(Exception e){
+            e.printStackTrace();
+        }
+
+        try{
+            BT.CreateClusteredIndex(sortedFile, btf, attrTypes, sizeArr, keyIndexAttr ,multiplier);
+        }catch(Exception e){
+            e.printStackTrace();
+        }
+
+        try
+        {
+            btf.printBTree();
+            btf.printAllLeafPages();
+        } catch (Exception e) {
+            System.err.println(e);
+            status = FAIL;
+        }
+
+        return status;
+    }
+
     private static boolean createTable(String tableName, int indexType, int indexAttr, String filename) {
         boolean status = OK;
 
@@ -446,7 +505,6 @@ public class Phase3Driver implements GlobalConst {
         if (status == FAIL) {
             return status;
         }
-
 
         /* flush pages to disk */
         status = flushToDisk();
@@ -1169,7 +1227,7 @@ public class Phase3Driver implements GlobalConst {
 
                     if (clustered.equalsIgnoreCase("clustered")) {
                         filename = new String(datafile);
-                        indexType = index.equalsIgnoreCase("btree") ? IndexType.B_Index : IndexType.Hash;
+                        indexType = index.equalsIgnoreCase("btree") ? IndexType.B_ClusteredIndex : IndexType.Hash;
                         indexKeyAttr = Integer.parseInt(indexAttr);
                     }
                     status = createTable(tableName, indexType, indexKeyAttr, filename);
