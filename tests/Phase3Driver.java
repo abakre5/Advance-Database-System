@@ -1078,7 +1078,30 @@ public class Phase3Driver implements GlobalConst {
         e.printStackTrace();
     }
 }
-    
+
+    private static void printClusteredHashIndexKeys(String tableName, int indexAttr) {
+
+        ClusteredHashFile chf = null;
+        AttrType[] attrTypes = null;
+        short[] strSizes = null;
+        try {
+            int numAttribs;
+            RelDesc rec = new RelDesc();
+            ExtendedSystemDefs.MINIBASE_RELCAT.getInfo(tableName, rec);
+            numAttribs = rec.getAttrCnt();
+            attrTypes = new AttrType[numAttribs];
+            strSizes = new short[numAttribs];
+
+            ExtendedSystemDefs.MINIBASE_ATTRCAT.getTupleStructure(tableName, numAttribs, attrTypes, strSizes);
+            chf = new ClusteredHashFile(tableName, indexAttr, attrTypes[indexAttr-1].attrType);
+            System.out.println(tableName + "attr=" + indexAttr + " keys:");
+            chf.printKeys();
+        } catch (Exception e) {
+            System.err.println("*** error fetching catalog info");
+            return;
+        }
+
+    }
     private static boolean openExistingHashUnclusteredIndex(String tableName, int indexType, int indexAttr) {
 
         try {
@@ -1705,7 +1728,7 @@ public class Phase3Driver implements GlobalConst {
                         System.out.println(cmd + ": insufficient arguments");
                         break;
                     }
-                    System.out.println(tokens.length);
+                    //System.out.println(tokens.length);
                     int indexAttr = Integer.parseInt(tokens[2]);
                     String tableName = tokens[1];
 
@@ -1717,13 +1740,11 @@ public class Phase3Driver implements GlobalConst {
                         System.out.println("No clustered Btree index");
                     } 
                     
-                    if(Phase3Utils.isIndexExists(tableName, indexAttr, new IndexType(IndexType.Hash) )) {
+                    if (Phase3Utils.isIndexExists(tableName, indexAttr, new IndexType(IndexType.Clustered_Hash) )) {
+                        printClusteredHashIndexKeys(tableName, indexAttr);
+                    }
+                    if (Phase3Utils.isIndexExists(tableName, indexAttr, new IndexType(IndexType.Hash) )){
                         printUnclusteredHashIndex(tableName, indexAttr);
-    
-
-                    } else if(!Phase3Utils.isIndexExists(tableName, indexAttr, new IndexType(IndexType.Hash) )){
-                        System.out.println("No unclustered hash index");
-
                     }
 
                     if(Phase3Utils.isIndexExists(tableName, indexAttr, new IndexType(IndexType.B_Index) )) {
