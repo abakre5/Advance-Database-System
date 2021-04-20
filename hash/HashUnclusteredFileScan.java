@@ -88,6 +88,8 @@ public class HashUnclusteredFileScan extends HashIndexFileScan implements Global
                     
                     ridTuple.setHdr((short)3, attrType, attrSizes);
                     entry.key = new IntegerKey(ridTuple.getIntFld(1));
+                    // System.out.println("Scan Key"+ ridTuple.getIntFld(1));
+                    // System.out.println("RID "+ ridTuple.getIntFld(2)+ ":"+ ridTuple.getIntFld(3));
                 } else if (hfile.indexkeyType == hfile.stringField){
                     attrType[0] = new AttrType (AttrType.attrString);
                     attrType[1] = new AttrType (AttrType.attrInteger);
@@ -95,6 +97,8 @@ public class HashUnclusteredFileScan extends HashIndexFileScan implements Global
 
                     ridTuple.setHdr((short)3, attrType, attrSizes);
                     entry.key = new StringKey(ridTuple.getStrFld(1));
+                    // System.out.println("Scan Key"+ ridTuple.getStrFld(1));
+                    // System.out.println("RID "+ ridTuple.getIntFld(2)+ ":"+ ridTuple.getIntFld(3));
                 }
                 
                 RID insert_rid = new RID();
