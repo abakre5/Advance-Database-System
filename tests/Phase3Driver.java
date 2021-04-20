@@ -24,7 +24,7 @@ public class Phase3Driver implements GlobalConst {
     /* class constants */
     private static final boolean OK = true;
     private static final boolean FAIL = false;
-    private static final short STR_SIZE = 32;
+    public static final short STR_SIZE = 32;
 
     private static final String NAMEROOT = "phase3";
 
@@ -524,7 +524,6 @@ public class Phase3Driver implements GlobalConst {
         /* flush pages to disk */
         status = flushToDisk();
         System.out.println();
-
         return status;
     }
     
@@ -1323,7 +1322,6 @@ public class Phase3Driver implements GlobalConst {
                     } catch (Exception e) {
                         System.out.println("create_index: index ATT_NO is NaN: " + indexAttrStr);
                     }
-
                     int indexType = indexTypeStr.equalsIgnoreCase("btree") ? IndexType.B_Index : IndexType.Hash;
                     int indexAttr = Integer.parseInt(indexAttrStr);
                     createUnclusteredIndex(tableName, indexType, indexAttr);
@@ -1402,7 +1400,7 @@ public class Phase3Driver implements GlobalConst {
         int nPages = Integer.parseInt(tokens[4]);
         String materTableName = null;
         if (tokens.length > 5 ){
-            materTableName = tokens[6];
+            materTableName = tokens[5];
         }
 
         IteratorDesc iteratorDesc = Phase3Utils.getTableItr(tableName);
@@ -1424,16 +1422,24 @@ public class Phase3Driver implements GlobalConst {
                 blockNestedLoopsSky.close();
                 iteratorDesc.getScan().close();
                 break;
-            case "SFS":
+            case "sfs":
+                assert iteratorDesc != null;
+                SortFirstSky sortFirstSky = new SortFirstSky(iteratorDesc.getAttrType(), iteratorDesc.getNumAttr(),
+                        iteratorDesc.getStrSizes(), iteratorDesc.getScan(), tableName, prefList, prefList.length,nPages);
+                assert materTableName != null;
+                sortFirstSky.printSkyline(materTableName);
+                sortFirstSky.close();
                 break;
-            case "BTS":
+            case "bts":
                 break;
-            case "BTSS":
+            case "btss":
                 break;
             default:
                 System.out.println("Select skyline operator from the specified list ...");
                 return;
         }
+        iteratorDesc.getScan().close();
+        Phase3Utils.writeToDisk();
     }
 
     //    – TOPKJOIN HASH/NRA K OTABLENAME O J ATT NO O M ATT NO ITABLENAME I JATT NO I MATT NO NPAGES
@@ -1448,7 +1454,7 @@ public class Phase3Driver implements GlobalConst {
         int innerJoinAttrNumber = Integer.parseInt(tokens[7]);
         int innerMergeAttrNumber = Integer.parseInt(tokens[8]);
         int nPages = Integer.parseInt(tokens[9]);
-        String materialTableName = null;
+        String materialTableName = "";
         if (tokens.length == 11){
              materialTableName = tokens[10];
         }
@@ -1473,10 +1479,66 @@ public class Phase3Driver implements GlobalConst {
             e.printStackTrace();
         }
 
+        if (!materialTableName.equals("")){
+            AttrDesc[] outerAttrs = new AttrDesc[outIteratorDesc.getNumAttr()];
+            AttrDesc[] innerAttrs = new AttrDesc[innerIteratorDesc.getNumAttr()];
+
+            try {
+                ExtendedSystemDefs.MINIBASE_ATTRCAT.getRelInfo(outTableName, outIteratorDesc.getNumAttr(), outerAttrs);
+                ExtendedSystemDefs.MINIBASE_ATTRCAT.getRelInfo(innerTableName, innerIteratorDesc.getNumAttr(), innerAttrs);
+            } catch (Catalogmissparam | Catalogioerror | Cataloghferror | AttrCatalogException | IOException | Catalognomem | Catalogattrnotfound | Catalogindexnotfound | Catalogrelnotfound catalogmissparam) {
+                catalogmissparam.printStackTrace();
+            }
+
+            String[] fieldNames = new String[outIteratorDesc.getNumAttr() + innerIteratorDesc.getNumAttr()];
+            for (int i=0; i<outIteratorDesc.getNumAttr(); i++) {
+                fieldNames[i] = outTableName + "."+ outerAttrs[i].attrName + "." + (i+1);
+            }
+            for (int i=0; i<innerIteratorDesc.getNumAttr(); i++) {
+                fieldNames[i+outIteratorDesc.getNumAttr()] = innerTableName +"."+innerAttrs[i].attrName + "."+ (i+outIteratorDesc.getNumAttr()+1);
+            }
+
+
+            AttrType[] jTypes = new AttrType[outIteratorDesc.getNumAttr()+innerIteratorDesc.getNumAttr()];
+            System.arraycopy(outIteratorDesc.getAttrType(), 0, jTypes, 0, outIteratorDesc.getNumAttr());
+            System.arraycopy(innerIteratorDesc.getAttrType(), 0, jTypes, outIteratorDesc.getNumAttr(), innerIteratorDesc.getNumAttr());
+
+            for (int i = 0; i < outIteratorDesc.getNumAttr() + innerIteratorDesc.getNumAttr(); i++){
+                System.out.println(fieldNames[i]);
+                System.out.println(jTypes[i].attrType);
+            }
+
+            try {
+                Phase3Utils.createOutputTable(materialTableName, fieldNames, jTypes, outIteratorDesc.getNumAttr()+innerIteratorDesc.getNumAttr());
+            } catch (Exception e) {
+                System.out.println("relation Creation failed for material table");
+                e.printStackTrace();
+            }
+
+        }
+
         FldSpec outJoinAttr = new FldSpec(new RelSpec(RelSpec.outer), outJoinAttrNumber);
         FldSpec outMrgAttr = new FldSpec(new RelSpec(RelSpec.outer), outMergeAttrNumber);
         FldSpec innerJoinAttr = new FldSpec(new RelSpec(RelSpec.outer), innerJoinAttrNumber);
         FldSpec innerMrgAttr = new FldSpec(new RelSpec(RelSpec.outer), innerMergeAttrNumber);
+
+        FileScan fOut = null;
+        FileScan fInner = null;
+        try {
+             fOut = getFileScan(outTableName, outIteratorDesc.getNumAttr(), outIteratorDesc.getAttrType(), outIteratorDesc.getStrSizes());
+             fInner = getFileScan(innerTableName, innerIteratorDesc.getNumAttr(), innerIteratorDesc.getAttrType(), innerIteratorDesc.getStrSizes());
+        } catch (IOException | FileScanException | TupleUtilsException | InvalidRelation e) {
+            e.printStackTrace();
+        }
+
+        try {
+            sortRelation(outIteratorDesc.getAttrType(),  outIteratorDesc.getNumAttr(), outIteratorDesc.getStrSizes(),fOut ,
+                    outMergeAttrNumber, 100, "newOutRelation");
+            sortRelation(innerIteratorDesc.getAttrType(),  innerIteratorDesc.getNumAttr(), innerIteratorDesc.getStrSizes(),fInner ,
+                    innerMergeAttrNumber, 100, "newInnerRelation");
+        } catch (IOException | SortException e) {
+            e.printStackTrace();
+        }
         if (isHashBased){
             System.out.println("Hash based top k join is performed : ");
 
@@ -1493,6 +1555,8 @@ public class Phase3Driver implements GlobalConst {
         } else{
             System.out.println("NRA based top k join algorithm is performed : ");
             AttrType x = outIteratorDesc.getAttrType()[outJoinAttr.offset - 1];
+            IndexScan scan = Phase3Utils.getBtreeClusteredIndexScan(outTableName, outIteratorDesc.getAttrType(), outIteratorDesc.getStrSizes(), outMergeAttrNumber);
+            IndexScan scan1 = Phase3Utils.getBtreeClusteredIndexScan(innerTableName, innerIteratorDesc.getAttrType(), innerIteratorDesc.getStrSizes(), innerMergeAttrNumber);
             if (x.attrType == AttrType.attrString){
                 System.out.println("Join Attribute is of String type");
                 try {
@@ -1500,27 +1564,26 @@ public class Phase3Driver implements GlobalConst {
                             outJoinAttr, outMrgAttr,
                             innerIteratorDesc.getAttrType(), innerIteratorDesc.getNumAttr(), innerIteratorDesc.getStrSizes(),
                             innerJoinAttr, innerMrgAttr,
-                            outTableName, innerTableName, k, nPages);
+
+                            "newOutRelation", "newInnerRelation", k, nPages, materialTableName);
 
                 } catch (IOException | FileScanException | InvalidRelation | TupleUtilsException | WrongPermat | InvalidTypeException | PageNotReadException | FieldNumberOutOfBoundException | PredEvalException | UnknowAttrType | InvalidTupleSizeException | JoinsException e) {
                     e.printStackTrace();
                 }
             } else {
+
                 try {
                     new TopK_NRAJoin(outIteratorDesc.getAttrType(), outIteratorDesc.getNumAttr(), outIteratorDesc.getStrSizes(),
                             outJoinAttr, outMrgAttr,
                             innerIteratorDesc.getAttrType(), innerIteratorDesc.getNumAttr(), innerIteratorDesc.getStrSizes(),
                             innerJoinAttr, innerMrgAttr,
-                            outTableName, innerTableName, k, nPages);
+                            "newOutRelation", "newInnerRelation", k, nPages, materialTableName);
 
                 } catch (IOException | FileScanException | InvalidRelation | TupleUtilsException | WrongPermat | InvalidTypeException | PageNotReadException | FieldNumberOutOfBoundException | PredEvalException | UnknowAttrType | InvalidTupleSizeException | JoinsException e) {
                     e.printStackTrace();
                 }
             }
-
         }
-
-
 
 
     }
@@ -1915,7 +1978,7 @@ public class Phase3Driver implements GlobalConst {
                     fieldNames[nOuterAttr+i] = innerTableName+"."+innerAttrs[i].attrName;
                 }
 
-                createOutputTable(outputTable, fieldNames, jTypes, nJoinAttr);
+                Phase3Utils.createOutputTable(outputTable, fieldNames, jTypes, nJoinAttr);
 
                 hf = new Heapfile(outputTable);
             }
@@ -1986,21 +2049,47 @@ public class Phase3Driver implements GlobalConst {
         return joinCond;
     }
 
-    private static void createOutputTable(String outputTable, String[] fieldNames, AttrType[] jtypes, int nJoinAttr) throws Exception {
-        try {
-            int SIZE_OF_INT = 4;
-            attrInfo[] attrs = new attrInfo[nJoinAttr];
 
-            for (int i = 0; i < nJoinAttr; ++i) {
-                attrs[i] = new attrInfo();
-                attrs[i].attrType = new AttrType(jtypes[i].attrType);
-                attrs[i].attrName = fieldNames[i];
-                attrs[i].attrLen = (jtypes[i].attrType == AttrType.attrInteger) ? SIZE_OF_INT : STR_SIZE;
+    /**
+     * Perform sort on the given relation and stores sort result in a new heap file.
+     *
+     * @throws Exception
+     */
+    public static void sortRelation(AttrType[] in,
+                                    short len_in,
+                                    short[] str_sizes,
+                                    Iterator am,
+                                    int sort_fld,
+                                    int n_pages, String relationName
+    ) throws IOException, SortException {
+        Sort sortedRelation = null;
+        Heapfile sortedTuples;
+        try {
+            TupleOrder order = new TupleOrder(TupleOrder.Descending);
+            sortedRelation = new Sort(in, len_in, str_sizes, am, sort_fld, order, len_in, n_pages);
+            sortedTuples = new Heapfile(relationName);
+            Tuple tuple = null;
+            while ((tuple = sortedRelation.get_next()) != null) {
+                sortedTuples.insertRecord(new Tuple(tuple).returnTupleByteArray());
             }
-            ExtendedSystemDefs.MINIBASE_RELCAT.createRel(outputTable, nJoinAttr, attrs);
         } catch (Exception e) {
-            throw new Exception("Create output table failed: ", e);
+            System.out.println("Error occurred while sorting -> " + e.getMessage());
+            e.printStackTrace();
+        } finally {
+            assert sortedRelation != null;
+            sortedRelation.close();
         }
+    }
+
+    private static FileScan getFileScan(String relationName, short noOfColumns, AttrType[] attrTypes, short[] stringSizes) throws IOException, FileScanException, TupleUtilsException, InvalidRelation {
+        FileScan scan = null;
+        FldSpec[] pProjection = new FldSpec[noOfColumns];
+        for (int i = 1; i <= noOfColumns; i++) {
+            pProjection[i - 1] = new FldSpec(new RelSpec(RelSpec.outer), i);
+        }
+        scan = new FileScan(relationName, attrTypes, stringSizes,
+                noOfColumns, noOfColumns, pProjection, null);
+        return scan;
     }
 
     public static void main(String[] args) {
