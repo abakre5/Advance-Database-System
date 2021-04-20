@@ -370,7 +370,7 @@ public class Phase3Driver implements GlobalConst {
             /* code to create clustered btree/hash index */
             if (indexType == IndexType.B_ClusteredIndex) {
                 createClusteredBtreeIndex(tableName, indexAttr);
-                //Phase3Utils.insertIndexEntry(tableName, indexAttr, indexType);
+                Phase3Utils.insertIndexEntry(tableName, indexAttr, indexType);
             } else if (indexType == IndexType.Clustered_Hash) {
                 createClusteredHashIndex(tableName, indexAttr);
                 Phase3Utils.insertIndexEntry(tableName, indexAttr, indexType);
@@ -442,6 +442,61 @@ public class Phase3Driver implements GlobalConst {
         }
         */
         
+        return status;
+    }
+
+    private static boolean printClusteredBtreeIndex(String tableName, int keyIndexAttr)
+    {
+        boolean status = OK;
+        Heapfile relation = null;
+        Tuple t = null;
+        RelDesc rec = new RelDesc();
+        AttrType[] attrTypes = null;
+        short[] sizeArr = null;
+        BTreeClusteredFile btf = null;
+        String indexFile = Phase3Utils.getClusteredBtreeIndexName(tableName, keyIndexAttr);
+        String sortedHeapFile = Phase3Utils.getClusteredBtreeHeapName(tableName, keyIndexAttr);
+        System.out.println("Btree Clustered Index file name :" + indexFile);
+        int multiplier = -1;
+        try {
+            int numAttr = 0;
+            ExtendedSystemDefs.MINIBASE_RELCAT.getInfo(tableName, rec);
+            numAttr = rec.getAttrCnt();
+            attrTypes = new AttrType[numAttr];
+            sizeArr = new short[numAttr];
+
+            ExtendedSystemDefs.MINIBASE_ATTRCAT.getTupleStructure(tableName, numAttr, attrTypes, sizeArr);
+            t = new Tuple();
+            t.setHdr((short) numAttr, attrTypes, sizeArr);
+
+            assert keyIndexAttr <= numAttr;
+            btf = new BTreeClusteredFile(indexFile, attrTypes[keyIndexAttr-1].attrType, STR_SIZE, 1, sortedHeapFile, attrTypes, sizeArr,keyIndexAttr, multiplier);
+        } catch (Exception e) {
+            System.err.println(e);
+            e.printStackTrace();
+        }
+
+        try
+        {
+            btf.printBTree();
+            btf.printAllLeafPages();
+//            IndexScan scan = Phase3Utils.getBtreeClusteredIndexScan(tableName, attrTypes, sizeArr, keyIndexAttr);
+//            Tuple temp = scan.get_next();
+//            while(temp!= null)
+//            {
+//                t = new Tuple(temp.getTupleByteArray(),temp.getOffset(), temp.getLength());
+//                t.setHdr((short) attrTypes.length, attrTypes, sizeArr);
+//                printTuple(t,attrTypes);
+//                temp = scan.get_next();
+//            }
+
+        } catch (Exception e) {
+            System.err.println(e);
+            status = FAIL;
+        }
+
+
+
         return status;
     }
 
@@ -1464,10 +1519,10 @@ public class Phase3Driver implements GlobalConst {
 
                     if(Phase3Utils.isIndexExists(tableName, indexAttr, new IndexType(IndexType.B_ClusteredIndex) )){
                         //print BTree code
+                        printClusteredBtreeIndex(tableName, indexAttr);
 
                     } else if (!Phase3Utils.isIndexExists(tableName, indexAttr, new IndexType(IndexType.B_ClusteredIndex) )) {
                         System.out.println("No clustered Btree index");
-
                     } 
                     
                     if(Phase3Utils.isIndexExists(tableName, indexAttr, new IndexType(IndexType.Hash) )) {
