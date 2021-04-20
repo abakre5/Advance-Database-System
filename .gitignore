@@ -28,3 +28,12 @@ index/Makefile
 iterator/Makefile
 Makefile
 MiniBase.iml
+bufmgr/Makefile
+btree/Makefile
+.idea/modules.xml
+btree/Makefile
+bufmgr/Makefile
+chainexception/Makefile
+catalog/Makefile
+bufmgr/Makefile
+btree/Makefile
