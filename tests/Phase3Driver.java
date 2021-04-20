@@ -29,6 +29,8 @@ public class Phase3Driver implements GlobalConst {
     private static final boolean OK = true;
     private static final boolean FAIL = false;
     public static final short STR_SIZE = 32;
+    // Set this to 1 for ascending order in btree clustered index and -1 for descending.
+    public static final int BTREE_CLUSTERED_ORDER = -1;
 
     private static final String NAMEROOT = "phase3";
 
@@ -350,7 +352,6 @@ public class Phase3Driver implements GlobalConst {
                 try {
                     rid = tableHeapFile.insertRecord(t.getTupleByteArray());
                     insertIntoIndex(tableName, numAttribs, rid, t);
-                    System.out.println("Inserted data");
                 } catch (Exception e) {
                     System.err.println("*** error in Heapfile.insertRecord() ***");
                     status = FAIL;
@@ -389,10 +390,7 @@ public class Phase3Driver implements GlobalConst {
         for(int i=1; i<=numAttr; i++) {
 
             if(Phase3Utils.isIndexExists(tableName,i, new IndexType(IndexType.B_ClusteredIndex))) {
-                
-                //
-
-
+                insertIntoClusteredBtreeIndex(tableName, numAttr, i, t);
             }
 
             if(Phase3Utils.isIndexExists(tableName,i, new IndexType(IndexType.Hash))) {
@@ -402,10 +400,7 @@ public class Phase3Driver implements GlobalConst {
             if(Phase3Utils.isIndexExists(tableName,i, new IndexType(IndexType.Clustered_Hash))) {
 
             }
-
-
         }
-
     }
 
     private static void InsertIntoUnclusteredHashIndex(String tableName, int numAttr,int indexAttr, RID rid, Tuple insertEntry) {
@@ -536,8 +531,8 @@ public class Phase3Driver implements GlobalConst {
         BTreeClusteredFile btf = null;
         String indexFile = Phase3Utils.getClusteredBtreeIndexName(tableName, keyIndexAttr);
         String sortedHeapFile = Phase3Utils.getClusteredBtreeHeapName(tableName, keyIndexAttr);
-        System.out.println("Btree Clustered Index file name :" + indexFile);
-        int multiplier = -1;
+        //System.out.println("Btree Clustered Index file name :" + indexFile);
+        int multiplier = BTREE_CLUSTERED_ORDER;
         try {
             int numAttr = 0;
             ExtendedSystemDefs.MINIBASE_RELCAT.getInfo(tableName, rec);
@@ -580,10 +575,49 @@ public class Phase3Driver implements GlobalConst {
         return status;
     }
 
+    private static boolean insertIntoClusteredBtreeIndex(String tableName, int numAttr, int keyIndexAttr, Tuple tuple)
+    {
+        boolean status = OK;
+        Heapfile relation = null;
+        Tuple t = null;
+        RelDesc rec = new RelDesc();
+        AttrType[] attrTypes = null;
+        short[] sizeArr = null;
+        BTreeClusteredFile btf = null;
+        String indexFile = Phase3Utils.getClusteredBtreeIndexName(tableName, keyIndexAttr);
+        String sortedHeapFile = Phase3Utils.getClusteredBtreeHeapName(tableName, keyIndexAttr);
+        //System.out.println("Btree Clustered Index file name :" + indexFile);
+        int multiplier = BTREE_CLUSTERED_ORDER;
+        try {
+            numAttr = 0;
+            ExtendedSystemDefs.MINIBASE_RELCAT.getInfo(tableName, rec);
+            numAttr = rec.getAttrCnt();
+            attrTypes = new AttrType[numAttr];
+            sizeArr = new short[numAttr];
 
+            ExtendedSystemDefs.MINIBASE_ATTRCAT.getTupleStructure(tableName, numAttr, attrTypes, sizeArr);
+            t = new Tuple();
+            t.setHdr((short) numAttr, attrTypes, sizeArr);
 
+            assert keyIndexAttr <= numAttr;
+            btf = new BTreeClusteredFile(indexFile, attrTypes[keyIndexAttr-1].attrType, STR_SIZE, 1, sortedHeapFile, attrTypes, sizeArr,keyIndexAttr, multiplier);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
 
+        try
+        {
+            t = new Tuple(tuple.getTupleByteArray(), tuple.getOffset(), tuple.getLength());
+            t.setHdr((short) numAttr, attrTypes, sizeArr);
+            btree.KeyClass key = BT.createKeyFromTupleField(t, attrTypes, sizeArr, keyIndexAttr , BTREE_CLUSTERED_ORDER);
+            btf.insertTuple(tuple, key, keyIndexAttr, BTREE_CLUSTERED_ORDER);
+        } catch (Exception e) {
+            System.err.println(e);
+            status = FAIL;
+        }
 
+        return status;
+    }
 
     private static boolean createClusteredBtreeIndex(String tableName, int keyIndexAttr) {
         boolean status = OK;
@@ -595,7 +629,7 @@ public class Phase3Driver implements GlobalConst {
         BTreeClusteredFile btf = null;
         String indexFile = Phase3Utils.getClusteredBtreeIndexName(tableName, keyIndexAttr);
         String sortedHeapFile = Phase3Utils.getClusteredBtreeHeapName(tableName, keyIndexAttr);
-        System.out.println("Btree Clustered Index file name :" + indexFile);
+        //System.out.println("Btree Clustered Index file name :" + indexFile);
         int multiplier = -1;
         try {
             int numAttr = 0;

@@ -250,8 +250,7 @@ public class BTreeClusteredFile extends ClusteredIndexFile
         }
 
         dbname = new String(filename);
-        //heapfile =  new Heapfile(heapFileName);
-        heapfile = null;
+        heapfile =  new Heapfile(heapFileName);
         attrTypes = attributeTypes;
         attrSizes = attributeSizes;
         indexField = fieldNumber;
@@ -1848,14 +1847,14 @@ public class BTreeClusteredFile extends ClusteredIndexFile
             SystemDefs.JavabaseBM.pinPage(pageId, (Page)hfPage, false);
             if(hfPage.available_space() >= tuple.size())
             {
-                System.out.println("adding on existing page");
+                //System.out.println("adding on existing page");
                 rid =  hfPage.insertRecord(tuple.getTupleByteArray());
             }
             else {
                 DataPageInfo dataPageInfo = new DataPageInfo();
                 HFPage pageToAttach= heapfile._newDatapage(dataPageInfo);
 
-                System.out.println("New page created " + pageToAttach.getCurPage().pid + " " +pageToAttach.available_space());
+                //System.out.println("New page created " + pageToAttach.getCurPage().pid + " " +pageToAttach.available_space());
 
                 heapfile.add_page_entry(dataPageInfo);
 
@@ -1887,7 +1886,7 @@ public class BTreeClusteredFile extends ClusteredIndexFile
                 }
 
                 //Now new page is created, Add this entry to Index
-                insert(new FloatKey(temp2.getFloFld(fieldNumber)), pageToAttach.getCurPage());
+                insert(key2, pageToAttach.getCurPage());
                 //SystemDefs.JavabaseBM.unpinPage(pageToAttach.getCurPage(), true);
             }
 
@@ -1912,7 +1911,7 @@ public class BTreeClusteredFile extends ClusteredIndexFile
 
         int totalTuples = (MINIBASE_PAGESIZE) / tupleSize;
         int half = totalTuples / 2;
-        System.out.println("Total records "  + totalTuples +" half "+ half);
+        //System.out.println("Total records "  + totalTuples +" half "+ half);
 
         while (half > 0 && rid != null){
             rid = existingPage.nextRecord(rid);
@@ -1921,7 +1920,7 @@ public class BTreeClusteredFile extends ClusteredIndexFile
 
         while(rid != null)
         {
-            System.out.println("moving a tuple....");
+            //System.out.println("moving a tuple....");
             tuple = existingPage.getRecord(rid);
             newPage.insertRecord(tuple.getTupleByteArray());
             existingPage.deleteRecord(rid);
