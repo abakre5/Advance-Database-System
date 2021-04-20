@@ -347,6 +347,8 @@ public class Phase3Driver implements GlobalConst {
                 /* insert tuple into heapfile */
                 try {
                     rid = tableHeapFile.insertRecord(t.getTupleByteArray());
+                    insertIntoIndex(tableName, numAttribs, rid, t);
+                    System.out.println("Inserted data");
                 } catch (Exception e) {
                     System.err.println("*** error in Heapfile.insertRecord() ***");
                     status = FAIL;
@@ -379,6 +381,82 @@ public class Phase3Driver implements GlobalConst {
 
 
         return status;
+    }
+
+    private static void insertIntoIndex(String tableName, int numAttr, RID rid, Tuple t) {
+        for(int i=1; i<=numAttr; i++) {
+
+            if(Phase3Utils.isIndexExists(tableName,i, new IndexType(IndexType.B_ClusteredIndex))) {
+                
+                //
+
+
+            }
+
+            if(Phase3Utils.isIndexExists(tableName,i, new IndexType(IndexType.Hash))) {
+                InsertIntoUnclusteredHashIndex(tableName, numAttr, i, rid, t);
+            }
+
+            if(Phase3Utils.isIndexExists(tableName,i, new IndexType(IndexType.Clustered_Hash))) {
+
+            }
+
+
+        }
+
+    }
+
+    private static void InsertIntoUnclusteredHashIndex(String tableName, int numAttr,int indexAttr, RID rid, Tuple insertEntry) {
+
+        try {
+                Tuple t = null;
+                HashFile hf = null;
+                RelDesc rec = new RelDesc();
+                AttrType[] attrTypes = null;
+                short[] sizeArr = null;
+                String indexFile = Phase3Utils.getUnclusteredHashIndexName(tableName, indexAttr);
+                System.out.println("Unclustered Hash Index file name :" + indexFile);
+                System.out.println("Index Field "+ indexAttr);
+                try {
+                IteratorDesc iteratorDesc = Phase3Utils.getTableItr(tableName);
+                Heapfile dbHeapFile = new Heapfile(tableName);
+                int num_records = dbHeapFile.getRecCnt();
+                System.out.println("Records:-> "+ num_records);
+                
+                numAttr = 0;
+                ExtendedSystemDefs.MINIBASE_RELCAT.getInfo(tableName, rec);
+                numAttr = rec.getAttrCnt();
+                attrTypes = new AttrType[numAttr];
+                sizeArr = new short[numAttr];
+
+                ExtendedSystemDefs.MINIBASE_ATTRCAT.getTupleStructure(tableName, numAttr, attrTypes, sizeArr);
+                t = new Tuple();
+                t.setHdr((short) numAttr, attrTypes, sizeArr);
+                Tuple addEntry = new Tuple(insertEntry.getTupleByteArray(), insertEntry.getOffset(),insertEntry.getLength());
+                addEntry.setHdr((short)numAttr, attrTypes, sizeArr);
+
+                assert indexAttr <= numAttr;
+                
+
+                int indexAttrType = attrTypes[indexAttr-1].attrType;
+                hf = new HashFile(tableName,indexFile, indexAttr, indexAttrType, num_records, dbHeapFile, iteratorDesc.getAttrType(), iteratorDesc.getStrSizes(),iteratorDesc.getNumAttr());
+                
+                System.out.println("Printing unclustered hashIndex");
+                //hf.printindex();
+
+                if(indexAttrType == AttrType.attrInteger) {
+                    hf.insert(new IntegerKey(addEntry.getIntFld(indexAttr)), rid);
+                } else if(indexAttrType == AttrType.attrString) {
+                    hf.insert(new StringKey(addEntry.getStrFld(indexAttr)), rid);
+                }
+
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        } catch(Exception e){
+            e.printStackTrace();
+        }
+
     }
 
     private static boolean createClusteredHashIndex(String tableName, int keyIndexAttr) {
@@ -935,6 +1013,7 @@ public class Phase3Driver implements GlobalConst {
             
             System.out.println("Printing unclustered hashIndex");
             hf.printindex();
+            hf.printMetadataFile();
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -1472,6 +1551,7 @@ public class Phase3Driver implements GlobalConst {
                     
                     if(Phase3Utils.isIndexExists(tableName, indexAttr, new IndexType(IndexType.Hash) )) {
                         printUnclusteredHashIndex(tableName, indexAttr);
+    
 
                     } else if(!Phase3Utils.isIndexExists(tableName, indexAttr, new IndexType(IndexType.Hash) )){
                         System.out.println("No unclustered hash index");
