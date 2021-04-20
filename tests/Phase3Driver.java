@@ -489,12 +489,13 @@ public class Phase3Driver implements GlobalConst {
         Tuple t = new Tuple();
         int numDelTuples = 0;
         List<Tuple> delTuples = new ArrayList<Tuple>();
+        String separator = ",";
 
         try (BufferedReader br = new BufferedReader(new FileReader(fileName))) {
             String line;
             line = br.readLine();
             /* Get the number of attributes from first line of input data file */
-            numAttribs = Integer.parseInt(line.trim());
+            numAttribs = Integer.parseInt(line.trim().split(separator)[0]);
             //System.out.println("Number of data attributes: " + numAttribs);
             attrTypes = new AttrType[numAttribs];
 
@@ -508,7 +509,7 @@ public class Phase3Driver implements GlobalConst {
             int numStringAttr = 0;
             for (int i = 0; i < numAttribs; ++i) {
                 schemaInfo[i] = br.readLine().trim();
-                attrInfo = schemaInfo[i].split("\\s+");
+                attrInfo = schemaInfo[i].split(separator);
                 fieldNames[i] = attrInfo[0];
 
                 if (attrInfo[1].equalsIgnoreCase("INT")) {
@@ -518,7 +519,8 @@ public class Phase3Driver implements GlobalConst {
                     numStringAttr++;
                 }
             }
-            System.out.println("delete_data_schema" + Arrays.toString(schemaInfo));
+            System.out.println("delete_data fields: " + Arrays.toString(fieldNames));
+            System.out.println("delete_data types: " + Arrays.toString(attrTypes));
 
             short[] strSizes = new short[numStringAttr];
             for (int i = 0; i < strSizes.length; ++i) {
@@ -604,7 +606,7 @@ public class Phase3Driver implements GlobalConst {
 
             while ((line = br.readLine()) != null) {
                 /* read each line from the file, create tuple, and insert into DB */
-                String row[] = line.trim().split("\\s+");
+                String row[] = line.trim().split(separator);
                 //System.out.println(Arrays.toString(row));
 
                 for (int i = 0; i < numAttribs; ++i) {
@@ -660,13 +662,13 @@ public class Phase3Driver implements GlobalConst {
                     numRowsDeleted++;
                 }
             }
+
+            //scan.closescan();
         } catch (Exception e) {
             System.err.println("*** error: " + e);
             e.printStackTrace();
             status = FAIL;
         }
-
-        scan.closescan();
 
         if (status && (numRowsDeleted != 0)) {
             /* flush pages to disk */
@@ -819,6 +821,84 @@ public class Phase3Driver implements GlobalConst {
 
     }
 
+    private static boolean openExistingUnclusteredIndex(String tableName, int indexType, int indexAttr) {
+        try {
+            int num_records = 1999;
+            Heapfile dbHeapFile = new Heapfile(tableName);
+            IteratorDesc iteratorDesc = Phase3Utils.getTableItr(tableName);
+            HashFile hf = null;
+            hf = new HashFile(tableName,"hashIndex", 1, AttrType.attrString, num_records, dbHeapFile, iteratorDesc.getAttrType(), iteratorDesc.getStrSizes(),iteratorDesc.getNumAttr());
+            hf.printMetadataFile();
+            
+            
+            Tuple findEntry = new Tuple();
+            AttrType[] dataFormat = new AttrType[3];
+            dataFormat[0] = new AttrType(AttrType.attrString);
+            dataFormat[1] = new AttrType(AttrType.attrInteger);
+            dataFormat[2] = new AttrType(AttrType.attrInteger);
+            short[] strdatasize = new short[1];
+            strdatasize[0] = 32;
+            findEntry.setHdr((short)3, dataFormat, strdatasize);
+            findEntry.setStrFld(1, "9aaaaaaaa");
+            findEntry.setIntFld(2, 4);
+            findEntry.setIntFld(3, 10);
+
+            System.out.println("Scanning test again\n");
+            
+            int elem_count = 0;
+            HashIndexFileScan hashScan = new HashUnclusteredFileScan();
+            hash.KeyClass key = null;
+            try {
+            hashScan = (HashUnclusteredFileScan)IndexUtils.HashUnclusteredScan(hf);
+           
+            hash.KeyDataEntry entry = hashScan.get_next();
+                while(entry!=null) {
+                    if(entry!=null) {
+                    RID fetchRID = entry.data;
+                    Tuple t = dbHeapFile.getRecord(fetchRID);
+                    Tuple current_tuple = new Tuple(t.getTupleByteArray(), t.getOffset(),t.getLength());
+
+                    current_tuple.setHdr((short)3, dataFormat, strdatasize);
+                    elem_count++;
+                    entry = hashScan.get_next();
+                
+                
+                System.out.println("\n\n");
+                }
+            }
+            System.out.println("Total elements scanned again "+ elem_count);
+        } catch(Exception e) {
+            e.printStackTrace();
+        }
+
+
+            System.out.println("Search Test\n");
+            //hf.printHeaderFile();
+            //hf.printindex();
+            //Tuple searchTup = hf.search(new StringKey("9aaaaaaaa"));
+            Tuple searchTup = hf.search(findEntry);
+            
+            if(searchTup!=null) {
+                        Tuple current_tuple = new Tuple(searchTup.getTupleByteArray(), searchTup.getOffset(),searchTup.getLength());
+                        current_tuple.setHdr((short)3, dataFormat, strdatasize);
+                        System.out.println("Found first matched tuple again");
+                        System.out.println(current_tuple.getStrFld(1)+" " + current_tuple.getIntFld(2)+ " " +current_tuple.getIntFld(3));
+            }
+
+            boolean flag = hf.delete(findEntry);
+            if(flag)
+            {   
+                System.out.println("Deleted Successfully");
+            }
+
+
+            hf.printMetadataFile();
+        } catch(Exception e) {
+            e.printStackTrace();
+        }
+        return true;
+    }
+
     private static boolean createUnclusteredIndex(String tableName, int indexType, int indexAttr) {
         boolean status = OK;
         PrintWriter writer = null;
@@ -842,14 +922,7 @@ public class Phase3Driver implements GlobalConst {
             IteratorDesc iteratorDesc = Phase3Utils.getTableItr(tableName);
             Heapfile dbHeapFile = new Heapfile(tableName);
             HashFile hf = null;
-                /**
-                 *
-                 *
-                 * HASH
-                 *
-                 *
-                 */
-            hf = new HashFile(tableName,"hashIndex", 2, AttrType.attrInteger, iteratorDesc.getScan(), num_records, dbHeapFile, iteratorDesc.getAttrType(), iteratorDesc.getStrSizes(),iteratorDesc.getNumAttr());
+            hf = new HashFile(tableName,"hashIndex", 1, AttrType.attrString, iteratorDesc.getScan(), num_records, dbHeapFile, iteratorDesc.getAttrType(), iteratorDesc.getStrSizes(),iteratorDesc.getNumAttr());
             System.out.println("Created unclustered hash index");
             System.out.println("Starting insert test");
 
@@ -874,18 +947,19 @@ public class Phase3Driver implements GlobalConst {
     
                     rid = dbHeapFile.insertRecord(data.getTupleByteArray());
     
-                    //hf.insert(new hash.StringKey(data.getStrFld(1)), rid);
-                    hf.insert(new hash.IntegerKey(data.getIntFld(2)), rid);
+                    hf.insert(new hash.StringKey(data.getStrFld(1)), rid);
+                    //hf.insert(new hash.IntegerKey(data.getIntFld(2)), rid);
                     count++;
                     System.out.println("Inserted phase 3 "+ data.getIntFld(2));
     
                
             } while (count <= 40);
-            hf.printindex();
+            
             
             System.out.println("Inserted "+ count+" tuples");
-
-
+            
+            //hf.printMetadataFile();
+            ///hf.printHeaderFile();
 
                 System.out.println("\n\n====Scanner starting");
                 try {
@@ -904,8 +978,6 @@ public class Phase3Driver implements GlobalConst {
                     while(entry!=null) {
                         if(entry!=null) {
                         RID fetchRID = entry.data;
-                       
-                        //System.out.println("\n\n Output :"+fetchRID.pageNo.pid + " "+fetchRID.slotNo);
                         Tuple t = dbHeapFile.getRecord(fetchRID);
                         Tuple current_tuple = new Tuple(t.getTupleByteArray(), t.getOffset(),t.getLength());
                         AttrType[] dataFormat = new AttrType[3];
@@ -916,11 +988,6 @@ public class Phase3Driver implements GlobalConst {
                         strdatasize[0] = 32;
 
                         current_tuple.setHdr((short)3, dataFormat, strdatasize);
-                        IntegerKey iKey =(IntegerKey) ((hash.KeyDataEntry)entry).key;
-                        Integer intKey = iKey.getKey();
-
-                        //System.out.println(current_tuple);
-                        writer.println("Key "+ intKey +" RID: "+fetchRID.pageNo.pid + ":"+fetchRID.slotNo);
                         elem_count++;
                         entry = hashScan.get_next();
                     
@@ -932,7 +999,9 @@ public class Phase3Driver implements GlobalConst {
             } catch(Exception e) {
                 e.printStackTrace();
             }
-            
+           // hf.printHeaderFile();
+
+
             Tuple findEntry = new Tuple();
             AttrType[] dataFormat = new AttrType[3];
             dataFormat[0] = new AttrType(AttrType.attrString);
@@ -941,13 +1010,13 @@ public class Phase3Driver implements GlobalConst {
             short[] strdatasize = new short[1];
             strdatasize[0] = 32;
             findEntry.setHdr((short)3, dataFormat, strdatasize);
-            findEntry.setStrFld(1, "6aaaaaaasss");
+            findEntry.setStrFld(1, "9aaaaaaaa");
             findEntry.setIntFld(2, 4);
-            findEntry.setIntFld(3, 1);
+            findEntry.setIntFld(3, 10);
 
-            writer.println("Search Test\n");
-            // hf.printHeaderFile();
-            // hf.printindex();
+            System.out.println("Search Test\n");
+            //hf.printHeaderFile();
+            //hf.printindex();
             //Tuple searchTup = hf.search(new StringKey("9aaaaaaaa"));
             Tuple searchTup = hf.search(findEntry);
             
@@ -962,11 +1031,12 @@ public class Phase3Driver implements GlobalConst {
             boolean flag = hf.delete(findEntry);
             if(flag)
             {   
-                System.out.println("Deleted Successfully");
+                System.out.println("Deleted Successfully again");
             }
             //hf.printindex();
-            hf.printHeaderFile();
-            hf.printMetadataFile();
+            //hf.printHeaderFile();
+            //hf.printMetadataFile();
+            // hf.printHeaderFile();
 
 
         } catch (Exception e){
@@ -1184,7 +1254,8 @@ public class Phase3Driver implements GlobalConst {
                     int indexType = indexTypeStr.equalsIgnoreCase("btree") ? IndexType.B_Index : IndexType.Hash;
                     int indexAttr = Integer.parseInt(indexAttrStr);
                     createUnclusteredIndex(tableName, indexType, indexAttr);
-
+                    System.out.println("Check existing hash\\n");
+                    openExistingUnclusteredIndex(tableName, indexType, indexAttr);
 
                     break;
                 }
@@ -1483,22 +1554,11 @@ public class Phase3Driver implements GlobalConst {
 
     private static boolean deleteDataFromTable(String tableName, String filename) {
         boolean status = false;
-        try {
-            status = deleteData(tableName, filename);
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-        if (status) {
-            /* flush pages to disk */
-            try {
-                SystemDefs.JavabaseBM.flushAllPages();
-            } catch (PagePinnedException ignored) {
 
-            } catch (Exception e) {
-                System.err.println("*** error flushing pages to disk");
-                e.printStackTrace();
-                status = FAIL;
-            }
+        status = deleteFromTable(tableName, filename);
+
+        if (status) {
+            flushToDisk();
             System.out.println();
         }
         return status;
@@ -1776,6 +1836,9 @@ public class Phase3Driver implements GlobalConst {
                 String[] fieldNames = new String[nJoinAttr];
                 for (int i=0; i<nOuterAttr; i++) {
                     fieldNames[i] = outerTableName+"."+outerAttrs[i].attrName;
+                }
+
+                for (int i=0; i<nInnerAttr; i++) {
                     fieldNames[nOuterAttr+i] = innerTableName+"."+innerAttrs[i].attrName;
                 }
 
@@ -1796,6 +1859,11 @@ public class Phase3Driver implements GlobalConst {
 
                 cnt++;
                 tt = joinItr.get_next();
+            }
+
+            // Persist the output table to disk
+            if (outputTable != null) {
+                flushToDisk();
             }
 
             System.out.println("\nNumber of joined rows: "+cnt);

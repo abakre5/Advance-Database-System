@@ -43,7 +43,7 @@ public class HashUnclusteredFileScan extends HashIndexFileScan implements Global
                     return null;
                 }
             currentBucketName = header_names.peek();
-                //header_names.size();
+            header_names.size();
             //System.out.println("Scanning Size "+header_names.size() +currentBucketName);
             bucket = new Heapfile(currentBucketName);
             bucketEntryCnt = bucket.getRecCnt();

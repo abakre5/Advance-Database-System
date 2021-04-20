@@ -58,16 +58,45 @@ public class HashFile extends IndexFile implements GlobalConst {
 
 
     //Constructor
-    public HashFile(String relationName,String hashFileName, int indexField, int keyType, Heapfile dbfile) throws IOException, HFException, HFDiskMgrException, HFBufMgrException,
+    public HashFile(String relationName,String hashFileName, int indexField, int keyType,int num_records, Heapfile dbfile, AttrType[] attributeTypes, short[] AttrSize, int numAttr) throws IOException, HFException, HFDiskMgrException, HFBufMgrException,
     InvalidTupleSizeException,InvalidSlotNumberException {
 
+        //Logger for storing input path. (Scanning input relation) (Issue : Logger exits before code)
+        try {
+            writer = new PrintWriter("Input_data_entry_log"+Math.random(), "UTF-8");
+       } catch (Exception e) {
+           e.printStackTrace();
+       }
+         /* This should not be hardcoded, received wrong AttrTypes from Hash file Iterator*/
+         AttrType[] dataFormat = new AttrType[3];
+         dataFormat[0] = new AttrType(AttrType.attrString);
+         dataFormat[1] = new AttrType(AttrType.attrInteger);
+         dataFormat[2] = new AttrType(AttrType.attrInteger);
+         short[] strdatasize = new short[1];
+         strdatasize[0] = 32;
+ 
+ 
+         attrs = dataFormat;
+         attrSizes = strdatasize;
+         indexkeyType = keyType;
+         numAttribs = 3;
+         indexAttr = indexField;
+         try{
+             DBScan = getDBFileScan(relationName);
+         } catch(Exception e){
+             e.printStackTrace();
+         }
+         
         hashIndexName = hashFileName;
         datafile = dbfile;
         headerFile = new Heapfile(hashIndexName);
         metadataFile = metadataFile + "_" +hashFileName;
         indexAttr = indexField ;
         populateMap();
+        //Loads the metadata file as well.
+        printMetadataFile();
 
+   
 
     }
 
@@ -102,7 +131,7 @@ public class HashFile extends IndexFile implements GlobalConst {
         }
         
         
-       
+       //Logger for storing input path. (Scanning input relation) (Issue : Logger exits before code)
         try {
             writer = new PrintWriter("Input_data_entry_log"+Math.random(), "UTF-8");
        } catch (Exception e) {
@@ -187,7 +216,7 @@ public class HashFile extends IndexFile implements GlobalConst {
         
         //Populate headerFile entries.
         for (Map.Entry<Integer, String> set : map.entrySet()) {
-		    System.out.println(set.getKey() + " == " + set.getValue());
+		   // System.out.println(set.getKey() + " == " + set.getValue());
 
             try {
                 h.setIntFld(1, (int)set.getKey());
@@ -205,7 +234,7 @@ public class HashFile extends IndexFile implements GlobalConst {
 
 		}
 
-
+        
         //Let's iterate through data file and try inserting data in individual buckets.
         TupleRIDPair dataPair;
         Tuple data = null;
@@ -231,7 +260,7 @@ public class HashFile extends IndexFile implements GlobalConst {
        
    
         while(data !=null) {
-            System.out.println("Scanning data file for insert bucket");
+            //System.out.println("Scanning data file for insert bucket");
             
             if(keyType == stringField) {
             String value = null;
@@ -242,13 +271,16 @@ public class HashFile extends IndexFile implements GlobalConst {
                 bucket = get_string_hash(value);
                 
                 bucket_name = map.get(bucket);
+                if(bucket_name == null) {
+                   System.out.println("Bucket Num "+bucket);
+                }
                 //System.out.println("Bucket Name is --> "+ bucket_name);
             } catch (Exception e) {
                 e.printStackTrace();
             }
 
             try {
-
+                
                 Heapfile bucketFile = new Heapfile(bucket_name);
                 Tuple bucketEntry = new Tuple();
                 attrSizes = new short[numAttribs];
@@ -263,10 +295,13 @@ public class HashFile extends IndexFile implements GlobalConst {
                 // if(bucket ==0) {
                 //     System.out.println("Insert debug" +value + " "+ rid.pageNo.pid + " "+rid.slotNo);
                 // }
-
+                rid = null;
                 rid = bucketFile.insertRecord(bucketEntry.getTupleByteArray());
                 //System.out.println("Insert debug " + bucket_name + " "+value + " "+ rid.pageNo.pid + " "+rid.slotNo);
-                ii++;
+                if(rid!=null){
+                    ii++;
+                }
+               
                 dataPair = scan.get_next1();
                 if (dataPair!=null) {
                     data = dataPair.getTuple();
@@ -292,13 +327,16 @@ public class HashFile extends IndexFile implements GlobalConst {
                 bucket = get_int_hash(value);
                 
                 bucket_name = map.get(bucket);
+                if(bucket_name == null) {
+                    System.out.println("Null bucket name");
+                }
                 //System.out.println("Bucket Name is --> "+ bucket_name);
             } catch (Exception e) {
                 e.printStackTrace();
             }
 
             try {
-
+                
                 Heapfile bucketFile = new Heapfile(bucket_name);
                 Tuple bucketEntry = new Tuple();
                 bucketEntry.setHdr((short)3,Ptypes, entrySizes);
@@ -309,7 +347,7 @@ public class HashFile extends IndexFile implements GlobalConst {
                 // if(bucket ==0) {
                 //     System.out.println("Insert debug" +value + " "+ rid.pageNo.pid + " "+rid.slotNo);
                 // }
-
+                rid = null;
                 rid = bucketFile.insertRecord(bucketEntry.getTupleByteArray());
                 //System.out.println("Insert debug" +value + " "+ rid.pageNo.pid + " "+rid.slotNo);
                 ii++;
@@ -350,7 +388,7 @@ public class HashFile extends IndexFile implements GlobalConst {
         dumpMetadata(globalSplit, num_buckets, N, n, total_records, split_position, indexAttr);
        // printMetadataFile();
         //System.out.println("========================");
-        printHeaderFile();
+        //printHeaderFile();
 
     
 	}
@@ -976,7 +1014,7 @@ public class HashFile extends IndexFile implements GlobalConst {
         }
         int total_count = 0;
         for (Map.Entry<Integer, String> set : map.entrySet()) {
-		    System.out.println(set.getKey() + " = " + set.getValue());
+		    //System.out.println(set.getKey() + " = " + set.getValue());
             try {
                 Heapfile h = new Heapfile(set.getValue());
                 writer.println("Printing :"+set.getValue());
@@ -1168,6 +1206,7 @@ public class HashFile extends IndexFile implements GlobalConst {
                         deleted = true;
                         iterate = false;
                     } else{
+                        //TODO check if need to dump metadata
                         System.out.println("DEBUG: Record present in index but could not be deleted from data file");
                         return false;
                     }
@@ -1364,7 +1403,7 @@ public class HashFile extends IndexFile implements GlobalConst {
             try {
                
                 if(indexkeyType == integerField) {
-                        System.out.println("Searching int..."+ tuple.getIntFld(1));
+                        //System.out.println("Searching int..."+ tuple.getIntFld(1));
 
                         if(tuple.getIntFld(1) == intkey) {
                             //System.out.println("Key: "+ tuple.getFloFld(1) + ", "+ tuple.getIntFld(2)+ ":"+tuple.getIntFld(3));
@@ -1379,7 +1418,7 @@ public class HashFile extends IndexFile implements GlobalConst {
                             System.out.println("DEBUG Tup: "+ current_tuple.getIntFld(2)+ ":"+current_tuple.getIntFld(3));
                             if(TupleUtils.Equal(current_tuple, searchEntry, attrs, 3)) {
                                 System.out.println("Found the entry");
-                                
+
                                 if(isDelete) {
                                     writer.println("Deleting entry from index");
                                     Heapfile bucket = new Heapfile(bucketFile);
@@ -1396,15 +1435,15 @@ public class HashFile extends IndexFile implements GlobalConst {
                             }
                             return rid;
                         } else {
-                            System.out.println("Next entry");
+                            //System.out.println("Next entry");
                         }
     
                         
                     } 
                 } else if(indexkeyType == stringField) {
-                        System.out.println("Searching str...");
-                        if(tuple.getStrFld(1) == strkey) {
-                            //System.out.println("Key: "+ tuple.getFloFld(1) + ", "+ tuple.getIntFld(2)+ ":"+tuple.getIntFld(3));
+                        //System.out.println("Searching str... "+ tuple.getStrFld(1)+ "looking for: "+strkey);
+                        if(tuple.getStrFld(1).equals(strkey)) {
+                            //System.out.println("Key: "+ tuple.getStrFld(1) + ", "+ tuple.getIntFld(2)+ ":"+tuple.getIntFld(3));
                             rid = new RID();
                             rid.pageNo.pid = tuple.getIntFld(2);
                             rid.slotNo = tuple.getIntFld(3);
@@ -1412,7 +1451,7 @@ public class HashFile extends IndexFile implements GlobalConst {
                             Tuple t = datafile.getRecord(rid);
                             Tuple current_tuple = new Tuple(t.getTupleByteArray(), t.getOffset(),t.getLength());
                             current_tuple.setHdr((short)3, dataFormat, strdatasize);
-
+                            System.out.println("DEBUG Tup: "+ current_tuple.getIntFld(2)+ ":"+current_tuple.getIntFld(3));
                             if(TupleUtils.Equal(current_tuple, searchEntry, attrs, 3)) {
                                 System.out.println("Found the tuple");
                                 if(isDelete) {
@@ -1431,7 +1470,7 @@ public class HashFile extends IndexFile implements GlobalConst {
                                 
                                 return rid;
                             } else {
-                                System.out.println("Next entry");
+                                //System.out.println("Next entry");
                             }
                     }
 
@@ -1480,11 +1519,12 @@ public class HashFile extends IndexFile implements GlobalConst {
     }
 
     public int get_string_hash(String value) {  
+        int val = get_ascii(value);
         if(split) {
             System.out.println("Split hash function in action");
-            return (value.hashCode() % (2*N));
+            return (val % (2*N));
         }
-        return (value.hashCode() % N);
+        return (val % N);
     }
 
     public int get_int_hash(Integer value) {  
@@ -1495,6 +1535,14 @@ public class HashFile extends IndexFile implements GlobalConst {
         return (value% N);
     }
 
+    public int get_ascii(String str) {
+        int asciiValue = 0;
+        for(int i=0; i<str.length(); i++) {
+            asciiValue = str.charAt(i);
+            //System.out.println(str.charAt(i) + "=" + asciiValue);
+        }
+        return asciiValue;
+    }
     public void HashFileTestFunct() throws IOException {
         
     }
