@@ -529,12 +529,14 @@ public class BT implements GlobalConst {
 
         Tuple temp = new Tuple(t.getTupleByteArray(), t.getOffset(), t.getLength());
         temp.setHdr((short) attrTypes.length, attrTypes, attrSizes);
+        AttrType[] attrs = new AttrType[attrTypes.length];
+        //attrs[0] = new AttrType()
 
-        if(attrTypes[fieldNumber].attrType == AttrType.attrReal){
+        if(attrTypes[fieldNumber-1].attrType == AttrType.attrReal){
             key = new FloatKey(temp.getFloFld(fieldNumber) * multiplier);
-        }else if(attrTypes[fieldNumber].attrType == AttrType.attrInteger){
+        }else if(attrTypes[fieldNumber-1].attrType == AttrType.attrInteger){
             key = new IntegerKey(temp.getIntFld(fieldNumber) * multiplier);
-        }else if(attrTypes[fieldNumber].attrType == AttrType.attrString){
+        }else if(attrTypes[fieldNumber-1].attrType == AttrType.attrString){
             key = new StringKey(temp.getStrFld(fieldNumber));
         }
 

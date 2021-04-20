@@ -474,7 +474,7 @@ public class Phase3Driver implements GlobalConst {
             t.setHdr((short) numAttr, attrTypes, sizeArr);
 
             assert keyIndexAttr <= numAttr;
-            btf = new BTreeClusteredFile(indexFile, attrTypes[keyIndexAttr].attrType, STR_SIZE, 1, sortedHeapFile, attrTypes, sizeArr,keyIndexAttr, multiplier);
+            btf = new BTreeClusteredFile(indexFile, attrTypes[keyIndexAttr-1].attrType, STR_SIZE, 1, sortedHeapFile, attrTypes, sizeArr,keyIndexAttr, multiplier);
         } catch (Exception e) {
             System.err.println(e);
             e.printStackTrace();
@@ -900,7 +900,9 @@ public class Phase3Driver implements GlobalConst {
 
     }
 
-    private static boolean openExistingUnclusteredIndex(String tableName, int indexType, int indexAttr) {
+    
+    private static boolean openExistingHashUnclusteredIndex(String tableName, int indexType, int indexAttr) {
+
         try {
             
             Tuple t = null;
@@ -1028,7 +1030,7 @@ public class Phase3Driver implements GlobalConst {
 
         if (indexType == IndexType.B_Index) {
             //ExtendedSystemDefs.MINIBASE_INDCAT.addIndex();
-        } else {
+        } else if(indexType == IndexType.Hash){
 
             Tuple t = null;
             HashFile hf = null;
@@ -1392,17 +1394,37 @@ public class Phase3Driver implements GlobalConst {
                     }
                     int indexType = indexTypeStr.equalsIgnoreCase("btree") ? IndexType.B_Index : IndexType.Hash;
                     int indexAttr = Integer.parseInt(indexAttrStr);
-                    createUnclusteredIndex(tableName, indexType, indexAttr);
-                    Phase3Utils.insertIndexEntry(tableName, indexAttr, indexType);
                     
-                    //Following code is just to check whether insert index entry works or not!
-                    System.out.println("Check existing hash\\n");
+                    if(!Phase3Utils.isIndexExists(tableName, indexAttr, new IndexType(indexType))) {
+                        createUnclusteredIndex(tableName, indexType, indexAttr);
+                        Phase3Utils.insertIndexEntry(tableName, indexAttr, indexType);
+                        System.out.println("Index created ");
+                    } else {
+                        System.out.println("Index already exists on table "+ tableName+" IndexType: "+ new IndexType(indexType).toString() +" indexAttr->"+indexAttr);
+                        //openExistingHashUnclusteredIndex(tableName, indexType, indexAttr);
+                    }
 
-                    //This test function searches and deletes an entry from existing index
-                    openExistingUnclusteredIndex(tableName, indexType, indexAttr);
-                    System.out.println("Scanning for second time");
-
+                    
                     break;
+                }
+                case "output_index":{
+                    if (dbOpen == false) {
+                        System.out.println(cmd + ": no database is open");
+                        break;
+                    }
+                    if (tokens.length < 3) {
+                        System.out.println(cmd + ": insufficient arguments");
+                        break;
+                    }
+                    System.out.println(tokens.length);
+                    int i = tokens.length;
+                    while(i>0) {
+                        System.out.println(tokens[i-1]);
+                        i--;
+                    }
+                    break;
+
+
                 }
                 case "prev": {
                     System.out.println(getPrevCmd());
