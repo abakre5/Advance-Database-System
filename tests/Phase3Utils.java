@@ -298,7 +298,7 @@ public class Phase3Utils {
             Tuple tuple;
             while ((tuple = indexMetaDataFileScan.get_next()) != null) {
                 if (tuple.getStrFld(1).equals(relationName)) {
-                    indexes.add(new TableIndexDesc(tuple.getIntFld(2), tuple.getIntFld(2)));
+                    indexes.add(new TableIndexDesc(tuple.getIntFld(3), tuple.getIntFld(2)));
                 }
             }
         } catch (Exception e) {

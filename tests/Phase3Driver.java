@@ -1875,6 +1875,7 @@ public class Phase3Driver implements GlobalConst {
                         //openExistingHashUnclusteredIndex(tableName, indexType, indexAttr);
                     }
 
+                    flushToDisk();
                     
                     break;
                 }

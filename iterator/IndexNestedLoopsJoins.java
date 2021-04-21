@@ -12,9 +12,13 @@ import index.IndexException;
 import index.IndexScan;
 import index.IndexUtils;
 import tests.Phase3Utils;
+import tests.TableIndexDesc;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.List;
+
+import static tests.Phase3Utils.*;
 
 /**
  * This file contains an implementation of Index Nested Loops Join
@@ -43,6 +47,7 @@ public class IndexNestedLoopsJoins extends Iterator {
     private NestedLoopsJoins nlj;
     private boolean isHash = false;
     private AttrType[] Jtypes;
+    private String indexFileName;
 
     /**
      * constructor
@@ -141,16 +146,50 @@ public class IndexNestedLoopsJoins extends Iterator {
 //            }
 //        }
 
-        PageId headerPageId = get_file_entry("boatIndex");
-        if (headerPageId == null) //file not exist
-        {
+//        PageId headerPageId = get_file_entry("boatIndex");
+//        if (headerPageId == null) //file not exist
+//        {
+//            nlj = new NestedLoopsJoins(in1, len_in1, t1_str_sizes, in2,
+//                    len_in2, t2_str_sizes, amt_of_mem, am1,
+//                    relationName, outFilter, rightFilter, proj_list, n_out_flds);
+//        } else {
+//            // todo: delete before commit
+//            isHash = true;
+//            nlj = null;
+//        }
+
+        int joinFldInner = OutputFilter[0].operand2.symbol.offset;
+        List<TableIndexDesc> indexList = getIndexesOnTable(_relationName);
+        if (indexList.isEmpty()) {
             nlj = new NestedLoopsJoins(in1, len_in1, t1_str_sizes, in2,
                     len_in2, t2_str_sizes, amt_of_mem, am1,
                     relationName, outFilter, rightFilter, proj_list, n_out_flds);
         } else {
-            // todo: delete before commit
             isHash = true;
-            nlj = null;
+            boolean isJoinAttr = false; // Checks if index is on the join attribute
+            for (TableIndexDesc desc : indexList) {
+                if (desc.getAttributeIndex() == joinFldInner) {
+                    isJoinAttr = true;
+
+                    // Go with B-index if possible, since it supports duplicates
+                    if (desc.getType() == IndexType.B_Index) {
+                        isHash = false;
+                    }
+                }
+            }
+
+            if (!isJoinAttr) {
+                nlj = new NestedLoopsJoins(in1, len_in1, t1_str_sizes, in2,
+                        len_in2, t2_str_sizes, amt_of_mem, am1,
+                        relationName, outFilter, rightFilter, proj_list, n_out_flds);
+            } else {
+                nlj = null;
+                if (!isHash) {
+                    indexFileName = Phase3Utils.getUnClusteredBtreeIndexName(_relationName, joinFldInner);
+                } else {
+                    indexFileName = Phase3Utils.getUnclusteredHashIndexName(_relationName, joinFldInner);
+                }
+            }
         }
     }
 
@@ -199,7 +238,7 @@ public class IndexNestedLoopsJoins extends Iterator {
     public Tuple get_next() throws IOException, JoinsException, IndexException, InvalidTupleSizeException, InvalidTypeException, PageNotReadException, TupleUtilsException, PredEvalException, SortException, LowMemException, UnknowAttrType, UnknownKeyTypeException, Exception {
         if (nlj != null) {
             return nlj.get_next();
-        } else if (isHash == true) {
+        } else if (isHash) {
             return hashGetNext();
         } else {
             if (done)
@@ -263,7 +302,7 @@ public class IndexNestedLoopsJoins extends Iterator {
                     try {
 
                         inner = new IndexScan(new IndexType(IndexType.B_Index), _relationName,
-                                "innerIndex", _in2, t2_str_sizescopy, in2_len, in2_len, proj,
+                                indexFileName, _in2, t2_str_sizescopy, in2_len, in2_len, proj,
                                 selects, joinFldInner, false);
                     } catch (Exception e) {
                         throw new IndexNestedLoopException(e, "Cannot get next tuple");
@@ -325,8 +364,8 @@ public class IndexNestedLoopsJoins extends Iterator {
         hash.KeyClass key = null;
 
         try {
-            hashf = new HashFile(_relationName, "boatIndex", joinFldInner, _in2[joinFldInner - 1].attrType,
-                    num_records, heapf, _in2, t2_str_sizescopy, in2_len); // todo: dynamic index name
+            hashf = new HashFile(_relationName, indexFileName, joinFldInner, _in2[joinFldInner - 1].attrType,
+                    num_records, heapf, _in2, t2_str_sizescopy, in2_len);
 
         } catch (Exception e) {
             throw new IndexNestedLoopException(e, "Cannot get next tuple");
@@ -358,14 +397,6 @@ public class IndexNestedLoopsJoins extends Iterator {
                         break;
                     }
                 }
-
-//                FldSpec[] proj = new FldSpec[in2_len];
-//                for (int i = 1; i <= in2_len; i++) {
-//                    proj[i - 1] = new FldSpec(new RelSpec(RelSpec.outer), i);
-//                }
-
-
-
 
             }  // ENDS: if (get_from_outer == TRUE)
 
