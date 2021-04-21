@@ -1,25 +1,23 @@
 package iterator;
 
 import bufmgr.PageNotReadException;
-import catalog.IndexDesc;
 import global.*;
 import heap.*;
 import index.IndexException;
-import org.w3c.dom.Attr;
-import tests.Phase3Utils;
+import tests.TableIndexDesc;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
+
+import static tests.Phase3Utils.getIndexesOnTable;
 
 public class HashJoin extends Iterator {
-    private AttrType _in1[], _in2[];
-    private int in1_len, in2_len;
+    private AttrType outerTypes[], innerTypes[];
+    private int nOuterRecs, nInnerRecs;
     private Iterator outer;
-    private short t2_str_sizescopy[];
-    private short t1_str_sizescopy[];
+    private short innerStrSizes[];
+    private short outerStrSizes[];
     private CondExpr OutputFilter[];
     private CondExpr RightFilter[];
     private int n_buf_pgs;        // # of buffer pages available.
@@ -51,17 +49,17 @@ public class HashJoin extends Iterator {
                     int n_out_flds
     ) throws IOException, NestedLoopException, HashJoinException {
 
-        _in1 = new AttrType[in1.length];
-        _in2 = new AttrType[in2.length];
-        System.arraycopy(in1, 0, _in1, 0, in1.length);
-        System.arraycopy(in2, 0, _in2, 0, in2.length);
-        in1_len = len_in1;
-        in2_len = len_in2;
+        outerTypes = new AttrType[in1.length];
+        innerTypes = new AttrType[in2.length];
+        System.arraycopy(in1, 0, outerTypes, 0, in1.length);
+        System.arraycopy(in2, 0, innerTypes, 0, in2.length);
+        nOuterRecs = len_in1;
+        nInnerRecs = len_in2;
 
 
         outer = am1;
-        t1_str_sizescopy = t1_str_sizes;
-        t2_str_sizescopy = t2_str_sizes;
+        outerStrSizes = t1_str_sizes;
+        innerStrSizes = t2_str_sizes;
         inner_tuple = new Tuple();
         Jtuple = new Tuple();
         OutputFilter = outFilter;
@@ -95,29 +93,32 @@ public class HashJoin extends Iterator {
         }
 
         int joinFldInner = OutputFilter[0].operand2.symbol.offset;
-        int innerIndexCnt = 0;
-        IndexDesc[] innerIndexDescsList = null;
-//        Phase3Utils.checkIndexesOnTable(relationName, len_in2, joinFldInner, innerIndexCnt, innerIndexDescsList);
+        List<TableIndexDesc> indexList = getIndexesOnTable(relationName);
+        boolean hashIndexExists = false;
+        if (!indexList.isEmpty()) {
+            for (TableIndexDesc desc : indexList) {
+                if (desc.getAttributeIndex() == joinFldInner && desc.getType() == IndexType.Hash) {
 
-        if (innerIndexCnt > 0) {
-            IndexDesc joinIndexDesc = innerIndexDescsList[joinFldInner-1];
-            IndexType joinIndexType = joinIndexDesc.getAccessType();
-            if (joinIndexType.indexType == IndexType.Hash) {
-                try {
-                    inlj = new IndexNestedLoopsJoins(in1, len_in1, t1_str_sizes, in2, len_in2, t2_str_sizes, amt_of_mem, am1, relationName,
-                            outFilter, rightFilter, proj_list, n_out_flds);
-                } catch (Exception e) {
-                    throw new HashJoinException(e, "Create IndexNestedLoopJoin iterator failed");
+                    hashIndexExists = true;
                 }
             }
-        } else {
+        }
+
+        if (!hashIndexExists) {
             inlj = null;
             try {
                 createInnerHashPartition();
                 createOuterHashPartition();
                 performHashJoin();
             } catch (Exception e) {
-                throw new HashJoinException(e, "Create new heapfile failed.");
+                throw new HashJoinException(e, "Perform hash join failed.");
+            }
+        } else {
+            try {
+                inlj = new IndexNestedLoopsJoins(in1, len_in1, t1_str_sizes, in2, len_in2, t2_str_sizes, amt_of_mem, am1, relationName,
+                        outFilter, rightFilter, proj_list, n_out_flds);
+            } catch (Exception e) {
+                throw new HashJoinException(e, "Create IndexNestedLoopJoin iterator failed");
             }
         }
     }
@@ -129,21 +130,21 @@ public class HashJoin extends Iterator {
         FileScan fscan = null;
         iHashList = new ArrayList<>();
 
-        FldSpec[] proj = new FldSpec[in2_len];
-        for (int i = 1; i <= in2_len; i++) {
+        FldSpec[] proj = new FldSpec[nInnerRecs];
+        for (int i = 1; i <= nInnerRecs; i++) {
             proj[i - 1] = new FldSpec(new RelSpec(RelSpec.outer), i);
         }
 
         try {
-            fscan = new FileScan(relation, _in2, t2_str_sizescopy, (short) in2_len, in2_len, proj, null);
+            fscan = new FileScan(relation, innerTypes, innerStrSizes, (short) nInnerRecs, nInnerRecs, proj, null);
             data = fscan.get_next();
-            data.setHdr((short) in2_len, _in2, t2_str_sizescopy);
+            data.setHdr((short) nInnerRecs, innerTypes, innerStrSizes);
             int joinFldInner = OutputFilter[0].operand2.symbol.offset;
             int bucket=-1;
             String bucket_name = "";
 
             while(data != null) {
-                switch (_in2[joinFldInner - 1].attrType) {
+                switch (innerTypes[joinFldInner - 1].attrType) {
                     case AttrType.attrInteger:
                         Integer iVal = data.getIntFld(joinFldInner);
                         bucket = get_hash(iVal);
@@ -180,20 +181,20 @@ public class HashJoin extends Iterator {
         FileScan fscan = null;
         oHashList = new ArrayList<>();
 
-        FldSpec[] proj = new FldSpec[in1_len];
-        for (int i = 1; i <= in1_len; i++) {
+        FldSpec[] proj = new FldSpec[nOuterRecs];
+        for (int i = 1; i <= nOuterRecs; i++) {
             proj[i - 1] = new FldSpec(new RelSpec(RelSpec.outer), i);
         }
 
         try {
             data = outer.get_next();
-            data.setHdr((short) in1_len, _in1, t1_str_sizescopy);
+            data.setHdr((short) nOuterRecs, outerTypes, outerStrSizes);
             int joinFldOuter = OutputFilter[0].operand1.symbol.offset;
             int bucket=-1;
             String bucket_name = "";
 
             while(data != null) {
-                switch (_in1[joinFldOuter - 1].attrType) {
+                switch (outerTypes[joinFldOuter - 1].attrType) {
                     case AttrType.attrInteger:
                         Integer iVal = data.getIntFld(joinFldOuter);
                         bucket = get_hash(iVal);
@@ -242,21 +243,21 @@ public class HashJoin extends Iterator {
                     continue;
                 }
 
-                FldSpec[] oProj = getProjection(in1_len);
+                FldSpec[] oProj = getProjection(nOuterRecs);
 
-                FileScan outerScan = new FileScan(outerFileName, _in1, t1_str_sizescopy, (short) in1_len, in1_len, oProj, null);
+                FileScan outerScan = new FileScan(outerFileName, outerTypes, outerStrSizes, (short) nOuterRecs, nOuterRecs, oProj, null);
 
                 // Perform NLJ
-                NestedLoopsJoins nlj = new NestedLoopsJoins(_in1, in1_len, t1_str_sizescopy, _in2,
-                        in2_len, t2_str_sizescopy, n_buf_pgs, outerScan,
+                NestedLoopsJoins nlj = new NestedLoopsJoins(outerTypes, nOuterRecs, outerStrSizes, innerTypes,
+                        nInnerRecs, innerStrSizes, n_buf_pgs, outerScan,
                         innerFileName, OutputFilter, RightFilter, perm_mat,
                         nOutFlds);
 
                 AttrType[] Jtypes = new AttrType[nOutFlds];
                 Tuple t = new Tuple();
                 TupleUtils.setup_op_tuple(t, Jtypes,
-                        _in1, in1_len, _in2, in2_len,
-                        t1_str_sizescopy, t2_str_sizescopy,
+                        outerTypes, nOuterRecs, innerTypes, nInnerRecs,
+                        outerStrSizes, innerStrSizes,
                         perm_mat, nOutFlds);
 
                 Jtuple = nlj.get_next();
@@ -324,6 +325,11 @@ public class HashJoin extends Iterator {
 
     @Override
     public Tuple get_next() throws IOException, JoinsException, IndexException, InvalidTupleSizeException, InvalidTypeException, PageNotReadException, TupleUtilsException, PredEvalException, SortException, LowMemException, UnknowAttrType, UnknownKeyTypeException, Exception {
+        if (inlj != null) {
+            System.out.println("Used INLJ");
+            return inlj.get_next();
+        }
+
         if (done) {
             return null;
         }

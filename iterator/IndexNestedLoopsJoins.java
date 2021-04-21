@@ -10,11 +10,9 @@ import hash.StringKey;
 import heap.*;
 import index.IndexException;
 import index.IndexScan;
-import index.IndexUtils;
 import tests.Phase3Utils;
 import tests.TableIndexDesc;
 
-import java.io.File;
 import java.io.IOException;
 import java.util.List;
 
@@ -27,11 +25,11 @@ import static tests.Phase3Utils.*;
 
 public class IndexNestedLoopsJoins extends Iterator {
 
-    private AttrType _in1[], _in2[];
-    private int in1_len, in2_len;
+    private AttrType outerTypes[], innerTypes[];
+    private int nOuterRecs, nInnerRecs;
     private Iterator outer;
-    private short t1_str_sizescopy[];
-    private short t2_str_sizescopy[];
+    private short outerStrSizes[];
+    private short innerStrSizes[];
     private CondExpr OutputFilter[];
     private CondExpr RightFilter[];
     private int n_buf_pgs;        // # of buffer pages available.
@@ -83,16 +81,16 @@ public class IndexNestedLoopsJoins extends Iterator {
                             FldSpec proj_list[],
                             int n_out_flds
     ) throws IOException, IndexNestedLoopException, GetFileEntryException, NestedLoopException, Catalogindexnotfound, Catalogattrnotfound, Catalogmissparam, Cataloghferror, Catalognomem, IndexCatalogException, Catalogioerror, Catalogrelnotfound, AttrCatalogException {
-        _in1 = new AttrType[in1.length];
-        _in2 = new AttrType[in2.length];
-        System.arraycopy(in1, 0, _in1, 0, in1.length);
-        System.arraycopy(in2, 0, _in2, 0, in2.length);
-        in1_len = len_in1;
-        in2_len = len_in2;
+        outerTypes = new AttrType[in1.length];
+        innerTypes = new AttrType[in2.length];
+        System.arraycopy(in1, 0, outerTypes, 0, in1.length);
+        System.arraycopy(in2, 0, innerTypes, 0, in2.length);
+        nOuterRecs = len_in1;
+        nInnerRecs = len_in2;
 
         outer = am1;
-        t1_str_sizescopy = t1_str_sizes;
-        t2_str_sizescopy = t2_str_sizes;
+        outerStrSizes = t1_str_sizes;
+        innerStrSizes = t2_str_sizes;
         inner_tuple = new Tuple();
         Jtuple = new Tuple();
         OutputFilter = outFilter;
@@ -123,40 +121,6 @@ public class IndexNestedLoopsJoins extends Iterator {
         } catch (Exception e) {
             throw new IndexNestedLoopException(e, "Create new heapfile failed.");
         }
-
-        // TODO: Check if index present on join attr, if yes, check if BTree or Hash
-
-        // Check if index is present on inner relation on given join attribute
-//        int joinFldInner = OutputFilter[0].operand2.symbol.offset;
-//        int indexCnt = 0;
-//        IndexDesc[] indexDescsList = null;
-//        Phase3Utils.checkIndexesOnTable(relationName, len_in2, joinFldInner, indexCnt, indexDescsList);
-//
-//        if (indexCnt == 0) {
-//            nlj = new NestedLoopsJoins(in1, len_in1, t1_str_sizes, in2,
-//                    len_in2, t2_str_sizes, amt_of_mem, am1,
-//                    relationName, outFilter, rightFilter, proj_list, n_out_flds);
-//        } else {
-//            nlj = null;
-//            IndexDesc joinIndexDesc = indexDescsList[0]; // TODO: dynamic karna hai ye bhi bc
-//            System.out.println("Index exists on attr: "+joinFldInner);
-//            IndexType joinIndexType = joinIndexDesc.getAccessType();
-//            if (joinIndexType.indexType == IndexType.Hash) {
-//                isHash = true;
-//            }
-//        }
-
-//        PageId headerPageId = get_file_entry("boatIndex");
-//        if (headerPageId == null) //file not exist
-//        {
-//            nlj = new NestedLoopsJoins(in1, len_in1, t1_str_sizes, in2,
-//                    len_in2, t2_str_sizes, amt_of_mem, am1,
-//                    relationName, outFilter, rightFilter, proj_list, n_out_flds);
-//        } else {
-//            // todo: delete before commit
-//            isHash = true;
-//            nlj = null;
-//        }
 
         int joinFldInner = OutputFilter[0].operand2.symbol.offset;
         List<TableIndexDesc> indexList = getIndexesOnTable(_relationName);
@@ -217,19 +181,19 @@ public class IndexNestedLoopsJoins extends Iterator {
         FileScan scan;
 
         if( isOuter ) {
-            FldSpec[] Pprojection = new FldSpec[in1_len];
-            for (int i = 1; i <= in1_len; i++) {
+            FldSpec[] Pprojection = new FldSpec[nOuterRecs];
+            for (int i = 1; i <= nOuterRecs; i++) {
                 Pprojection[i - 1] = new FldSpec(new RelSpec(RelSpec.outer), i);
             }
-            scan = new FileScan(fileName, _in1, t1_str_sizescopy,
-                    (short) in1_len, in1_len, Pprojection, null);
+            scan = new FileScan(fileName, outerTypes, outerStrSizes,
+                    (short) nOuterRecs, nOuterRecs, Pprojection, null);
         } else {
-            FldSpec[] Pprojection = new FldSpec[in2_len];
-            for (int i = 1; i <= in2_len; i++) {
+            FldSpec[] Pprojection = new FldSpec[nInnerRecs];
+            for (int i = 1; i <= nInnerRecs; i++) {
                 Pprojection[i - 1] = new FldSpec(new RelSpec(RelSpec.outer), i);
             }
-            scan = new FileScan(fileName, _in2, t2_str_sizescopy,
-                    (short) in2_len, in2_len, Pprojection, null);
+            scan = new FileScan(fileName, innerTypes, innerStrSizes,
+                    (short) nInnerRecs, nInnerRecs, Pprojection, null);
         }
 
         return scan;
@@ -276,7 +240,7 @@ public class IndexNestedLoopsJoins extends Iterator {
                         return null;
                     }
 
-                    switch (_in2[joinFldInner - 1].attrType) {
+                    switch (innerTypes[joinFldInner - 1].attrType) {
                         case (AttrType.attrInteger) : {
                             selects[0].type2 = new AttrType(AttrType.attrInteger);
                             selects[0].operand2.integer = outer_tuple.getIntFld(joinFldOuter);
@@ -294,15 +258,15 @@ public class IndexNestedLoopsJoins extends Iterator {
                         }
                     }
 
-                    FldSpec[] proj = new FldSpec[in2_len];
-                    for (int i = 1; i <= in2_len; i++) {
+                    FldSpec[] proj = new FldSpec[nInnerRecs];
+                    for (int i = 1; i <= nInnerRecs; i++) {
                         proj[i - 1] = new FldSpec(new RelSpec(RelSpec.outer), i);
                     }
 
                     try {
 
                         inner = new IndexScan(new IndexType(IndexType.B_Index), _relationName,
-                                indexFileName, _in2, t2_str_sizescopy, in2_len, in2_len, proj,
+                                indexFileName, innerTypes, innerStrSizes, nInnerRecs, nInnerRecs, proj,
                                 selects, joinFldInner, false);
                     } catch (Exception e) {
                         throw new IndexNestedLoopException(e, "Cannot get next tuple");
@@ -320,7 +284,7 @@ public class IndexNestedLoopsJoins extends Iterator {
                     t = inner.get_next();
 
                     if (t != null) {
-                        Projection.Join(outer_tuple, _in1, t, _in2, Jtuple, perm_mat, nOutFlds);
+                        Projection.Join(outer_tuple, outerTypes, t, innerTypes, Jtuple, perm_mat, nOutFlds);
                         return Jtuple;
                     } else {
                         inner.close();
@@ -364,8 +328,8 @@ public class IndexNestedLoopsJoins extends Iterator {
         hash.KeyClass key = null;
 
         try {
-            hashf = new HashFile(_relationName, indexFileName, joinFldInner, _in2[joinFldInner - 1].attrType,
-                    num_records, heapf, _in2, t2_str_sizescopy, in2_len);
+            hashf = new HashFile(_relationName, indexFileName, joinFldInner, innerTypes[joinFldInner - 1].attrType,
+                    num_records, heapf, innerTypes, innerStrSizes, nInnerRecs);
 
         } catch (Exception e) {
             throw new IndexNestedLoopException(e, "Cannot get next tuple");
@@ -387,7 +351,7 @@ public class IndexNestedLoopsJoins extends Iterator {
                     return null;
                 }
 
-                switch (_in1[joinFldOuter - 1].attrType) {
+                switch (outerTypes[joinFldOuter - 1].attrType) {
                     case (AttrType.attrInteger) : {
                         key = new IntegerKey(outer_tuple.getIntFld(joinFldOuter));
                         break;
@@ -412,19 +376,19 @@ public class IndexNestedLoopsJoins extends Iterator {
 
                 // get inner tuple using this RID
                 Tuple tt = new Tuple();
-                tt.setHdr((short) in2_len, _in2, t2_str_sizescopy);
+                tt.setHdr((short) nInnerRecs, innerTypes, innerStrSizes);
 
                 int size = tt.size();
 
                 t = new Tuple(size);
-                t.setHdr((short) in2_len, _in2, t2_str_sizescopy);
+                t.setHdr((short) nInnerRecs, innerTypes, innerStrSizes);
 
                 tt = heapf.getRecord(inRid);
                 t.tupleCopy(tt);
                 get_from_outer = true;
 
                 if (t != null) {
-                    Projection.Join(outer_tuple, _in1, t, _in2, Jtuple, perm_mat, nOutFlds);
+                    Projection.Join(outer_tuple, outerTypes, t, innerTypes, Jtuple, perm_mat, nOutFlds);
                     Jtuple.print(Jtypes);
                     return Jtuple;
                 }
