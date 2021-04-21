@@ -2,6 +2,7 @@ package iterator;
 
 import btree.*;
 import bufmgr.PageNotReadException;
+import catalog.*;
 import global.*;
 import heap.*;
 import index.IndexException;
@@ -26,6 +27,7 @@ public class BTreeSky extends Iterator {
     private java.lang.String relation_name;
     private boolean first_time;
     private BlockNestedLoopsSky bnlskyline;
+    private List<Tuple> skyline;
 
     /**
      * Constructor for BtreeSky
@@ -57,6 +59,7 @@ public class BTreeSky extends Iterator {
         index_files = index_file_list;
         n_buf_pgs = n_pages;
         first_time = true;
+        skyline = new ArrayList<>();
     }
 
 
@@ -73,7 +76,7 @@ public class BTreeSky extends Iterator {
      * 6. Generate skyline by calling BlockNested algorithm
      * @throws Exception
      */
-    private void compute_skyline() throws Exception
+    public void compute_skyline() throws Exception
     {
         // start index scan
         IndexFileScan[] index_list = new BTFileScan[pref_list.length];
@@ -574,11 +577,53 @@ public class BTreeSky extends Iterator {
         try
         {
             bnlskyline = new BlockNestedLoopsSky(attrTypes, attrTypes.length, str_sizes, am, temp_file, pref_list, pref_list.length, n_buf_pgs);
+            skyline.addAll(bnlskyline.getAllSkylineMembers());
         }
         catch (Exception e)
         {
             e.printStackTrace();
         }
+    }
+
+    public void printSkyline(String materTableName) throws IOException, HFException, HFBufMgrException, HFDiskMgrException, InvalidSlotNumberException, SpaceNotAvailableException, InvalidTupleSizeException, Catalogrelexists, Catalogmissparam, Catalognomem, RelCatalogException, Cataloghferror, Catalogdupattrs, Catalogioerror, FileAlreadyDeletedException {
+        Heapfile file = null;
+        attrInfo[] attrs = new attrInfo[len_in];
+        if (checkToMaterialize(materTableName)) {
+            int SIZE_OF_INT = 4;
+            for (int i = 0; i < len_in; ++i) {
+                attrs[i] = new attrInfo();
+                attrs[i].attrType = new AttrType(attrTypes[i].attrType);
+                attrs[i].attrName = "Col" + i;
+                attrs[i].attrLen = (attrTypes[i].attrType == AttrType.attrInteger) ? SIZE_OF_INT : 32;
+            }
+            file = new Heapfile(materTableName);
+        }
+        int count = 0;
+        for (Tuple tuple : skyline) {
+            if (checkToMaterialize(materTableName)) {
+                file.insertRecord(tuple.returnTupleByteArray());
+            } else {
+                tuple.print(attrTypes);
+            }
+            count++;
+        }
+
+        System.out.println("Skyline computation completed!");
+        System.out.println("No of skyline members -> " + count);
+        if (checkToMaterialize(materTableName)) {
+            try {
+                ExtendedSystemDefs.MINIBASE_RELCAT.createRel(materTableName, len_in, attrs);
+            } catch (Exception e) {
+                System.err.println("Error occurred while creating materialized view!");
+                file.deleteFile();
+            }
+            System.out.println("Created materialize view! -> " + materTableName);
+        }
+        System.out.println("---------------------------------------------------------------------------------------------------------");
+    }
+
+    private boolean checkToMaterialize(String materTableName) {
+        return (materTableName != null && materTableName.length() > 0);
     }
 }
 

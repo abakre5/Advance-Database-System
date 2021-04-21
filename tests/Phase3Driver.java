@@ -12,17 +12,17 @@ import global.*;
 import heap.*;
 import index.IndexScan;
 import iterator.*;
+
+import java.util.*;
 import java.util.concurrent.TimeUnit;
 
 import java.io.*;
 import java.sql.Time;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Objects;
 
 import hash.*;
 import index.IndexUtils;
+import iterator.Iterator;
+
 public class Phase3Driver implements GlobalConst {
 
     /* class constants */
@@ -379,6 +379,13 @@ public class Phase3Driver implements GlobalConst {
             } else if (indexType == IndexType.Clustered_Hash) {
                 createClusteredHashIndex(tableName, indexAttr);
                 Phase3Utils.insertIndexEntry(tableName, indexAttr, indexType);
+                /*
+                 * Get all Indexes on a table -> index type as int and attribute index on which Index is created
+                List<TableIndexDesc> indexes = Phase3Utils.getIndexesOnTable(tableName);
+                for (TableIndexDesc index : indexes) {
+                    System.out.println("Index -> " + new IndexType(index.getType()) + " : " + index.getAttributeIndex());
+                }
+                */
             }
         }
 
@@ -420,9 +427,14 @@ public class Phase3Driver implements GlobalConst {
                 InsertIntoUnclusteredHashIndex(tableName, numAttr, i, rid, t);
             }
 
+            if(Phase3Utils.isIndexExists(tableName,i, new IndexType(IndexType.B_Index))) {
+                insertIntoUnclusteredBtreeIndex(tableName, numAttr, i, rid, t);
+            }
+
             if(Phase3Utils.isIndexExists(tableName,i, new IndexType(IndexType.Clustered_Hash))) {
 
             }
+
         }
     }
 
@@ -650,6 +662,8 @@ public class Phase3Driver implements GlobalConst {
 
         return status;
     }
+
+
 
     private static boolean insertIntoClusteredBtreeIndex(String tableName, int numAttr, int keyIndexAttr, Tuple tuple)
     {
@@ -1435,6 +1449,46 @@ public class Phase3Driver implements GlobalConst {
         return status;
     }
 
+    private static boolean insertIntoUnclusteredBtreeIndex(String tableName, int numAttr,int keyIndexAttr, RID rid, Tuple tuple)
+    {
+        boolean status = OK;
+        Tuple t = null;
+        BTreeFile btf = null;
+        RelDesc rec = new RelDesc();
+        AttrType[] attrTypes = null;
+        short[] sizeArr = null;
+        String indexFile = Phase3Utils.getUnClusteredBtreeIndexName(tableName, keyIndexAttr);
+        try {
+            numAttr = 0;
+            ExtendedSystemDefs.MINIBASE_RELCAT.getInfo(tableName, rec);
+            numAttr = rec.getAttrCnt();
+            attrTypes = new AttrType[numAttr];
+            sizeArr = new short[numAttr];
+
+            ExtendedSystemDefs.MINIBASE_ATTRCAT.getTupleStructure(tableName, numAttr, attrTypes, sizeArr);
+            t = new Tuple();
+            t.setHdr((short) numAttr, attrTypes, sizeArr);
+
+            assert keyIndexAttr <= numAttr;
+
+            btf = new BTreeFile(indexFile);
+        }catch (Exception e){
+            e.printStackTrace();
+        }
+
+        try {
+            t = new Tuple(tuple.getTupleByteArray(), tuple.getOffset(), tuple.getLength());
+            t.setHdr((short) numAttr, attrTypes, sizeArr);
+            btree.KeyClass key = BT.createKeyFromTupleField(t, attrTypes, sizeArr, keyIndexAttr , BTREE_CLUSTERED_ORDER);
+            btf.insert(key, rid);
+        } catch (Exception e) {
+            status = FAIL;
+            e.printStackTrace();
+        }
+
+        return status;
+    }
+
 
     private static boolean createUnclusteredIndex(String tableName, int indexType, int indexAttr) {
         boolean status = OK;
@@ -1970,7 +2024,21 @@ public class Phase3Driver implements GlobalConst {
                 sortFirstSky.close();
                 break;
             case "bts":
+                BTreeFile[] bTreeFiles = new BTreeFile[prefList.length];
+                for(int i = 0; i < prefList.length; i++){
+                    bTreeFiles[i] = Phase3Utils.getBtreeIndexFileForAttribute(tableName, prefList[i]);
+                }
+
+                BTreeSky bTreeSky = new BTreeSky(iteratorDesc.getAttrType(), iteratorDesc.getNumAttr(),
+                        iteratorDesc.getStrSizes(), iteratorDesc.getScan(),tableName, prefList,
+                        null, (btree.IndexFile[]) bTreeFiles, nPages);
+                bTreeSky.compute_skyline();
+                assert materTableName != null;
+                bTreeSky.printSkyline(materTableName);
+                bTreeSky.close();
+                iteratorDesc.getScan().close();
                 break;
+
             case "btss":
                 break;
             default:
