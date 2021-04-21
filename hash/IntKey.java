@@ -31,4 +31,9 @@ public class IntKey extends KeyClass {
     public void setKey(int value) {
         key = value;
     }
+
+
+    public int hashCode() {
+        return this.key;
+    }
 }

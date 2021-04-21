@@ -31,4 +31,8 @@ public class StrKey extends KeyClass {
     public void setKey(String value) {
         key = value;
     }
+
+    public int hashCode() {
+        return key.hashCode();
+    }
 }

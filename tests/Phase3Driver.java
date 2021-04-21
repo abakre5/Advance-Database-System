@@ -406,7 +406,7 @@ public class Phase3Driver implements GlobalConst {
             }
 
             if(Phase3Utils.isIndexExists(tableName,i, IndexType.Clustered_Hash)) {
-
+                deleteFromClusteredHashIndex(tableName, numAttr, i, t);
             }
 
             if(Phase3Utils.isIndexExists(tableName, i, IndexType.B_Index)){
@@ -429,8 +429,8 @@ public class Phase3Driver implements GlobalConst {
                 insertIntoUnclusteredBtreeIndex(tableName, numAttr, i, rid, t);
             }
 
-            if(Phase3Utils.isIndexExists(tableName,i, IndexType.Clustered_Hash)) {
-
+            if (Phase3Utils.isIndexExists(tableName,i, IndexType.Clustered_Hash)) {
+               insertIntoClusteredHashIndex(tableName, numAttr, i, t);
             }
 
         }
@@ -1567,6 +1567,42 @@ public class Phase3Driver implements GlobalConst {
         return status;
     }
 
+    private static boolean insertIntoClusteredHashIndex(String TableName, int NumAttrs, int IndexAttr, Tuple t) {
+        boolean status = OK;
+        try {
+            AttrType[] attrTypes = new AttrType[NumAttrs];
+            short[] strSize = new short[NumAttrs];
+
+            ExtendedSystemDefs.MINIBASE_ATTRCAT.getTupleStructure(TableName, NumAttrs, attrTypes, strSize);
+            ClusteredHashFile chf = new ClusteredHashFile(TableName, IndexAttr, attrTypes[IndexAttr - 1].attrType);
+            chf.insert(t);
+        } catch (Exception e) {
+            System.err.println(e);
+            status = FAIL;
+            return status;
+        }
+
+        return status;
+    }
+
+    private static boolean deleteFromClusteredHashIndex(String TableName, int NumAttrs, int IndexAttr, Tuple Tup) {
+        boolean status = OK;
+        System.out.printf("deleteFromClusteredHashIndex> numAttr=%d; indexAttr=%d\n", NumAttrs, IndexAttr);
+        try {
+            AttrType[] attrTypes = new AttrType[NumAttrs];
+            short[] strSize = new short[NumAttrs];
+
+            ExtendedSystemDefs.MINIBASE_ATTRCAT.getTupleStructure(TableName, NumAttrs, attrTypes, strSize);
+            ClusteredHashFile chf = new ClusteredHashFile(TableName, IndexAttr, attrTypes[IndexAttr - 1].attrType);
+            status = chf.delete(Tup);
+        } catch (Exception e) {
+            System.err.println(e);
+            status = FAIL;
+            return status;
+        }
+
+        return status;
+    }
 
     private static boolean createUnclusteredIndex(String tableName, int indexType, int indexAttr) {
         boolean status = OK;

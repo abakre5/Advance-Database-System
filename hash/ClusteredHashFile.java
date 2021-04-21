@@ -119,32 +119,6 @@ public class ClusteredHashFile  implements GlobalConst {
 
     }
 
-    /**
-     * This method returns a tuple which can be used to read/write
-     * tuples from hash index header file
-     */
-    private Tuple getIndexHdrTupleStructure()
-    {
-
-        int numFields = 2;
-        /* a bucket file tuple stores [magicword, number of buckets(int)]] */
-        AttrType[] Ptypes = new AttrType[numFields];
-
-        Ptypes[0] = new AttrType (AttrType.attrInteger); // MAGIC WORD
-        Ptypes[1] = new AttrType (AttrType.attrInteger); // NUM BUCKETS
-        //Ptypes[2] = new AttrType (AttrType.attrInteger);
-
-        Tuple t = new Tuple();
-        try {
-            t.setHdr((short) numFields, Ptypes, null);
-        }
-        catch (Exception e) {
-            System.err.println("*** error in Tuple.setHdr() ***");
-            e.printStackTrace();
-        }
-
-        return t;
-    }
 
     public RID insert(Tuple t) throws IOException, FieldNumberOutOfBoundException, HFException, HFDiskMgrException, HFBufMgrException,
     InvalidBufferException,InvalidSlotNumberException, InvalidTupleSizeException, SpaceNotAvailableException, FileAlreadyDeletedException {
@@ -167,6 +141,7 @@ public class ClusteredHashFile  implements GlobalConst {
             }
         }
         bucketIdx = getBucketIndex(value);
+        System.err.println("insert> bucketNum: " + bucketIdx);
         Heapfile bucketFile = this.buckets[bucketIdx];
         RID rid = null;
         try {
@@ -177,16 +152,37 @@ public class ClusteredHashFile  implements GlobalConst {
         return rid;
     }
 
-    public boolean delete(KeyClass Key, RID rid) throws Exception {
+    public boolean delete(Tuple t) throws Exception {
         boolean status = true;
         int bucketIdx;
+        KeyClass key = null;
 
-        bucketIdx = getBucketIndex(Key);
+        if (this.keyType == AttrType.attrInteger) {
+            key = new IntKey(t.getIntFld(this.keyAttrIndex));
+        } else {
+            key = new StrKey(t.getStrFld(this.keyAttrIndex));
+        }
+
+        bucketIdx = getBucketIndex(key);
+        System.err.println("delete> bucketNum: " + bucketIdx);
         assert bucketIdx < this.numBuckets;
         try {
-            status = this.buckets[bucketIdx].deleteRecord(rid);
+            Heapfile bucketFile = this.buckets[bucketIdx];
+            Scan scan = bucketFile.openScan();
+            Tuple temp = null;
+            RID rid = new RID();
+            Tuple tup = new Tuple(t);
+            while ((temp = scan.getNext(rid)) != null) {
+                tup.tupleCopy(temp);
+                if (tup.equals(t)) {
+                    System.out.println("clustered hash> found tuple to delete");
+                    status = bucketFile.deleteRecord(rid);
+                    scan.closescan();
+                    break;
+                }
+            }
         } catch (Exception e) {
-            throw e;
+            //throw e;
         }
         return status;
     }
@@ -226,6 +222,7 @@ public class ClusteredHashFile  implements GlobalConst {
                     }
                     System.out.println(key);
                 }
+                scan.closescan();
 
             }
         } catch (Exception e) {
@@ -233,11 +230,38 @@ public class ClusteredHashFile  implements GlobalConst {
         }
     }
 
+    /**
+     * This method returns a tuple which can be used to read/write
+     * tuples from hash index header file
+     */
+    private Tuple getIndexHdrTupleStructure()
+    {
+
+        int numFields = 2;
+        /* a bucket file tuple stores [magicword, number of buckets(int)]] */
+        AttrType[] Ptypes = new AttrType[numFields];
+
+        Ptypes[0] = new AttrType (AttrType.attrInteger); // MAGIC WORD
+        Ptypes[1] = new AttrType (AttrType.attrInteger); // NUM BUCKETS
+        //Ptypes[2] = new AttrType (AttrType.attrInteger);
+
+        Tuple t = new Tuple();
+        try {
+            t.setHdr((short) numFields, Ptypes, null);
+        }
+        catch (Exception e) {
+            System.err.println("*** error in Tuple.setHdr() ***");
+            e.printStackTrace();
+        }
+
+        return t;
+    }
+
     private int getBucketIndex(KeyClass value) {
         /*
         if(split) {
             return (value.hashCode() % (2*N));
         }*/
-        return (value.hashCode() % this.numBuckets);
+        return (Math.abs(value.hashCode()) % this.numBuckets);
     }
 }
