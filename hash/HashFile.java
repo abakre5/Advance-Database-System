@@ -56,7 +56,24 @@ public class HashFile extends IndexFile implements GlobalConst {
 
 
 
-    //Constructor
+    /**
+     * 
+     * @param relationName
+     * @param hashFileName
+     * @param indexField
+     * @param keyType
+     * @param num_records
+     * @param dbfile
+     * @param attributeTypes
+     * @param AttrSize
+     * @param numAttr
+     * @throws IOException
+     * @throws HFException
+     * @throws HFDiskMgrException
+     * @throws HFBufMgrException
+     * @throws InvalidTupleSizeException
+     * @throws InvalidSlotNumberException
+     */
     public HashFile(String relationName,String hashFileName, int indexField, int keyType,int num_records, Heapfile dbfile, AttrType[] attributeTypes, short[] AttrSize, int numAttr) throws IOException, HFException, HFDiskMgrException, HFBufMgrException,
     InvalidTupleSizeException,InvalidSlotNumberException {        
 
@@ -80,7 +97,7 @@ public class HashFile extends IndexFile implements GlobalConst {
         //Loads the metadata file as well.
         printMetadataFile();
 
-   
+         System.out.println("Loaded existing index");
 
     }
 
@@ -91,6 +108,25 @@ public class HashFile extends IndexFile implements GlobalConst {
     }
   
     //Constructor
+    /**
+     * 
+     * @param relationName
+     * @param hashFileName
+     * @param indexField
+     * @param keyType
+     * @param scan
+     * @param num_records
+     * @param dbfile
+     * @param attributeTypes
+     * @param AttrSize
+     * @param numAttr
+     * @throws IOException
+     * @throws HFException
+     * @throws HFDiskMgrException
+     * @throws HFBufMgrException
+     * @throws InvalidTupleSizeException
+     * @throws InvalidSlotNumberException
+     */
     public HashFile(String relationName,String hashFileName, int indexField, int keyType, FileScan scan, int num_records, Heapfile dbfile, AttrType[] attributeTypes, short[] AttrSize, int numAttr) throws IOException, HFException, HFDiskMgrException, HFBufMgrException,
                  InvalidTupleSizeException,InvalidSlotNumberException {
 
@@ -354,7 +390,21 @@ public class HashFile extends IndexFile implements GlobalConst {
 
     
 	}
-        
+    
+    /**
+     * 
+     * @param globalSplit
+     * @param num_buckets
+     * @param hash_domain
+     * @param tuples_per_page
+     * @param total_records
+     * @param split_position
+     * @param indexAttr
+     * @throws IOException
+     * @throws HFDiskMgrException
+     * @throws HFBufMgrException
+     * @throws HFException
+     */
     public void dumpMetadata(int globalSplit, int num_buckets, int hash_domain, 
                                 int tuples_per_page, int total_records, int split_position, int indexAttr) throws IOException, HFDiskMgrException,HFBufMgrException,HFException {
 
@@ -405,6 +455,14 @@ public class HashFile extends IndexFile implements GlobalConst {
         
     }
 
+    /**
+     * 
+     * @throws IOException
+     * @throws HFBufMgrException
+     * @throws HFDiskMgrException
+     * @throws HFException
+     * @throws InvalidTupleSizeException
+     */
     public void printMetadataFile() throws IOException, HFBufMgrException, HFDiskMgrException, HFException, InvalidTupleSizeException {
         Heapfile hf = new Heapfile(metadataFile);
         Scan scan = hf.openScan();
@@ -463,7 +521,10 @@ public class HashFile extends IndexFile implements GlobalConst {
     }
 
     
-
+    /**
+     * 
+     * @return
+     */
     public HashUnclusteredFileScan new_scan() {
 
         HashUnclusteredFileScan scan = new HashUnclusteredFileScan();
@@ -485,6 +546,15 @@ public class HashFile extends IndexFile implements GlobalConst {
 
     }
 
+    /**
+     * 
+     * @param fname
+     * @return
+     * @throws IOException
+     * @throws FileScanException
+     * @throws TupleUtilsException
+     * @throws InvalidRelation
+     */
     private FileScan getFileScan(String fname) throws IOException, FileScanException, TupleUtilsException, InvalidRelation {
         //File scan for buckets : Fixed format
         
@@ -511,6 +581,15 @@ public class HashFile extends IndexFile implements GlobalConst {
         return scan;
     }
 
+    /**
+     * 
+     * @param fname
+     * @return
+     * @throws IOException
+     * @throws FileScanException
+     * @throws TupleUtilsException
+     * @throws InvalidRelation
+     */
     private FileScan getDBFileScan(String fname) throws IOException, FileScanException, TupleUtilsException, InvalidRelation {
         FileScan scan = null;
 
@@ -523,6 +602,15 @@ public class HashFile extends IndexFile implements GlobalConst {
     }
 
 
+    /**
+     * 
+     * @param fname
+     * @return
+     * @throws IOException
+     * @throws FileScanException
+     * @throws TupleUtilsException
+     * @throws InvalidRelation
+     */
     private FileScan getHeaderFileScan(String fname) throws IOException, FileScanException, TupleUtilsException, InvalidRelation {
         //File scan for header file : Fixed format
 
@@ -593,6 +681,10 @@ public class HashFile extends IndexFile implements GlobalConst {
 
     }
 
+    /**
+     * 
+     * @return
+     */
     public Tuple wrapperForHeader() {
         // tuple for storing hash value -> bucket map
         short[] attrSize = new short[1];
@@ -627,6 +719,10 @@ public class HashFile extends IndexFile implements GlobalConst {
 
     }
 
+    /**
+     * 
+     * @return
+     */
     public Tuple wrapperForMetadata() {
         //boolean globalSplit, int num_buckets, int hash_domain, int tuples_per_page, int total_records, int split_position
          
@@ -662,8 +758,12 @@ public class HashFile extends IndexFile implements GlobalConst {
   
         return metadata_tuple;
     }
+  
     //PlaceHolders for delete/insert.
 
+    /**
+     * 
+     */
     public void insert(hash.KeyClass key, RID rid) throws IOException, FieldNumberOutOfBoundException, HFException, HFDiskMgrException, HFBufMgrException,
     InvalidBufferException,InvalidSlotNumberException, InvalidTupleSizeException, SpaceNotAvailableException, FileAlreadyDeletedException {
 
@@ -877,7 +977,11 @@ public class HashFile extends IndexFile implements GlobalConst {
     dumpMetadata(globalSplit, num_buckets, N, n, total_records, split_position, indexAttr);
 
 }
-
+    /**
+     * 
+     * @throws IOException
+     * @throws InvalidTupleSizeException
+     */
     public void populateMap() throws IOException, InvalidTupleSizeException {
         Scan scan = headerFile.openScan();
         RID rid = new RID();
@@ -924,6 +1028,18 @@ public class HashFile extends IndexFile implements GlobalConst {
         
     }
 
+    /**
+     * 
+     * @param Name
+     * @throws IOException
+     * @throws HFException
+     * @throws HFDiskMgrException
+     * @throws HFBufMgrException
+     * @throws InvalidTupleSizeException
+     * @throws FileScanException
+     * @throws TupleUtilsException
+     * @throws InvalidRelation
+     */
     public void deleteHeaderFileEntry(String Name) throws IOException, HFException,HFDiskMgrException,HFBufMgrException,InvalidTupleSizeException, 
     FileScanException,TupleUtilsException,InvalidRelation {
 
@@ -965,6 +1081,10 @@ public class HashFile extends IndexFile implements GlobalConst {
     }
 
     //Debug function to print the index.
+    /**
+     * 
+     * @throws IOException
+     */
     public void printindex() throws IOException {
    
         int total_count = 0;
@@ -1015,6 +1135,14 @@ public class HashFile extends IndexFile implements GlobalConst {
     } 
 
     //DEBUG : Utility for printing headerfile contents
+    /**
+     * 
+     * @throws IOException
+     * @throws HFException
+     * @throws HFBufMgrException
+     * @throws HFDiskMgrException
+     * @throws InvalidTupleSizeException
+     */
     public void  printHeaderFile() throws IOException, HFException, HFBufMgrException,HFDiskMgrException, InvalidTupleSizeException {
        
         Heapfile headerFile = new Heapfile(hashIndexName);
@@ -1062,6 +1190,15 @@ public class HashFile extends IndexFile implements GlobalConst {
 
     }
 
+    /**
+     * 
+     * @param bucketNames
+     * @throws IOException
+     * @throws HFException
+     * @throws HFBufMgrException
+     * @throws HFDiskMgrException
+     * @throws InvalidTupleSizeException
+     */
     public void  populateHeaderFileMap(Queue<String> bucketNames) throws IOException, HFException, HFBufMgrException,HFDiskMgrException, InvalidTupleSizeException {
        
         Heapfile headerFile = new Heapfile(hashIndexName);
@@ -1088,7 +1225,7 @@ public class HashFile extends IndexFile implements GlobalConst {
                     System.out.println("Header "+ headerTuple.getIntFld(1) + " "+ headerTuple.getStrFld(2));
                     //printheapfile(headerTuple.getStrFld(2));
                     Heapfile hf = new Heapfile(headerTuple.getStrFld(2));
-                    //System.out.println(hf.getRecCnt());
+                    System.out.println(hf.getRecCnt());
                     bucketNames.add(headerTuple.getStrFld(2));
 
 
@@ -1102,7 +1239,9 @@ public class HashFile extends IndexFile implements GlobalConst {
     }
 
 
-
+    /**
+     * 
+     */
     public boolean delete(Tuple deleteEntry) throws IOException {
 
         boolean iterate = true;
@@ -1171,7 +1310,12 @@ public class HashFile extends IndexFile implements GlobalConst {
     return deleted;
     }
 
-
+    /**
+     * 
+     * @param findTuple
+     * @return
+     * @throws IOException
+     */
     public Tuple search(Tuple findTuple) throws IOException {
         boolean iterate = true;
         KeyClass key = null;
@@ -1230,6 +1374,14 @@ public class HashFile extends IndexFile implements GlobalConst {
     return current_tuple;
     }
 
+    /**
+     * 
+     * @param key
+     * @param searchEntry
+     * @param isDelete
+     * @return
+     * @throws IOException
+     */
     public RID searchIndex(KeyClass key, Tuple searchEntry,boolean isDelete) throws IOException {
         int bucket = -1;
         if(indexkeyType == integerField) {
@@ -1300,6 +1452,18 @@ public class HashFile extends IndexFile implements GlobalConst {
         return null;
     }
 
+    /**
+     * 
+     * @param fs
+     * @param searchEntry
+     * @param bucketFile
+     * @param key
+     * @param isDelete
+     * @return
+     * @throws IOException
+     * @throws JoinsException
+     * @throws InvalidTupleSizeException
+     */
     public RID findKey(FileScan fs, Tuple searchEntry,String bucketFile,KeyClass key, boolean isDelete) throws IOException, JoinsException, InvalidTupleSizeException{
         TupleRIDPair tupleRIDPair = null;
         Tuple tuple = null;
@@ -1434,7 +1598,12 @@ public class HashFile extends IndexFile implements GlobalConst {
         System.out.println("Exiting Searchin loop...");
         return null;
     }
-
+    /**
+     * 
+     * @param key
+     * @return
+     * @throws IOException
+     */
     public RID searchIndexForJoin(KeyClass key) throws IOException {
         int bucket = -1;
         if(indexkeyType == integerField) {
@@ -1580,6 +1749,7 @@ public class HashFile extends IndexFile implements GlobalConst {
         
         return true;
     }
+    
     public int get_hash(Float value) {  
         if(split) {
            // System.out.println("Split hash function in action");

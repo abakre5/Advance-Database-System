@@ -74,6 +74,7 @@ public class HashUnclusteredFileScan extends HashIndexFileScan implements Global
         short[] attrSizes;
         attrSizes = hfile.attrSizes;
 
+
         try {
             ridTuple = bucket_scan.getNext(bucketRID);
             if(ridTuple!=null) {
@@ -87,10 +88,8 @@ public class HashUnclusteredFileScan extends HashIndexFileScan implements Global
                     attrType[2] = new AttrType (AttrType.attrInteger);
                     
                     ridTuple.setHdr((short)3, attrType, attrSizes);
-                    ridTuple = new Tuple(ridTuple.size());
-                    ridTuple.setHdr((short)3, attrType, attrSizes);
                     entry.key = new IntegerKey(ridTuple.getIntFld(1));
-                    // System.out.println("Scan Key"+ ridTuple.getIntFld(1));
+                    // System.out.println("Scan Key Integer"+ ridTuple.getIntFld(1));
                     // System.out.println("RID "+ ridTuple.getIntFld(2)+ ":"+ ridTuple.getIntFld(3));
                 } else if (hfile.indexkeyType == hfile.stringField){
                     attrType[0] = new AttrType (AttrType.attrString);
@@ -98,10 +97,8 @@ public class HashUnclusteredFileScan extends HashIndexFileScan implements Global
                     attrType[2] = new AttrType (AttrType.attrInteger);
 
                     ridTuple.setHdr((short)3, attrType, attrSizes);
-                    ridTuple = new Tuple(ridTuple.size());
-                    ridTuple.setHdr((short)3, attrType, attrSizes);
                     entry.key = new StringKey(ridTuple.getStrFld(1));
-                    // System.out.println("Scan Key"+ ridTuple.getStrFld(1));
+                    // System.out.println("Scan Key Str"+ ridTuple.getStrFld(1));
                     // System.out.println("RID "+ ridTuple.getIntFld(2)+ ":"+ ridTuple.getIntFld(3));
                 }
                 
@@ -112,7 +109,7 @@ public class HashUnclusteredFileScan extends HashIndexFileScan implements Global
                 entry.data = new RID(insert_rid.pageNo,insert_rid.slotNo);
                 
                 if(bucketEntryCnt == 0) {
-                    //System.out.println("This is the last entry");
+                    System.out.println("This is the last entry");
                     header_names.remove();
                     
                     currentBucketCnt++;
