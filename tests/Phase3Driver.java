@@ -2017,7 +2017,21 @@ public class Phase3Driver implements GlobalConst {
                 sortFirstSky.close();
                 break;
             case "bts":
+                BTreeFile[] bTreeFiles = new BTreeFile[prefList.length];
+                for(int i = 0; i < prefList.length; i++){
+                    bTreeFiles[i] = Phase3Utils.getBtreeIndexFileForAttribute(tableName, prefList[i]);
+                }
+
+                BTreeSky bTreeSky = new BTreeSky(iteratorDesc.getAttrType(), iteratorDesc.getNumAttr(),
+                        iteratorDesc.getStrSizes(), iteratorDesc.getScan(),tableName, prefList,
+                        null, (btree.IndexFile[]) bTreeFiles, nPages);
+                bTreeSky.compute_skyline();
+                assert materTableName != null;
+                bTreeSky.printSkyline(materTableName);
+                bTreeSky.close();
+                iteratorDesc.getScan().close();
                 break;
+
             case "btss":
                 break;
             default:
