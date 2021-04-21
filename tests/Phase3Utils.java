@@ -288,7 +288,6 @@ public class Phase3Utils {
         String indexName = tableName + IndexType.getStringForType(IndexType.Hash) + Integer.toString(attrNo);
         return indexName;
     }
-
     
     public static String getUnclusteredHashHeapName(String tableName, int attrNo)
     {
@@ -299,6 +298,12 @@ public class Phase3Utils {
     public static String getClusteredBtreeIndexName(String tableName, int attrNo)
     {
         String indexName = tableName + IndexType.getStringForType(IndexType.B_ClusteredIndex) + Integer.toString(attrNo);
+        return indexName;
+    }
+
+    public static String getUnClusteredBtreeIndexName(String tableName, int attrNo)
+    {
+        String indexName = tableName + IndexType.getStringForType(IndexType.B_Index) + Integer.toString(attrNo);
         return indexName;
     }
 
