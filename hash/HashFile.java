@@ -1598,6 +1598,86 @@ public class HashFile extends IndexFile implements GlobalConst {
         System.out.println("Exiting Searchin loop...");
         return null;
     }
+   
+   
+    /**
+    * 
+    * @param key
+    * @return
+    * @throws IOException
+    */
+    public List <RID> searchHashIndexForJoin(KeyClass key) throws IOException {
+        int bucket = -1;
+        List <RID> RIDList = new ArrayList<RID>();
+        if(indexkeyType == integerField) {
+            hash.IntegerKey intKey = (hash.IntegerKey)key;
+            Integer keyValue = intKey.getKey();
+
+            bucket = get_int_hash(keyValue);
+        } else if(indexkeyType == stringField) {
+            hash.StringKey strKey = (hash.StringKey)key;
+            String keyValue = strKey.getKey();
+
+            bucket = get_string_hash(keyValue);
+        }
+
+        Heapfile searchBucket = null;
+        if (globalSplit == 1) {
+            System.out.println("First!!");
+            split = true;
+        }
+        String bucket_file = map.get(bucket);
+        System.out.println("Bucket Name "+ bucket + bucket_file);
+        RID rid = null;
+        try{
+            searchBucket = new Heapfile(bucket_file);
+            System.out.println("Total elements "+ searchBucket.getRecCnt());
+            FileScan fs = getFileScan(bucket_file);
+
+            //This checks if this bucketfile is non existant. (Yet it was mapped here by hash function because it is in domain range).
+            if(bucket_file == null){
+                System.out.println("Non existant bucket, skipping..");
+                RIDList = null;
+            } else {
+                RIDList = findKeysForJoin(fs, bucket_file,key);
+            }
+
+            if(rid == null && secondTry) {
+                if(secondTry) {
+                    System.out.println("Trying in another bucket");
+                    globalSplit = 0;
+                    split = false;
+                    secondTry = false;
+                    List<RID> RID_List = searchHashIndexForJoin(key);
+                    RIDList.addAll(RID_List);
+                    return RIDList;
+                }
+                return null;
+            } else if(rid == null && !secondTry) {
+                System.out.println("Key not present");
+                return RIDList;
+
+            } else {
+
+                if(!secondTry) {
+                    secondTry = true;
+                    globalSplit = 1;
+                    split = true;
+                }
+                // rid.pageNo.pid = 14;
+                // rid.slotNo = 26;
+                return RIDList;
+            }
+
+        } catch(Exception e) {
+            e.printStackTrace();
+        }
+
+        return null;
+    }
+   
+   
+   
     /**
      * 
      * @param key
@@ -1672,6 +1752,94 @@ public class HashFile extends IndexFile implements GlobalConst {
         return null;
     }
 
+    /**
+     * 
+     * @param fs
+     * @param bucketFile
+     * @param key
+     * @return
+     * @throws IOException
+     * @throws JoinsException
+     * @throws InvalidTupleSizeException
+     */
+    public List<RID> findKeysForJoin(FileScan fs, String bucketFile, KeyClass key) throws IOException, JoinsException, InvalidTupleSizeException {
+        TupleRIDPair tupleRIDPair = null;
+        Tuple tuple = null;
+        RID indexRID = null;
+        Integer intkey=-99999;
+        String strkey=null;
+        List<RID> RIDList = new ArrayList<RID>();
+
+        if(indexkeyType == integerField) {
+            hash.IntegerKey intKey = (hash.IntegerKey)key;
+            Integer keyValue = intKey.getKey();
+            intkey = keyValue;
+
+        } else if(indexkeyType == stringField) {
+            hash.StringKey strKey = (hash.StringKey)key;
+            String keyValue = strKey.getKey();
+            strkey = keyValue;
+
+        }
+        try{
+            tupleRIDPair = fs.get_next1();
+            indexRID = tupleRIDPair.getRID();
+            Tuple localTuple = tupleRIDPair.getTuple();
+            tuple = new Tuple(localTuple);
+        } catch(Exception e){
+            e.printStackTrace();
+        }
+
+        RID rid = null;
+
+        while(tuple!=null) {
+            try {
+                if(indexkeyType == integerField) {
+                    if(tuple.getIntFld(1) == intkey) {
+                        rid = new RID();
+                        rid.pageNo.pid = tuple.getIntFld(2);
+                        rid.slotNo = tuple.getIntFld(3);
+                        RIDList.add(rid);
+                        //return rid;
+                    }
+                } else if(indexkeyType == stringField) {
+                    if(tuple.getStrFld(1).equals(strkey)) {
+                        rid = new RID();
+                        rid.pageNo.pid = tuple.getIntFld(2);
+                        rid.slotNo = tuple.getIntFld(3);
+                        RIDList.add(rid);
+                        //return rid;
+                    }
+                }
+
+                tupleRIDPair = fs.get_next1();
+                if(tupleRIDPair!=null) {
+                    indexRID = tupleRIDPair.getRID();
+                    Tuple localTuple = tupleRIDPair.getTuple();
+                    tuple = new Tuple(localTuple);
+                } else {
+                    break;
+                }
+
+            }catch(Exception e){
+                e.printStackTrace();
+            }
+        }
+
+        return RIDList;
+    }
+
+
+    /**
+     * 
+     * @param fs
+     * @param bucketFile
+     * @param key
+     * @return
+     * @throws IOException
+     * @throws JoinsException
+     * @throws InvalidTupleSizeException
+     */
     public RID findKeyForJoin(FileScan fs, String bucketFile, KeyClass key) throws IOException, JoinsException, InvalidTupleSizeException {
         TupleRIDPair tupleRIDPair = null;
         Tuple tuple = null;
