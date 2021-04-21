@@ -193,7 +193,7 @@ public class HashFile extends IndexFile implements GlobalConst {
         //Create buckets
 
         for(int i =0; i<num_buckets; i++) {
-            String FileName = hashIndexName+"_hash_buckets_"+i;
+            String FileName = hashIndexName+"_b_"+i;
             Heapfile hf = new Heapfile(FileName);
             map.put(i, FileName);
         }
@@ -776,7 +776,7 @@ public class HashFile extends IndexFile implements GlobalConst {
             globalSplit = 1;
             //split_position++;
             num_buckets++;
-            String FileName = hashIndexName + "_hash_buckets_" + num_buckets;
+            String FileName = hashIndexName + "_b_" + num_buckets;
             String orig_File = map.get(split_position);
             String FileName_orig_dash = orig_File+"_1";
             Heapfile hf = new Heapfile(FileName);
