@@ -6,6 +6,7 @@ import diskmgr.*;
 import bufmgr.*;
 import global.*;
 import heap.*;
+import iterator.TupleUtils;
 
 
 /**
@@ -1931,13 +1932,19 @@ public class BTreeClusteredFile extends ClusteredIndexFile
         return true;
     }
 
-    public boolean deleteTuple(RID rid)
+    public boolean deleteFromIndex(Tuple tuple)
             throws HFDiskMgrException, HFException, HFBufMgrException, InvalidSlotNumberException, InvalidTupleSizeException, Exception
     {
-        System.out.println("Deleting rid : " + rid.pageNo.pid + " slot " + rid.slotNo);
+        boolean status = true;
+        RID rid = getRidForMatchedTuple(tuple);
+        if(rid == null){
+            return status;
+        }
+
+        //System.out.println("Matched rid " + rid.pageNo.pid + ":"+rid.slotNo);
+
         // Btree holds pointer to first key of the page. update in tree is required only if this
-        // key is deleted.
-        // delete this key from btree and add next record as key.
+        // key is deleted. delete this key from btree and add next record as key.
         PageId pageId  = new PageId();
         pageId.copyPageId(rid.pageNo);
 
@@ -1949,16 +1956,17 @@ public class BTreeClusteredFile extends ClusteredIndexFile
             RID currentRID = new RID();
             currentRID = hfPage.firstRecord();
             if(currentRID == null){
-                System.out.println("Invalid rid for first record");
+                ///System.out.println("Invalid rid for first record");
             }
             if(currentRID.equals(rid))
             {
                 Tuple record = hfPage.getRecord(currentRID);
                 Tuple firstRecord = new Tuple(record.getTupleByteArray(), record.getOffset(), record.getLength());
                 firstRecord.setHdr((short) attrTypes.length, attrTypes, attrSizes);
-                boolean b= Delete(new FloatKey(firstRecord.getFloFld(1)), hfPage.getCurPage());
+                KeyClass keyTobeDeleted = BT.createKeyFromTupleField(firstRecord, attrTypes, attrSizes, indexField, multiplier);
+                boolean b= Delete(keyTobeDeleted, hfPage.getCurPage());
                 if(!b){
-                    System.out.println("Failed to delete key from btree");
+                    //System.out.println("Failed to delete key from btree");
                 }
 
                 currentRID = hfPage.nextRecord(currentRID);
@@ -1971,8 +1979,8 @@ public class BTreeClusteredFile extends ClusteredIndexFile
 
                     KeyClass key = BT.createKeyFromTupleField(temp, attrTypes, attrSizes, indexField, multiplier);
                     //Now new page is created, Add this entry to Index
-                    insert(new FloatKey(temp.getFloFld(1)), hfPage.getCurPage());
-                    System.out.println("Inserting new key");
+                    insert(key, hfPage.getCurPage());
+                    //System.out.println("Inserting new key");
                 }
             }
 
@@ -1982,8 +1990,44 @@ public class BTreeClusteredFile extends ClusteredIndexFile
         }
 
         //Delete from actual heap file
-        boolean status = heapfile.deleteRecord(rid);
+        status = heapfile.deleteRecord(rid);
         return status;
+    }
+
+    private RID getRidForMatchedTuple(Tuple tuple){
+
+        if(heapfile == null)
+        {
+            return null;
+        }
+
+        Scan scan = null;
+        try
+        {
+            Tuple tupleToMatch = new Tuple(tuple.getTupleByteArray(), tuple.getOffset(), tuple.getLength());
+            tupleToMatch.setHdr((short) attrTypes.length, attrTypes, attrSizes);
+
+            scan = heapfile.openScan();
+            if(scan == null){
+                return null;
+            }
+            RID rid = new RID();
+            Tuple temp = scan.getNext(rid);
+            while (temp != null) {
+                Tuple t = new Tuple(temp.getTupleByteArray(), temp.getOffset(), temp.getLength());
+                t.setHdr((short) attrTypes.length, attrTypes, attrSizes);
+                if(TupleUtils.Equal(tupleToMatch, t, attrTypes, attrTypes.length)){
+                    scan.closescan();
+                    return rid;
+                }
+                temp = scan.getNext(rid);
+            }
+        }catch(Exception e){
+            e.printStackTrace();
+        }
+
+        scan.closescan();
+        return null;
     }
 
 

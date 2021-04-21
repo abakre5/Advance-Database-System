@@ -398,10 +398,7 @@ public class Phase3Driver implements GlobalConst {
         for(int i=1; i<=numAttr; i++) {
 
             if(Phase3Utils.isIndexExists(tableName,i, IndexType.B_ClusteredIndex)) {
-                
-                //
-
-
+                DeleteFromClusteredBtreeIndex(tableName, numAttr, i, t);
             }
 
             if(Phase3Utils.isIndexExists(tableName,i, IndexType.Hash)) {
@@ -411,8 +408,6 @@ public class Phase3Driver implements GlobalConst {
             if(Phase3Utils.isIndexExists(tableName,i, IndexType.Clustered_Hash)) {
 
             }
-
-
         }
 
 
@@ -664,6 +659,47 @@ public class Phase3Driver implements GlobalConst {
         return status;
     }
 
+    private static boolean DeleteFromClusteredBtreeIndex(String tableName, int numAttr, int keyIndexAttr, Tuple deleteTup)
+    {
+        boolean status = OK;
+        Heapfile relation = null;
+        Tuple t = null;
+        RelDesc rec = new RelDesc();
+        AttrType[] attrTypes = null;
+        short[] sizeArr = null;
+        BTreeClusteredFile btf = null;
+        String indexFile = Phase3Utils.getClusteredBtreeIndexName(tableName, keyIndexAttr);
+        String sortedHeapFile = Phase3Utils.getClusteredBtreeHeapName(tableName, keyIndexAttr);
+        //System.out.println("Btree Clustered Index file name :" + indexFile);
+        int multiplier = BTREE_CLUSTERED_ORDER;
+        try {
+            numAttr = 0;
+            ExtendedSystemDefs.MINIBASE_RELCAT.getInfo(tableName, rec);
+            numAttr = rec.getAttrCnt();
+            attrTypes = new AttrType[numAttr];
+            sizeArr = new short[numAttr];
+
+            ExtendedSystemDefs.MINIBASE_ATTRCAT.getTupleStructure(tableName, numAttr, attrTypes, sizeArr);
+            t = new Tuple();
+            t.setHdr((short) numAttr, attrTypes, sizeArr);
+
+            assert keyIndexAttr <= numAttr;
+            btf = new BTreeClusteredFile(indexFile, attrTypes[keyIndexAttr-1].attrType, STR_SIZE, 1, sortedHeapFile, attrTypes, sizeArr,keyIndexAttr, multiplier);
+        } catch (Exception e) {
+            System.err.println(e);
+            e.printStackTrace();
+        }
+
+        try
+        {
+            btf.deleteFromIndex(deleteTup);
+        } catch (Exception e) {
+            System.err.println(e);
+            status = FAIL;
+        }
+        return status;
+    }
+
 
 
     private static boolean insertIntoClusteredBtreeIndex(String tableName, int numAttr, int keyIndexAttr, Tuple tuple)
@@ -710,7 +746,7 @@ public class Phase3Driver implements GlobalConst {
         return status;
     }
 
-    private static boolean createClusteredBtreeIndex(String tableName, int keyIndexAttr) {
+    public static boolean createClusteredBtreeIndex(String tableName, int keyIndexAttr) {
         boolean status = OK;
         Heapfile relation = null;
         Tuple t = null;
@@ -721,7 +757,7 @@ public class Phase3Driver implements GlobalConst {
         String indexFile = Phase3Utils.getClusteredBtreeIndexName(tableName, keyIndexAttr);
         String sortedHeapFile = Phase3Utils.getClusteredBtreeHeapName(tableName, keyIndexAttr);
         //System.out.println("Btree Clustered Index file name :" + indexFile);
-        int multiplier = -1;
+        int multiplier = BTREE_CLUSTERED_ORDER;
         try {
             int numAttr = 0;
             ExtendedSystemDefs.MINIBASE_RELCAT.getInfo(tableName, rec);
@@ -755,6 +791,7 @@ public class Phase3Driver implements GlobalConst {
 //      Scanning method for clustered btree index
 //      Refer getClusteredBtreeHeapName and getClusteredBtreeHeapName for generating names of clustered index and
 //      data file
+//
 //        try
 //        {
 //            btf.printBTree();
@@ -774,8 +811,6 @@ public class Phase3Driver implements GlobalConst {
 //            System.err.println(e);
 //            status = FAIL;
 //        }
-
-
 
         return status;
     }
