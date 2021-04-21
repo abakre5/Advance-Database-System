@@ -1,5 +1,6 @@
 package tests;
 
+import btree.BTreeFile;
 import bufmgr.PageNotReadException;
 import catalog.*;
 import global.*;
@@ -474,6 +475,18 @@ public class Phase3Utils {
         } catch (Exception e) {
             throw new Exception("Create output table failed: ", e);
         }
+    }
+
+    public static BTreeFile getBtreeIndexFileForAttribute(String tableName, int attributeNum){
+
+        String indexName = getUnClusteredBtreeIndexName(tableName,attributeNum);
+        BTreeFile btf = null;
+        try{
+            btf = new BTreeFile(indexName);
+        }catch (Exception e){
+            e.printStackTrace();
+        }
+        return btf;
     }
 
 }
