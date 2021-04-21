@@ -406,7 +406,7 @@ public class Phase3Driver implements GlobalConst {
             }
 
             if(Phase3Utils.isIndexExists(tableName,i, IndexType.Clustered_Hash)) {
-
+                deleteFromClusteredHashIndex(tableName, numAttr, i, t);
             }
 
             if(Phase3Utils.isIndexExists(tableName, i, IndexType.B_Index)){
@@ -429,8 +429,8 @@ public class Phase3Driver implements GlobalConst {
                 insertIntoUnclusteredBtreeIndex(tableName, numAttr, i, rid, t);
             }
 
-            if(Phase3Utils.isIndexExists(tableName,i, IndexType.Clustered_Hash)) {
-
+            if (Phase3Utils.isIndexExists(tableName,i, IndexType.Clustered_Hash)) {
+               insertIntoClusteredHashIndex(tableName, numAttr, i, t);
             }
 
         }
@@ -1567,6 +1567,42 @@ public class Phase3Driver implements GlobalConst {
         return status;
     }
 
+    private static boolean insertIntoClusteredHashIndex(String TableName, int NumAttrs, int IndexAttr, Tuple t) {
+        boolean status = OK;
+        try {
+            AttrType[] attrTypes = new AttrType[NumAttrs];
+            short[] strSize = new short[NumAttrs];
+
+            ExtendedSystemDefs.MINIBASE_ATTRCAT.getTupleStructure(TableName, NumAttrs, attrTypes, strSize);
+            ClusteredHashFile chf = new ClusteredHashFile(TableName, IndexAttr, attrTypes[IndexAttr - 1].attrType);
+            chf.insert(t);
+        } catch (Exception e) {
+            System.err.println(e);
+            status = FAIL;
+            return status;
+        }
+
+        return status;
+    }
+
+    private static boolean deleteFromClusteredHashIndex(String TableName, int NumAttrs, int IndexAttr, Tuple Tup) {
+        boolean status = OK;
+        System.out.printf("deleteFromClusteredHashIndex> numAttr=%d; indexAttr=%d\n", NumAttrs, IndexAttr);
+        try {
+            AttrType[] attrTypes = new AttrType[NumAttrs];
+            short[] strSize = new short[NumAttrs];
+
+            ExtendedSystemDefs.MINIBASE_ATTRCAT.getTupleStructure(TableName, NumAttrs, attrTypes, strSize);
+            ClusteredHashFile chf = new ClusteredHashFile(TableName, IndexAttr, attrTypes[IndexAttr - 1].attrType);
+            status = chf.delete(Tup);
+        } catch (Exception e) {
+            System.err.println(e);
+            status = FAIL;
+            return status;
+        }
+
+        return status;
+    }
 
     private static boolean createUnclusteredIndex(String tableName, int indexType, int indexAttr) {
         boolean status = OK;
@@ -1738,6 +1774,43 @@ public class Phase3Driver implements GlobalConst {
             
         }
         return status;
+    }
+
+    private static void outputIndexes(String tableName, int indexAttr) {
+        if (!isTableInDB(tableName)) {
+            System.err.printf("*** error: table '%s' not found in DB\n", tableName);
+            return;
+        }
+
+        /* check if Clustered BTree index exists */
+        if (Phase3Utils.isIndexExists(tableName, indexAttr, IndexType.B_ClusteredIndex )){
+            //print BTree code
+            printClusteredBtreeIndex(tableName, indexAttr);
+
+        } else if (!Phase3Utils.isIndexExists(tableName, indexAttr, IndexType.B_ClusteredIndex )) {
+            System.out.println("No clustered Btree index");
+        }
+
+        /* check if Clustered Hash index exists */
+        if (Phase3Utils.isIndexExists(tableName, indexAttr, IndexType.Clustered_Hash)) {
+            printClusteredHashIndexKeys(tableName, indexAttr);
+        } else {
+            System.out.println("No clustered Hash index");
+        }
+
+        /* check if unclustered hash index exists */
+        if (Phase3Utils.isIndexExists(tableName, indexAttr, IndexType.Hash )){
+            printUnclusteredHashIndex(tableName, indexAttr);
+        } else {
+            System.out.println("No unclustered Hash index");
+        }
+
+        /* check if unclustered Btree index exists */
+        if(Phase3Utils.isIndexExists(tableName, indexAttr, IndexType.B_Index) ) {
+            printUnclusteredBtreeIndex(tableName, indexAttr);
+        } else {
+            System.out.println("No unclustered btree index");
+        }
     }
     private static void dbShell() throws Exception
     {
@@ -1969,28 +2042,8 @@ public class Phase3Driver implements GlobalConst {
                     int indexAttr = Integer.parseInt(tokens[2]);
                     String tableName = tokens[1];
 
-                    if(Phase3Utils.isIndexExists(tableName, indexAttr, IndexType.B_ClusteredIndex )){
-                        //print BTree code
-                        printClusteredBtreeIndex(tableName, indexAttr);
+                    outputIndexes(tableName, indexAttr);
 
-                    } else if (!Phase3Utils.isIndexExists(tableName, indexAttr, IndexType.B_ClusteredIndex )) {
-                        System.out.println("No clustered Btree index");
-                    } 
-                    
-                    if (Phase3Utils.isIndexExists(tableName, indexAttr, IndexType.Clustered_Hash)) {
-                        printClusteredHashIndexKeys(tableName, indexAttr);
-                    }
-                    if (Phase3Utils.isIndexExists(tableName, indexAttr, IndexType.Hash )){
-                        printUnclusteredHashIndex(tableName, indexAttr);
-                    }
-
-                    if(Phase3Utils.isIndexExists(tableName, indexAttr, IndexType.B_Index) ) {
-                        printUnclusteredBtreeIndex(tableName, indexAttr);
-
-                    } else if(!Phase3Utils.isIndexExists(tableName, indexAttr, IndexType.B_Index )){
-                        System.out.println("No unclustered btree index");
-
-                    }
                     break;
 
 
