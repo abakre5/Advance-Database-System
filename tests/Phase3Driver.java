@@ -2179,23 +2179,44 @@ public class Phase3Driver implements GlobalConst {
         FldSpec innerJoinAttr = new FldSpec(new RelSpec(RelSpec.outer), innerJoinAttrNumber);
         FldSpec innerMrgAttr = new FldSpec(new RelSpec(RelSpec.outer), innerMergeAttrNumber);
 
-        FileScan fOut = null;
-        FileScan fInner = null;
-        try {
-             fOut = getFileScan(outTableName, outIteratorDesc.getNumAttr(), outIteratorDesc.getAttrType(), outIteratorDesc.getStrSizes());
-             fInner = getFileScan(innerTableName, innerIteratorDesc.getNumAttr(), innerIteratorDesc.getAttrType(), innerIteratorDesc.getStrSizes());
-        } catch (IOException | FileScanException | TupleUtilsException | InvalidRelation e) {
-            e.printStackTrace();
-        }
+//        FileScan fOut = null;
+//        FileScan fInner = null;
+//        try {
+//             fOut = getFileScan(outTableName, outIteratorDesc.getNumAttr(), outIteratorDesc.getAttrType(), outIteratorDesc.getStrSizes());
+//             fInner = getFileScan(innerTableName, innerIteratorDesc.getNumAttr(), innerIteratorDesc.getAttrType(), innerIteratorDesc.getStrSizes());
+//        } catch (IOException | FileScanException | TupleUtilsException | InvalidRelation e) {
+//            e.printStackTrace();
+//        }
 
-        try {
-            sortRelation(outIteratorDesc.getAttrType(),  outIteratorDesc.getNumAttr(), outIteratorDesc.getStrSizes(),fOut ,
-                    outMergeAttrNumber, 100, "newOutRelation");
-            sortRelation(innerIteratorDesc.getAttrType(),  innerIteratorDesc.getNumAttr(), innerIteratorDesc.getStrSizes(),fInner ,
-                    innerMergeAttrNumber, 100, "newInnerRelation");
-        } catch (IOException | SortException e) {
-            e.printStackTrace();
-        }
+//        try {
+//            sortRelation(outIteratorDesc.getAttrType(),  outIteratorDesc.getNumAttr(), outIteratorDesc.getStrSizes(),fOut ,
+//                    outMergeAttrNumber, 100, "newOutRelation");
+//            sortRelation(innerIteratorDesc.getAttrType(),  innerIteratorDesc.getNumAttr(), innerIteratorDesc.getStrSizes(),fInner ,
+//                    innerMergeAttrNumber, 100, "newInnerRelation");
+//        } catch (IOException | SortException e) {
+//            e.printStackTrace();
+//        }
+
+//        List<TableIndexDesc> indexesOnTable = Phase3Utils.getIndexesOnTable(outTableName);
+//        for (TableIndexDesc tableIndexDesc : indexesOnTable){
+//            System.out.println("type of index : " +tableIndexDesc.getType());
+//            System.out.println("index Attribute number : " +tableIndexDesc.getAttributeIndex());
+//        }
+//
+//        if (Phase3Utils.isIndexExists(outTableName, outMergeAttrNumber, IndexType.B_ClusteredIndex)){
+//            System.out.println("Index exists for both Merge attribute");
+//        } else {
+//            System.out.println("Index does not exists for Merge attribute");
+//
+//        }
+//
+//
+//        if (Phase3Utils.isIndexExists(innerTableName, innerMergeAttrNumber, IndexType.B_ClusteredIndex)){
+//            System.out.println("  222 Index exists for Merge attribute");
+//        } else {
+//            System.out.println(" 22 Index does not exists for Merge attribute");
+//
+//        }
         if (isHashBased){
             System.out.println("Hash based top k join is performed : ");
 
@@ -2209,11 +2230,14 @@ public class Phase3Driver implements GlobalConst {
             } catch (IOException | NestedLoopException | HashJoinException e) {
                 e.printStackTrace();
             }
-        } else{
-            System.out.println("NRA based top k join algorithm is performed : ");
-            AttrType x = outIteratorDesc.getAttrType()[outJoinAttr.offset - 1];
+
+
+        } else if (Phase3Utils.isIndexExists(outTableName, outMergeAttrNumber, IndexType.B_ClusteredIndex) && Phase3Utils.isIndexExists(innerTableName, innerMergeAttrNumber, IndexType.B_ClusteredIndex)){
+            System.out.println("Index exists for both Merge attribute");
+            System.out.println("NRA based top k join algorithm is being performed : ");
             IndexScan scan = Phase3Utils.getBtreeClusteredIndexScan(outTableName, outIteratorDesc.getAttrType(), outIteratorDesc.getStrSizes(), outMergeAttrNumber);
             IndexScan scan1 = Phase3Utils.getBtreeClusteredIndexScan(innerTableName, innerIteratorDesc.getAttrType(), innerIteratorDesc.getStrSizes(), innerMergeAttrNumber);
+            AttrType x = outIteratorDesc.getAttrType()[outJoinAttr.offset - 1];
             if (x.attrType == AttrType.attrString){
                 System.out.println("Join Attribute is of String type");
                 try {
@@ -2234,8 +2258,7 @@ public class Phase3Driver implements GlobalConst {
                             outJoinAttr, outMrgAttr,
                             innerIteratorDesc.getAttrType(), innerIteratorDesc.getNumAttr(), innerIteratorDesc.getStrSizes(),
                             innerJoinAttr, innerMrgAttr,
-                            "newOutRelation", "newInnerRelation", k, nPages, materialTableName);
-
+                            Phase3Utils.getClusteredBtreeHeapName(outTableName, outMergeAttrNumber), Phase3Utils.getClusteredBtreeHeapName(innerTableName, innerMergeAttrNumber), k, nPages, materialTableName, scan, scan1);
                 } catch (IOException | FileScanException | InvalidRelation | TupleUtilsException | WrongPermat | InvalidTypeException | PageNotReadException | FieldNumberOutOfBoundException | PredEvalException | UnknowAttrType | InvalidTupleSizeException | JoinsException e) {
                     e.printStackTrace();
                 }

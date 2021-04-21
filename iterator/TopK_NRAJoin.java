@@ -106,10 +106,10 @@ public class TopK_NRAJoin {
     }
 
     private void computeKJoin() throws Exception {
-//        IndexScan relation1 = indexScan;
-        FileScan relation1 = getFileScan(relationName1, (short) len_in1, in1, t1_str_sizes);
-//        IndexScan relation2 = indexScan1;
-        FileScan relation2 = getFileScan(relationName2, (short) len_in2, in2, t2_str_sizes);
+        IndexScan relation1 = indexScan;
+        FileScan relation3 = getFileScan(relationName1, (short) len_in1, in1, t1_str_sizes);
+        IndexScan relation2 = indexScan1;
+        FileScan relation4 = getFileScan(relationName2, (short) len_in2, in2, t2_str_sizes);
         float joinAttributeValue1 = 0;
         float joinAttributeValue2 = 0;
         float mergeAttributeValue1 = 0;
@@ -250,7 +250,7 @@ public class TopK_NRAJoin {
                     e.printStackTrace();
                 }
                 if (topKCandidate.get(index).getRidRel1() != null) {
-                    t1 = relation1.fetchRecord(topKCandidate.get(index).getRidRel1());
+                    t1 = relation3.fetchRecord(topKCandidate.get(index).getRidRel1());
                 }
                 Tuple rid_tuple = new Tuple(t1.getTupleByteArray(), t1.getOffset(), t1.getLength());
                 rid_tuple.setHdr((short) in1.length, in1, t1_str_sizes);
@@ -264,7 +264,7 @@ public class TopK_NRAJoin {
                     e.printStackTrace();
                 }
                 if (topKCandidate.get(index).getRidRel2() != null) {
-                    t2 = relation2.fetchRecord(topKCandidate.get(index).getRidRel2());
+                    t2 = relation4.fetchRecord(topKCandidate.get(index).getRidRel2());
 
                 }
                 Tuple rid_tuple2 = new Tuple(t2.getTupleByteArray(), t2.getOffset(), t2.getLength());
