@@ -383,6 +383,29 @@ public class Phase3Driver implements GlobalConst {
         return status;
     }
 
+    private static void deleteFromIndex(String tableName, int numAttr, Tuple t) {
+        for(int i=1; i<=numAttr; i++) {
+
+            if(Phase3Utils.isIndexExists(tableName,i, new IndexType(IndexType.B_ClusteredIndex))) {
+                
+                //
+
+
+            }
+
+            if(Phase3Utils.isIndexExists(tableName,i, new IndexType(IndexType.Hash))) {
+                DeleteFromUnclusteredHashIndex(tableName, numAttr, i, t);
+            }
+
+            if(Phase3Utils.isIndexExists(tableName,i, new IndexType(IndexType.Clustered_Hash))) {
+
+            }
+
+
+        }
+
+
+    }
     private static void insertIntoIndex(String tableName, int numAttr, RID rid, Tuple t) {
         for(int i=1; i<=numAttr; i++) {
 
@@ -403,6 +426,59 @@ public class Phase3Driver implements GlobalConst {
 
 
         }
+
+    }
+
+    private static void DeleteFromUnclusteredHashIndex(String tableName, int numAttr, int indexAttr, Tuple deleteTup) {
+        try {
+            Tuple t = null;
+            HashFile hf = null;
+            RelDesc rec = new RelDesc();
+            AttrType[] attrTypes = null;
+            short[] sizeArr = null;
+            String indexFile = Phase3Utils.getUnclusteredHashIndexName(tableName, indexAttr);
+            System.out.println("Unclustered Hash Index file name :" + indexFile);
+            System.out.println("Index Field "+ indexAttr);
+            try {
+            IteratorDesc iteratorDesc = Phase3Utils.getTableItr(tableName);
+            Heapfile dbHeapFile = new Heapfile(tableName);
+            int num_records = dbHeapFile.getRecCnt();
+            System.out.println("Records:-> "+ num_records);
+            
+            numAttr = 0;
+            ExtendedSystemDefs.MINIBASE_RELCAT.getInfo(tableName, rec);
+            numAttr = rec.getAttrCnt();
+            attrTypes = new AttrType[numAttr];
+            sizeArr = new short[numAttr];
+
+            ExtendedSystemDefs.MINIBASE_ATTRCAT.getTupleStructure(tableName, numAttr, attrTypes, sizeArr);
+            t = new Tuple();
+            t.setHdr((short) numAttr, attrTypes, sizeArr);
+            Tuple delEntry = new Tuple(deleteTup.getTupleByteArray(), deleteTup.getOffset(),deleteTup.getLength());
+            delEntry.setHdr((short)numAttr, attrTypes, sizeArr);
+
+            assert indexAttr <= numAttr;
+            
+
+            int indexAttrType = attrTypes[indexAttr-1].attrType;
+            hf = new HashFile(tableName,indexFile, indexAttr, indexAttrType, num_records, dbHeapFile, iteratorDesc.getAttrType(), iteratorDesc.getStrSizes(),iteratorDesc.getNumAttr());
+            
+            System.out.println("Printing unclustered hashIndex");
+            //hf.printindex();
+
+            if(indexAttrType == AttrType.attrInteger) {
+                hf.delete(delEntry);
+            } else if(indexAttrType == AttrType.attrString) {
+                hf.delete(delEntry);
+            }
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    } catch(Exception e){
+        e.printStackTrace();
+    }
+
 
     }
 
@@ -693,7 +769,7 @@ public class Phase3Driver implements GlobalConst {
 
     private static boolean deleteFromTable(String tableName, String fileName) {
         boolean status = OK;
-        int numAttribs;
+        int numAttribs=-1;
         AttrType[] attrTypes;
         String[] schemaInfo;
         Heapfile tableFile = null;
@@ -869,6 +945,7 @@ public class Phase3Driver implements GlobalConst {
                 }
                 //System.err.println("tuple(rid=" + rid.hashCode() + ") equality: " + t.equals(delTuples.get(0)));
                 if (delTuples.contains(t)) {
+                    deleteFromIndex(tableName, numAttribs, t);
                     tupleDel = tableFile.deleteRecord(rid);
                     delTuples.remove(t);
                     numRowsDeleted++;
@@ -1335,7 +1412,7 @@ public class Phase3Driver implements GlobalConst {
             // System.out.println("Search Test\n");
             // hf.printHeaderFile();
             // hf.printindex();
-            //Tuple searchTup = hf.search(new StringKey("9aaaaaaaa"));
+            // Tuple searchTup = hf.search(new StringKey("9aaaaaaaa"));
             // Tuple searchTup = hf.search(findEntry);
             
             // if(searchTup!=null) {
@@ -2085,6 +2162,7 @@ public class Phase3Driver implements GlobalConst {
                         temp.setHdr((short) attrTypes.length, attrTypes, strSizes);
                         if (isSameTuple(row, temp, attrs)) {
                             recordToBeDeleted.add(new RID(rid.pageNo, rid.slotNo));
+                            deleteFromIndex(tableName,numAttr, temp);
                         }
                     }
                     scan.closescan();
@@ -2100,6 +2178,7 @@ public class Phase3Driver implements GlobalConst {
         tableFile = new Heapfile(tableName);
         for (RID ridToDelete : recordToBeDeleted) {
             tableFile.deleteRecord(ridToDelete);
+            //deleteFromIndex(tableName,numAttr, temp);
             deletionCount++;
         }
         System.out.println("Deletion Count is " + deletionCount);

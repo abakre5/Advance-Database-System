@@ -1171,9 +1171,6 @@ public class HashFile extends IndexFile implements GlobalConst {
                 current_tuple.setHdr((short)numAttribs,attrs,attrSizes);
 
                 if(TupleUtils.Equal(current_tuple, deleteEntry, attrs, numAttribs)) {
-                    boolean tt = datafile.deleteRecord(rid);
-                    if(tt){
-                        System.out.println("DEBUG: Record deleted successfully from datafile");
                         double a = ((N)*n);
                         a = total_records/a;        
                         current_util = a;
@@ -1186,11 +1183,7 @@ public class HashFile extends IndexFile implements GlobalConst {
                         dumpMetadata(globalSplit, num_buckets, N, n, total_records, split_position, indexAttr);
                         deleted = true;
                         iterate = false;
-                    } else{
-                        //TODO check if need to dump metadata
-                        System.out.println("DEBUG: Record present in index but could not be deleted from data file");
-                        return false;
-                    }
+                        System.out.println("Exiting delete");
                         
             } else {
                 continue;
@@ -1411,7 +1404,8 @@ public class HashFile extends IndexFile implements GlobalConst {
                                         total_records--;
                                         writer.println("Total records reduced to "+total_records);
                                     } else {
-                                        writer.println("Could not delete the entry from index file");
+                                        System.out.println("Could not delete entry from index file");
+                                        //writer.println("Could not delete the entry from index file");
                                         return null;
                                     }
                             }
@@ -1440,13 +1434,16 @@ public class HashFile extends IndexFile implements GlobalConst {
                                 if(isDelete) {
                                     writer.println("Deleting entry from index");
                                     Heapfile bucket = new Heapfile(bucketFile);
+                                    System.out.println();
                                     boolean checkDelete = bucket.deleteRecord(indexRID);
                                     if(checkDelete) {
                                         writer.println("Successfully deleted the entry from index file");
                                         total_records--;
-                                        writer.println("Total records reduced to "+total_records);
+                                        System.out.println("Deleted entry from the index file");
+                                        System.out.println("Total records reduced to "+total_records);
                                     } else {
                                         writer.println("Could not delete the entry from index file");
+                                        System.out.println("Could not delete entry from index file");
                                         return null;
                                     }
                                 }
