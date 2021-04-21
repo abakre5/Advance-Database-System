@@ -7,7 +7,7 @@ import btree.KeyDataEntry;
 import btree.LeafData;
 import bufmgr.PageNotReadException;
 import global.AttrType;
-import global.RID;
+import global.*;
 import heap.HFBufMgrException;
 import heap.HFDiskMgrException;
 import heap.HFException;
@@ -23,6 +23,8 @@ import index.IndexScan;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.*;
+import catalog.*;
+import heap.*;
 
 
 
@@ -106,7 +108,7 @@ public class BTreeSortedSky extends Iterator {
 
  * @throws Exception
  */ 
-    private void compute_skyline() throws Exception {
+    public void compute_skyline() throws Exception {
 
         BTFileScan index_scan = new BTFileScan();
         Heapfile hf = null;
@@ -147,7 +149,8 @@ public class BTreeSortedSky extends Iterator {
             Tuple t = hf.getRecord(rid);
             
             Tuple current_tuple = new Tuple(t.getTupleByteArray(), t.getOffset(),t.getLength());
-            current_tuple.setHdr((short)len_in, attrTypes, null);
+            str_sizes[0] = 32;
+            current_tuple.setHdr((short)len_in, attrTypes, str_sizes);
 
             //Buffer threshold = Number of tuples that can be accomodated in memory window called skyline_list.
             //This number is arrived at using n_pages attributes and minibase page size.
@@ -369,6 +372,7 @@ public class BTreeSortedSky extends Iterator {
         for (Tuple tupleInSkyline : skylines) {
             outHeapfile.insertRecord(tupleInSkyline.getTupleByteArray());
         }
+        skyline.addAll(skylines);
     }
     
     @Override
@@ -438,4 +442,49 @@ public class BTreeSortedSky extends Iterator {
             }
         }
     }
+
+    public void printSkyline(String materTableName) throws IOException, HFException, HFBufMgrException, HFDiskMgrException, InvalidSlotNumberException, SpaceNotAvailableException, InvalidTupleSizeException, Catalogrelexists, Catalogmissparam, Catalognomem, RelCatalogException, Cataloghferror, Catalogdupattrs, Catalogioerror, FileAlreadyDeletedException {
+        Heapfile file = null;
+        attrInfo[] attrs = new attrInfo[len_in];
+        if (checkToMaterialize(materTableName)) {
+            int SIZE_OF_INT = 4;
+            for (int i = 0; i < len_in; ++i) {
+                attrs[i] = new attrInfo();
+                attrs[i].attrType = new AttrType(attrTypes[i].attrType);
+                attrs[i].attrName = "Col" + i;
+                attrs[i].attrLen = (attrTypes[i].attrType == AttrType.attrInteger) ? SIZE_OF_INT : 32;
+            }
+            file = new Heapfile(materTableName);
+        }
+        int count = 0;
+        for (Tuple tuple : skyline) {
+            if (checkToMaterialize(materTableName)) {
+                file.insertRecord(tuple.returnTupleByteArray());
+            } else {
+                tuple.print(attrTypes);
+            }
+            count++;
+        }
+
+        System.out.println("Skyline computation completed!");
+        System.out.println("No of skyline members -> " + count);
+        if (checkToMaterialize(materTableName)) {
+            try {
+                ExtendedSystemDefs.MINIBASE_RELCAT.createRel(materTableName, len_in, attrs);
+            } catch (Exception e) {
+                System.err.println("Error occurred while creating materialized view!");
+                file.deleteFile();
+            }
+            System.out.println("Created materialize view! -> " + materTableName);
+        }
+        System.out.println("---------------------------------------------------------------------------------------------------------");
+        skyline.clear();
+        //file.deleteFile();
+    }
+
+    private boolean checkToMaterialize(String materTableName) {
+        return (materTableName != null && materTableName.length() > 0);
+    }
+
+
 }

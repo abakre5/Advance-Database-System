@@ -4,6 +4,7 @@ import btree.BT;
 import btree.BTreeClusteredFile;
 import btree.BTreeFile;
 import btree.FloatKey;
+import btree.IndexFile;
 import bufmgr.PageNotReadException;
 import bufmgr.PagePinnedException;
 import catalog.*;
@@ -396,18 +397,18 @@ public class Phase3Driver implements GlobalConst {
     private static void deleteFromIndex(String tableName, int numAttr, Tuple t) {
         for(int i=1; i<=numAttr; i++) {
 
-            if(Phase3Utils.isIndexExists(tableName,i, new IndexType(IndexType.B_ClusteredIndex))) {
+            if(Phase3Utils.isIndexExists(tableName,i, IndexType.B_ClusteredIndex)) {
                 
                 //
 
 
             }
 
-            if(Phase3Utils.isIndexExists(tableName,i, new IndexType(IndexType.Hash))) {
+            if(Phase3Utils.isIndexExists(tableName,i, IndexType.Hash)) {
                 DeleteFromUnclusteredHashIndex(tableName, numAttr, i, t);
             }
 
-            if(Phase3Utils.isIndexExists(tableName,i, new IndexType(IndexType.Clustered_Hash))) {
+            if(Phase3Utils.isIndexExists(tableName,i, IndexType.Clustered_Hash)) {
 
             }
 
@@ -419,19 +420,19 @@ public class Phase3Driver implements GlobalConst {
     private static void insertIntoIndex(String tableName, int numAttr, RID rid, Tuple t) {
         for(int i=1; i<=numAttr; i++) {
 
-            if(Phase3Utils.isIndexExists(tableName,i, new IndexType(IndexType.B_ClusteredIndex))) {
+            if(Phase3Utils.isIndexExists(tableName,i, IndexType.B_ClusteredIndex)) {
                 insertIntoClusteredBtreeIndex(tableName, numAttr, i, t);
             }
 
-            if(Phase3Utils.isIndexExists(tableName,i, new IndexType(IndexType.Hash))) {
+            if(Phase3Utils.isIndexExists(tableName,i, IndexType.Hash)) {
                 InsertIntoUnclusteredHashIndex(tableName, numAttr, i, rid, t);
             }
 
-            if(Phase3Utils.isIndexExists(tableName,i, new IndexType(IndexType.B_Index))) {
+            if(Phase3Utils.isIndexExists(tableName,i, IndexType.B_Index)) {
                 insertIntoUnclusteredBtreeIndex(tableName, numAttr, i, rid, t);
             }
 
-            if(Phase3Utils.isIndexExists(tableName,i, new IndexType(IndexType.Clustered_Hash))) {
+            if(Phase3Utils.isIndexExists(tableName,i, IndexType.Clustered_Hash)) {
 
             }
 
@@ -1872,7 +1873,7 @@ public class Phase3Driver implements GlobalConst {
                     int indexType = indexTypeStr.equalsIgnoreCase("btree") ? IndexType.B_Index : IndexType.Hash;
                     int indexAttr = Integer.parseInt(indexAttrStr);
                     
-                    if(!Phase3Utils.isIndexExists(tableName, indexAttr, new IndexType(indexType))) {
+                    if(!Phase3Utils.isIndexExists(tableName, indexAttr, indexType)) {
                         createUnclusteredIndex(tableName, indexType, indexAttr);
                         Phase3Utils.insertIndexEntry(tableName, indexAttr, indexType);
                         System.out.println("Index created ");
@@ -1897,25 +1898,25 @@ public class Phase3Driver implements GlobalConst {
                     int indexAttr = Integer.parseInt(tokens[2]);
                     String tableName = tokens[1];
 
-                    if(Phase3Utils.isIndexExists(tableName, indexAttr, new IndexType(IndexType.B_ClusteredIndex) )){
+                    if(Phase3Utils.isIndexExists(tableName, indexAttr, IndexType.B_ClusteredIndex)){
                         //print BTree code
                         printClusteredBtreeIndex(tableName, indexAttr);
 
-                    } else if (!Phase3Utils.isIndexExists(tableName, indexAttr, new IndexType(IndexType.B_ClusteredIndex) )) {
+                    } else if (!Phase3Utils.isIndexExists(tableName, indexAttr, IndexType.B_ClusteredIndex)) {
                         System.out.println("No clustered Btree index");
                     } 
                     
-                    if (Phase3Utils.isIndexExists(tableName, indexAttr, new IndexType(IndexType.Clustered_Hash) )) {
+                    if (Phase3Utils.isIndexExists(tableName, indexAttr, IndexType.Clustered_Hash)) {
                         printClusteredHashIndexKeys(tableName, indexAttr);
                     }
-                    if (Phase3Utils.isIndexExists(tableName, indexAttr, new IndexType(IndexType.Hash) )){
+                    if (Phase3Utils.isIndexExists(tableName, indexAttr, IndexType.Hash)){
                         printUnclusteredHashIndex(tableName, indexAttr);
                     }
 
-                    if(Phase3Utils.isIndexExists(tableName, indexAttr, new IndexType(IndexType.B_Index) )) {
+                    if(Phase3Utils.isIndexExists(tableName, indexAttr, IndexType.B_Index)) {
                         printUnclusteredBtreeIndex(tableName, indexAttr);
 
-                    } else if(!Phase3Utils.isIndexExists(tableName, indexAttr, new IndexType(IndexType.B_Index) )){
+                    } else if(!Phase3Utils.isIndexExists(tableName, indexAttr, IndexType.B_Index)){
                         System.out.println("No unclustered btree index");
 
                     }
@@ -2040,7 +2041,62 @@ public class Phase3Driver implements GlobalConst {
                 break;
 
             case "btss":
-                break;
+            BTreeFile btf = null;
+            try {
+                btf = new BTreeFile("BTreeIndexNew", AttrType.attrReal, 4, 1/*delete*/);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+            
+            Heapfile heapfile = Phase3Utils.getHeapFileInstance(tableName);
+            Scan heapfile_scan = heapfile.openScan();
+    
+            RID rid = new RID();
+            Float key = null;
+    
+            Tuple temp;
+            Tuple t;
+            AttrType[] attrTypes = iteratorDesc.getAttrType();
+    
+            try {
+                while ((temp = heapfile_scan.getNext(rid)) != null) {
+                    short[] strSizes = new short[1];
+                    strSizes[0] = 32;
+                    temp.setHdr((short)iteratorDesc.getNumAttr(), iteratorDesc.getAttrType(), strSizes);
+                    key = 0f;
+                    for (int  i = 0 ; i < prefList.length; i++) {
+                        try {
+                            if(attrTypes[prefList[i]-1].attrType == AttrType.attrInteger) {
+                                key += temp.getIntFld(prefList[i]);
+                            } else if(attrTypes[prefList[i]-1].attrType == AttrType.attrReal) {
+                                key += temp.getFloFld(prefList[i]);
+                            }
+                            
+                        } catch (Exception e) {
+                            e.printStackTrace();
+                        }
+                    }
+                    btf.insert(new FloatKey(key), rid);
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+            IndexFile[] indexFiles = new IndexFile[1];
+            indexFiles[0] =(IndexFile)btf;
+            BTreeSortedSky btss = null;
+
+            try {
+                btss = new BTreeSortedSky(attrTypes, attrTypes.length, iteratorDesc.getStrSizes(), 0, iteratorDesc.getScan(), tableName, prefList, null, indexFiles, nPages);
+            } catch(Exception e){
+                e.printStackTrace();
+            }
+
+            btss.compute_skyline();
+            assert materTableName != null;
+            btss.printSkyline(materTableName);
+            btss.close();
+            iteratorDesc.getScan().close();
+            break;
             default:
                 System.out.println("Select skyline operator from the specified list ...");
                 return;
