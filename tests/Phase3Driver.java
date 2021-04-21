@@ -1775,6 +1775,43 @@ public class Phase3Driver implements GlobalConst {
         }
         return status;
     }
+
+    private static void outputIndexes(String tableName, int indexAttr) {
+        if (!isTableInDB(tableName)) {
+            System.err.printf("*** error: table '%s' not found in DB\n", tableName);
+            return;
+        }
+
+        /* check if Clustered BTree index exists */
+        if (Phase3Utils.isIndexExists(tableName, indexAttr, IndexType.B_ClusteredIndex )){
+            //print BTree code
+            printClusteredBtreeIndex(tableName, indexAttr);
+
+        } else if (!Phase3Utils.isIndexExists(tableName, indexAttr, IndexType.B_ClusteredIndex )) {
+            System.out.println("No clustered Btree index");
+        }
+
+        /* check if Clustered Hash index exists */
+        if (Phase3Utils.isIndexExists(tableName, indexAttr, IndexType.Clustered_Hash)) {
+            printClusteredHashIndexKeys(tableName, indexAttr);
+        } else {
+            System.out.println("No clustered Hash index");
+        }
+
+        /* check if unclustered hash index exists */
+        if (Phase3Utils.isIndexExists(tableName, indexAttr, IndexType.Hash )){
+            printUnclusteredHashIndex(tableName, indexAttr);
+        } else {
+            System.out.println("No unclustered Hash index");
+        }
+
+        /* check if unclustered Btree index exists */
+        if(Phase3Utils.isIndexExists(tableName, indexAttr, IndexType.B_Index) ) {
+            printUnclusteredBtreeIndex(tableName, indexAttr);
+        } else {
+            System.out.println("No unclustered btree index");
+        }
+    }
     private static void dbShell() throws Exception
     {
         String commandLine;
@@ -2005,28 +2042,8 @@ public class Phase3Driver implements GlobalConst {
                     int indexAttr = Integer.parseInt(tokens[2]);
                     String tableName = tokens[1];
 
-                    if(Phase3Utils.isIndexExists(tableName, indexAttr, IndexType.B_ClusteredIndex )){
-                        //print BTree code
-                        printClusteredBtreeIndex(tableName, indexAttr);
+                    outputIndexes(tableName, indexAttr);
 
-                    } else if (!Phase3Utils.isIndexExists(tableName, indexAttr, IndexType.B_ClusteredIndex )) {
-                        System.out.println("No clustered Btree index");
-                    } 
-                    
-                    if (Phase3Utils.isIndexExists(tableName, indexAttr, IndexType.Clustered_Hash)) {
-                        printClusteredHashIndexKeys(tableName, indexAttr);
-                    }
-                    if (Phase3Utils.isIndexExists(tableName, indexAttr, IndexType.Hash )){
-                        printUnclusteredHashIndex(tableName, indexAttr);
-                    }
-
-                    if(Phase3Utils.isIndexExists(tableName, indexAttr, IndexType.B_Index) ) {
-                        printUnclusteredBtreeIndex(tableName, indexAttr);
-
-                    } else if(!Phase3Utils.isIndexExists(tableName, indexAttr, IndexType.B_Index )){
-                        System.out.println("No unclustered btree index");
-
-                    }
                     break;
 
 
