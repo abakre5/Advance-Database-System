@@ -1493,12 +1493,6 @@ public class Phase3Driver implements GlobalConst {
 
     private static boolean createUnclusteredIndex(String tableName, int indexType, int indexAttr) {
         boolean status = OK;
-        PrintWriter writer = null;
-        try {
-             writer = new PrintWriter("the-file-name.txt", "UTF-8");
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
  
         if (isTableInDB(tableName) == false) {
             System.err.println("*** error: relation " + tableName + " not found in DB");
@@ -1664,7 +1658,6 @@ public class Phase3Driver implements GlobalConst {
         }
 
             System.out.println("Scanner");
-            writer.close();
             
         }
         return status;
