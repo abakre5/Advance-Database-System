@@ -4,6 +4,9 @@ import btree.*;
 import bufmgr.PageNotReadException;
 import catalog.*;
 import global.*;
+import hash.HashFile;
+import hash.IntegerKey;
+import hash.StringKey;
 import heap.*;
 import index.IndexException;
 import index.IndexScan;
@@ -39,6 +42,7 @@ public class IndexNestedLoopsJoins extends Iterator {
     private String _relationName;
     private NestedLoopsJoins nlj;
     private boolean isHash = false;
+    private AttrType[] Jtypes;
 
     /**
      * constructor
@@ -94,7 +98,7 @@ public class IndexNestedLoopsJoins extends Iterator {
         done = false;
         get_from_outer = true;
 
-        AttrType[] Jtypes = new AttrType[n_out_flds];
+        Jtypes = new AttrType[n_out_flds];
         short[] t_size;
 
         perm_mat = proj_list;
@@ -118,34 +122,36 @@ public class IndexNestedLoopsJoins extends Iterator {
         // TODO: Check if index present on join attr, if yes, check if BTree or Hash
 
         // Check if index is present on inner relation on given join attribute
-        int joinFldInner = OutputFilter[0].operand2.symbol.offset;
-        int indexCnt = 0;
-        IndexDesc[] indexDescsList = null;
-        Phase3Utils.checkIndexesOnTable(relationName, len_in2, joinFldInner, indexCnt, indexDescsList);
-
-        if (indexCnt == 0) {
-            nlj = new NestedLoopsJoins(in1, len_in1, t1_str_sizes, in2,
-                    len_in2, t2_str_sizes, amt_of_mem, am1,
-                    relationName, outFilter, rightFilter, proj_list, n_out_flds);
-        } else {
-            nlj = null;
-            IndexDesc joinIndexDesc = indexDescsList[joinFldInner-1];
-            System.out.println("Index on attr: "+indexDescsList);
-            IndexType joinIndexType = joinIndexDesc.getAccessType();
-            if (joinIndexType.indexType == IndexType.Hash) {
-                isHash = true;
-            }
-        }
-
-//        PageId headerPageId = get_file_entry("innerIndex");
-//        if (headerPageId == null) //file not exist
-//        {
+//        int joinFldInner = OutputFilter[0].operand2.symbol.offset;
+//        int indexCnt = 0;
+//        IndexDesc[] indexDescsList = null;
+//        Phase3Utils.checkIndexesOnTable(relationName, len_in2, joinFldInner, indexCnt, indexDescsList);
+//
+//        if (indexCnt == 0) {
 //            nlj = new NestedLoopsJoins(in1, len_in1, t1_str_sizes, in2,
 //                    len_in2, t2_str_sizes, amt_of_mem, am1,
 //                    relationName, outFilter, rightFilter, proj_list, n_out_flds);
 //        } else {
 //            nlj = null;
+//            IndexDesc joinIndexDesc = indexDescsList[0]; // TODO: dynamic karna hai ye bhi bc
+//            System.out.println("Index exists on attr: "+joinFldInner);
+//            IndexType joinIndexType = joinIndexDesc.getAccessType();
+//            if (joinIndexType.indexType == IndexType.Hash) {
+//                isHash = true;
+//            }
 //        }
+
+        PageId headerPageId = get_file_entry("boatIndex");
+        if (headerPageId == null) //file not exist
+        {
+            nlj = new NestedLoopsJoins(in1, len_in1, t1_str_sizes, in2,
+                    len_in2, t2_str_sizes, amt_of_mem, am1,
+                    relationName, outFilter, rightFilter, proj_list, n_out_flds);
+        } else {
+            // todo: delete before commit
+            isHash = true;
+            nlj = null;
+        }
     }
 
     private PageId get_file_entry(String filename)
@@ -193,6 +199,8 @@ public class IndexNestedLoopsJoins extends Iterator {
     public Tuple get_next() throws IOException, JoinsException, IndexException, InvalidTupleSizeException, InvalidTypeException, PageNotReadException, TupleUtilsException, PredEvalException, SortException, LowMemException, UnknowAttrType, UnknownKeyTypeException, Exception {
         if (nlj != null) {
             return nlj.get_next();
+        } else if (isHash == true) {
+            return hashGetNext();
         } else {
             if (done)
                 return null;
@@ -289,6 +297,115 @@ public class IndexNestedLoopsJoins extends Iterator {
                 //exhausted, => set get_from_outer = TRUE, go to top of loop
             } while (true);
         }
+    }
+
+    public Tuple hashGetNext() throws Exception {
+        if (done)
+            return null;
+
+        RID rid = new RID();
+
+        // Get tuple from inner using index
+        int joinFldInner = OutputFilter[0].operand2.symbol.offset;
+        int joinFldOuter = OutputFilter[0].operand1.symbol.offset;
+
+        Heapfile heapf = null;
+        int num_records = 0;
+        try {
+            heapf = new Heapfile(_relationName);
+            num_records = heapf.getRecCnt();
+        } catch (Exception e) {
+            throw new IndexNestedLoopException(e, "Create heapfile failed");
+        }
+
+        Tuple t = null;
+
+        HashFile hashf = null;
+        Scan scan = null;
+        hash.KeyClass key = null;
+
+        try {
+            hashf = new HashFile(_relationName, "boatIndex", joinFldInner, _in2[joinFldInner - 1].attrType,
+                    num_records, heapf, _in2, t2_str_sizescopy, in2_len); // todo: dynamic index name
+
+        } catch (Exception e) {
+            throw new IndexNestedLoopException(e, "Cannot get next tuple");
+        }
+
+        do {
+            // If get_from_outer is true, Get a tuple from the outer, delete
+            // an existing scan on the file, and reopen a new scan on the file.
+            // If a get_next on the outer returns DONE?, then the nested loops
+            //join is done too.
+
+            if (get_from_outer) {
+                get_from_outer = false;
+
+                // Get next tuple from outer on given join condition
+                if ((outer_tuple = outer.get_next()) == null) {
+                    done = true;
+
+                    return null;
+                }
+
+                switch (_in1[joinFldOuter - 1].attrType) {
+                    case (AttrType.attrInteger) : {
+                        key = new IntegerKey(outer_tuple.getIntFld(joinFldOuter));
+                        break;
+                    }
+                    case (AttrType.attrReal) : {
+                        key = new StringKey(outer_tuple.getStrFld(joinFldOuter));
+                        break;
+                    }
+                }
+
+//                FldSpec[] proj = new FldSpec[in2_len];
+//                for (int i = 1; i <= in2_len; i++) {
+//                    proj[i - 1] = new FldSpec(new RelSpec(RelSpec.outer), i);
+//                }
+
+
+
+
+            }  // ENDS: if (get_from_outer == TRUE)
+
+
+            // The next step is to get a tuple from the inner,
+            // while the inner is not completely scanned && there
+            // is no match (with pred),get a tuple from the inner.
+
+
+            try {
+                // perform searchIndex to get RID of corresponding inner
+                RID inRid = hashf.searchIndexForJoin(key);
+
+                // get inner tuple using this RID
+                Tuple tt = new Tuple();
+                tt.setHdr((short) in2_len, _in2, t2_str_sizescopy);
+
+                int size = tt.size();
+
+                t = new Tuple(size);
+                t.setHdr((short) in2_len, _in2, t2_str_sizescopy);
+
+                tt = heapf.getRecord(inRid);
+                t.tupleCopy(tt);
+                get_from_outer = true;
+
+                if (t != null) {
+                    Projection.Join(outer_tuple, _in1, t, _in2, Jtuple, perm_mat, nOutFlds);
+                    Jtuple.print(Jtypes);
+                    return Jtuple;
+                }
+
+            } catch (Exception e) {
+                throw new IndexNestedLoopException(e, "Cannot get tuple from index");
+            }
+
+            // There has been no match. (otherwise, we would have
+            //returned from t//he while loop. Hence, inner is
+            //exhausted, => set get_from_outer = TRUE, go to top of loop
+        } while (true);
     }
 
     public void close() throws IOException, JoinsException, SortException, IndexException {
