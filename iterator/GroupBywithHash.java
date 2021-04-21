@@ -4,6 +4,7 @@ import bufmgr.PageNotReadException;
 import catalog.*;
 import global.AggType;
 import global.AttrType;
+import global.IndexType;
 import global.RID;
 import hash.HashFile;
 import hash.HashIndexFileScan;
@@ -37,7 +38,6 @@ public class GroupBywithHash {
     private String hashIndexName;
 
     private Heapfile hashBucketTuples;
-    private FileScan scan;
     private HashIndexFileScan hashScan;
 
     /**
@@ -58,7 +58,7 @@ public class GroupBywithHash {
      */
     public GroupBywithHash(AttrType[] in1, int len_in1, short[] t1_str_sizes,
                            String tableName, FldSpec group_by_attr, FldSpec[] agg_list,
-                           AggType agg_type, FldSpec[] proj_list, int n_out_flds, int n_pages, String tableNameT) throws IOException, HFException, HFBufMgrException, HFDiskMgrException, FileScanException, TupleUtilsException, InvalidRelation, JoinsException, FieldNumberOutOfBoundException, PageNotReadException, WrongPermat, InvalidTypeException, InvalidTupleSizeException, PredEvalException, UnknowAttrType {
+                           AggType agg_type, FldSpec[] proj_list, int n_out_flds, int n_pages, String tableNameT) throws IOException, HFException, HFBufMgrException, HFDiskMgrException, FileScanException, TupleUtilsException, InvalidRelation, JoinsException, FieldNumberOutOfBoundException, PageNotReadException, WrongPermat, InvalidTypeException, InvalidTupleSizeException, PredEvalException, UnknowAttrType, InvalidSlotNumberException {
         this.attrType = in1;
         this.noOfColumns = (short) len_in1;
         this.strSize = t1_str_sizes;
@@ -71,49 +71,43 @@ public class GroupBywithHash {
         this.nPages = n_pages;
         this.materTableName = tableNameT;
         this.materHeapfile = null;
+
         if (Phase3Utils.aggListContainsStringAttr(agg_list, in1)) {
             System.err.println("Aggregation attributes does not support String attribute!");
             return;
         }
-        this.materHeapfile = new Heapfile(materTableName);
 
-        this.hashIndexName = tableName + "HASH" + (groupByAttr.offset);
+        if (Phase3Utils.createMaterializedView(tableNameT)) {
+            this.materHeapfile = new Heapfile(materTableName);
+        }
+
+        this.hashIndexName = tableName + "BHs" + (groupByAttr.offset);
         System.out.println("Hash Index name: " + this.hashIndexName);
 
-        this.dbHeapFile  = new Heapfile(tableName);
+        this.dbHeapFile = new Heapfile(tableName);
         System.out.println("No of elements: " + noOfColumns);
         System.out.println("Attr type no: " + in1.length);
         System.out.println("Project No : " + proj_list.length);
-        scan = new FileScan(tableName, attrType, strSize, noOfColumns, noOfColumns, proj_list, null);
-        //if (!ifIndexExistOnTheTable()) {
+        if (!ifIndexExistOnTheTable()) {
             try {
-                System.out.println("Testttttttttttttttttttttttttttttttttttttttttttt");
+                System.out.println("Creating Unclustered Hash Index on table " + tableName + " and attribute " + group_by_attr.offset);
                 hashFile = new HashFile(tableName, hashIndexName, group_by_attr.offset,
                         attrType[groupByAttr.offset - 1].attrType,
-                        scan, dbHeapFile.getRecCnt(), dbHeapFile, attrType, strSize, noOfColumns);
+                        null, dbHeapFile.getRecCnt(), dbHeapFile, attrType, strSize, noOfColumns);
             } catch (Exception e) {
                 System.err.println("Error occurred while creating Index.");
                 return;
             }
+            Phase3Utils.insertIndexEntry(tableName, group_by_attr.offset, IndexType.Hash);
             System.out.println("Hash Index created on group by attr -> " + groupByAttr.offset);
-        /*} else {
-            hashFile = new HashFile(hashIndexName);
+        } else {
+            hashFile = new HashFile(tableName, hashIndexName, group_by_attr.offset, IndexType.Hash, 0, dbHeapFile,attrType, strSize, noOfColumns);
             System.out.println("Reusing hash index created on group by attr -> " + groupByAttr.offset);
-        }*/
+        }
     }
 
     private boolean ifIndexExistOnTheTable() {
-        try {
-            int numOfRecords = new Heapfile(hashIndexName).getRecCnt();
-            if (numOfRecords > 0) {
-                System.out.println("Hash Index present on group by attr");
-                return true;
-            }
-        } catch (InvalidSlotNumberException | InvalidTupleSizeException | HFDiskMgrException | HFBufMgrException | IOException | HFException e) {
-            e.printStackTrace();
-        }
-        System.out.println("Hash Index not present ... Creating one");
-        return false;
+        return Phase3Utils.isIndexExists(tableName, groupByAttr.offset, IndexType.Hash);
     }
 
     /**
@@ -152,7 +146,7 @@ public class GroupBywithHash {
             }
         } finally {
             System.out.println("Done computing group by operation!");
-            scan.close();
+
         }
     }
 
@@ -182,47 +176,54 @@ public class GroupBywithHash {
         float min = Float.MAX_VALUE;
         float groupByAttrValue = 0;
         int rows = 0;
-        hash.KeyDataEntry entry = hashScan.get_next();
-        while (entry != null) {
-            RID fetchRID = entry.data;
-            tuple = dbHeapFile.getRecord(fetchRID);
-            tuple = new Tuple(tuple.getTupleByteArray(), tuple.getOffset(), tuple.getLength());
-            tuple.setHdr(noOfColumns, attrType, strSize);
-            int index = groupByAttr.offset;
-            groupByAttrValue = Phase3Utils.getAttrVal(tuple, index, attrType[index - 1]);
-            if (previousGroupByAttrValue == Float.MIN_VALUE) {
-                min = Phase3Utils.getAttrVal(tuple, aggList[0].offset, attrType[aggList[0].offset - 1]);
-                minTuple = tuple;
-            } else if (previousGroupByAttrValue == groupByAttrValue) {
-                float val = Phase3Utils.getAttrVal(tuple, aggList[0].offset, attrType[aggList[0].offset - 1]);
-                min = Math.min(val, min);
-                if (min == val) {
+        try {
+            hash.KeyDataEntry entry = hashScan.get_next();
+            while (entry != null) {
+                System.out.println("Yay");
+                RID fetchRID = entry.data;
+                tuple = dbHeapFile.getRecord(fetchRID);
+                System.out.println("Tuple -> " + tuple);
+                tuple = new Tuple(tuple.getTupleByteArray(), tuple.getOffset(), tuple.getLength());
+                tuple.setHdr(noOfColumns, attrType, strSize);
+                int index = groupByAttr.offset;
+                groupByAttrValue = Phase3Utils.getAttrVal(tuple, index, attrType[index - 1]);
+                if (previousGroupByAttrValue == Float.MIN_VALUE) {
+                    min = Phase3Utils.getAttrVal(tuple, aggList[0].offset, attrType[aggList[0].offset - 1]);
                     minTuple = tuple;
-                }
-            } else {
-                Tuple to = new Tuple(Phase3Utils.getAggTuple(groupByAttrValue, groupByAttr.offset, min,
-                        attrType[aggList[0].offset - 1], attrType));
-                min = Phase3Utils.getAttrVal(tuple, aggList[0].offset, attrType[aggList[0].offset - 1]);
-                minTuple = tuple;
-                if (Phase3Utils.createMaterializedView(materTableName)) {
-                    materHeapfile.insertRecord(to.returnTupleByteArray());
+                } else if (previousGroupByAttrValue == groupByAttrValue) {
+                    float val = Phase3Utils.getAttrVal(tuple, aggList[0].offset, attrType[aggList[0].offset - 1]);
+                    min = Math.min(val, min);
+                    if (min == val) {
+                        minTuple = tuple;
+                    }
                 } else {
-                    to.print(groupByAttrTypes);
+                    Tuple to = new Tuple(Phase3Utils.getAggTuple(groupByAttrValue, groupByAttr.offset, min,
+                            attrType[aggList[0].offset - 1], attrType));
+                    min = Phase3Utils.getAttrVal(tuple, aggList[0].offset, attrType[aggList[0].offset - 1]);
+                    minTuple = tuple;
+                    if (Phase3Utils.createMaterializedView(materTableName)) {
+                        materHeapfile.insertRecord(to.returnTupleByteArray());
+                    } else {
+                        to.print(groupByAttrTypes);
+                    }
+                    rows++;
                 }
-                rows++;
-            }
-            previousGroupByAttrValue = groupByAttrValue;
+                previousGroupByAttrValue = groupByAttrValue;
 
-            entry = hashScan.get_next();
-        }
-        assert minTuple != null;
-        rows++;
-        Tuple to = new Tuple(Phase3Utils.getAggTuple(groupByAttrValue, groupByAttr.offset, min,
-                attrType[aggList[0].offset - 1], attrType));
-        if (Phase3Utils.createMaterializedView(materTableName)) {
-            materHeapfile.insertRecord(to.returnTupleByteArray());
-        } else {
-            to.print(groupByAttrTypes);
+                entry = hashScan.get_next();
+            }
+            assert minTuple != null;
+            rows++;
+            Tuple to = new Tuple(Phase3Utils.getAggTuple(groupByAttrValue, groupByAttr.offset, min,
+                    attrType[aggList[0].offset - 1], attrType));
+            if (Phase3Utils.createMaterializedView(materTableName)) {
+                materHeapfile.insertRecord(to.returnTupleByteArray());
+            } else {
+                to.print(groupByAttrTypes);
+            }
+        } catch (Exception e) {
+            System.out.println("Error occurred while computing group by MIN!" + e);
+            e.printStackTrace();
         }
         System.out.println("No of rows in group by " + rows);
     }
@@ -233,40 +234,45 @@ public class GroupBywithHash {
         float min = Float.MAX_VALUE;
         String groupByAttrValue = "";
         int rows = 0;
-        hash.KeyDataEntry entry = hashScan.get_next();
-        while (entry != null) {
-            RID fetchRID = entry.data;
-            tuple = dbHeapFile.getRecord(fetchRID);
-            tuple = new Tuple(tuple.getTupleByteArray(), tuple.getOffset(), tuple.getLength());
-            tuple.setHdr(noOfColumns, attrType, strSize);
-            int index = groupByAttr.offset;
-            groupByAttrValue = Phase3Utils.getAttrValString(tuple, index, attrType[index - 1]);
-            if (previousGroupByAttrValue.equals(Phase3Utils.GROUP_BY_ATTR_STRING_INITIALIZER)) {
-                min = Phase3Utils.getAttrVal(tuple, aggList[0].offset, attrType[aggList[0].offset - 1]);
-            } else if (previousGroupByAttrValue.equals(groupByAttrValue)) {
-                float val = Phase3Utils.getAttrVal(tuple, aggList[0].offset, attrType[aggList[0].offset - 1]);
-                min = Math.min(val, min);
-            } else {
-                Tuple to = new Tuple(Phase3Utils.getAggTupleGroupByAttrString(groupByAttrValue, groupByAttr.offset, min,
-                        attrType[aggList[0].offset - 1]));
-                if (Phase3Utils.createMaterializedView(materTableName)) {
-                    materHeapfile.insertRecord(to.returnTupleByteArray());
+        try {
+            hash.KeyDataEntry entry = hashScan.get_next();
+            while (entry != null) {
+                RID fetchRID = entry.data;
+                tuple = dbHeapFile.getRecord(fetchRID);
+                tuple = new Tuple(tuple.getTupleByteArray(), tuple.getOffset(), tuple.getLength());
+                tuple.setHdr(noOfColumns, attrType, strSize);
+                int index = groupByAttr.offset;
+                groupByAttrValue = Phase3Utils.getAttrValString(tuple, index, attrType[index - 1]);
+                if (previousGroupByAttrValue.equals(Phase3Utils.GROUP_BY_ATTR_STRING_INITIALIZER)) {
+                    min = Phase3Utils.getAttrVal(tuple, aggList[0].offset, attrType[aggList[0].offset - 1]);
+                } else if (previousGroupByAttrValue.equals(groupByAttrValue)) {
+                    float val = Phase3Utils.getAttrVal(tuple, aggList[0].offset, attrType[aggList[0].offset - 1]);
+                    min = Math.min(val, min);
                 } else {
-                    to.print(groupByAttrTypes);
+                    Tuple to = new Tuple(Phase3Utils.getAggTupleGroupByAttrString(groupByAttrValue, groupByAttr.offset, min,
+                            attrType[aggList[0].offset - 1]));
+                    if (Phase3Utils.createMaterializedView(materTableName)) {
+                        materHeapfile.insertRecord(to.returnTupleByteArray());
+                    } else {
+                        to.print(groupByAttrTypes);
+                    }
+                    min = Phase3Utils.getAttrVal(tuple, aggList[0].offset, attrType[aggList[0].offset - 1]);
+                    rows++;
                 }
-                min = Phase3Utils.getAttrVal(tuple, aggList[0].offset, attrType[aggList[0].offset - 1]);
-                rows++;
+                previousGroupByAttrValue = groupByAttrValue;
+                entry = hashScan.get_next();
             }
-            previousGroupByAttrValue = groupByAttrValue;
-            entry = hashScan.get_next();
-        }
-        rows++;
-        Tuple to = new Tuple(Phase3Utils.getAggTupleGroupByAttrString(groupByAttrValue, groupByAttr.offset, min,
-                attrType[aggList[0].offset - 1]));
-        if (Phase3Utils.createMaterializedView(materTableName)) {
-            materHeapfile.insertRecord(to.returnTupleByteArray());
-        } else {
-            to.print(groupByAttrTypes);
+            rows++;
+            Tuple to = new Tuple(Phase3Utils.getAggTupleGroupByAttrString(groupByAttrValue, groupByAttr.offset, min,
+                    attrType[aggList[0].offset - 1]));
+            if (Phase3Utils.createMaterializedView(materTableName)) {
+                materHeapfile.insertRecord(to.returnTupleByteArray());
+            } else {
+                to.print(groupByAttrTypes);
+            }
+        } catch (Exception e) {
+            System.out.println("Error occurred while computing group by MAX!" + e);
+            e.printStackTrace();
         }
         System.out.println("No of rows in group by " + rows);
     }
@@ -296,38 +302,43 @@ public class GroupBywithHash {
         float max = Float.MIN_VALUE;
 
         float groupByAttrValue = 0;
-        hash.KeyDataEntry entry = hashScan.get_next();
-        while (entry != null) {
-            RID fetchRID = entry.data;
-            tuple = dbHeapFile.getRecord(fetchRID);
-            tuple = new Tuple(tuple.getTupleByteArray(), tuple.getOffset(), tuple.getLength());
-            tuple.setHdr(noOfColumns, attrType, strSize);
-            int index = groupByAttr.offset;
-            groupByAttrValue = Phase3Utils.getAttrVal(tuple, index, attrType[index - 1]);
-            if (previousGroupByAttrValue == Float.MAX_VALUE) {
-                max = Phase3Utils.getAttrVal(tuple, aggList[0].offset, attrType[aggList[0].offset - 1]);
-            } else if (previousGroupByAttrValue == groupByAttrValue) {
-                float val = Phase3Utils.getAttrVal(tuple, aggList[0].offset, attrType[aggList[0].offset - 1]);
-                max = Math.max(val, max);
-            } else {
-                Tuple to = new Tuple(Phase3Utils.getAggTuple(groupByAttrValue, groupByAttr.offset, max,
-                        attrType[aggList[0].offset - 1], attrType));
-                if (Phase3Utils.createMaterializedView(materTableName)) {
-                    materHeapfile.insertRecord(to.returnTupleByteArray());
+        try {
+            hash.KeyDataEntry entry = hashScan.get_next();
+            while (entry != null) {
+                RID fetchRID = entry.data;
+                tuple = dbHeapFile.getRecord(fetchRID);
+                tuple = new Tuple(tuple.getTupleByteArray(), tuple.getOffset(), tuple.getLength());
+                tuple.setHdr(noOfColumns, attrType, strSize);
+                int index = groupByAttr.offset;
+                groupByAttrValue = Phase3Utils.getAttrVal(tuple, index, attrType[index - 1]);
+                if (previousGroupByAttrValue == Float.MAX_VALUE) {
+                    max = Phase3Utils.getAttrVal(tuple, aggList[0].offset, attrType[aggList[0].offset - 1]);
+                } else if (previousGroupByAttrValue == groupByAttrValue) {
+                    float val = Phase3Utils.getAttrVal(tuple, aggList[0].offset, attrType[aggList[0].offset - 1]);
+                    max = Math.max(val, max);
                 } else {
-                    to.print(groupByAttrTypes);
+                    Tuple to = new Tuple(Phase3Utils.getAggTuple(groupByAttrValue, groupByAttr.offset, max,
+                            attrType[aggList[0].offset - 1], attrType));
+                    if (Phase3Utils.createMaterializedView(materTableName)) {
+                        materHeapfile.insertRecord(to.returnTupleByteArray());
+                    } else {
+                        to.print(groupByAttrTypes);
+                    }
+                    max = Phase3Utils.getAttrVal(tuple, aggList[0].offset, attrType[aggList[0].offset - 1]);
                 }
-                max = Phase3Utils.getAttrVal(tuple, aggList[0].offset, attrType[aggList[0].offset - 1]);
+                previousGroupByAttrValue = groupByAttrValue;
+                entry = hashScan.get_next();
             }
-            previousGroupByAttrValue = groupByAttrValue;
-            entry = hashScan.get_next();
-        }
-        Tuple to = new Tuple(Phase3Utils.getAggTuple(groupByAttrValue, groupByAttr.offset, max,
-                attrType[aggList[0].offset - 1], attrType));
-        if (Phase3Utils.createMaterializedView(materTableName)) {
-            materHeapfile.insertRecord(to.returnTupleByteArray());
-        } else {
-            to.print(groupByAttrTypes);
+            Tuple to = new Tuple(Phase3Utils.getAggTuple(groupByAttrValue, groupByAttr.offset, max,
+                    attrType[aggList[0].offset - 1], attrType));
+            if (Phase3Utils.createMaterializedView(materTableName)) {
+                materHeapfile.insertRecord(to.returnTupleByteArray());
+            } else {
+                to.print(groupByAttrTypes);
+            }
+        } catch (Exception e) {
+            System.out.println("Error occurred while computing group by MAX!" + e);
+            e.printStackTrace();
         }
     }
 
@@ -337,39 +348,44 @@ public class GroupBywithHash {
         float max = Float.MIN_VALUE;
 
         String groupByAttrValue = "";
-        hash.KeyDataEntry entry = hashScan.get_next();
-        while (entry != null) {
-            RID fetchRID = entry.data;
-            tuple = dbHeapFile.getRecord(fetchRID);
-            tuple = new Tuple(tuple.getTupleByteArray(), tuple.getOffset(), tuple.getLength());
-            tuple.setHdr(noOfColumns, attrType, strSize);
-            int index = groupByAttr.offset;
-            groupByAttrValue = Phase3Utils.getAttrValString(tuple, index, attrType[index - 1]);
-            if (previousGroupByAttrValue.equals(Phase3Utils.GROUP_BY_ATTR_STRING_INITIALIZER)) {
-                max = Phase3Utils.getAttrVal(tuple, aggList[0].offset, attrType[aggList[0].offset - 1]);
-            } else if (previousGroupByAttrValue.equals(groupByAttrValue)) {
-                float val = Phase3Utils.getAttrVal(tuple, aggList[0].offset, attrType[aggList[0].offset - 1]);
-                max = Math.max(val, max);
-            } else {
-                Tuple to = new Tuple(Phase3Utils.getAggTupleGroupByAttrString(groupByAttrValue, groupByAttr.offset, max,
-                        attrType[aggList[0].offset - 1]));
-                if (Phase3Utils.createMaterializedView(materTableName)) {
-                    materHeapfile.insertRecord(to.returnTupleByteArray());
+        try {
+            hash.KeyDataEntry entry = hashScan.get_next();
+            while (entry != null) {
+                RID fetchRID = entry.data;
+                tuple = dbHeapFile.getRecord(fetchRID);
+                tuple = new Tuple(tuple.getTupleByteArray(), tuple.getOffset(), tuple.getLength());
+                tuple.setHdr(noOfColumns, attrType, strSize);
+                int index = groupByAttr.offset;
+                groupByAttrValue = Phase3Utils.getAttrValString(tuple, index, attrType[index - 1]);
+                if (previousGroupByAttrValue.equals(Phase3Utils.GROUP_BY_ATTR_STRING_INITIALIZER)) {
+                    max = Phase3Utils.getAttrVal(tuple, aggList[0].offset, attrType[aggList[0].offset - 1]);
+                } else if (previousGroupByAttrValue.equals(groupByAttrValue)) {
+                    float val = Phase3Utils.getAttrVal(tuple, aggList[0].offset, attrType[aggList[0].offset - 1]);
+                    max = Math.max(val, max);
                 } else {
-                    to.print(groupByAttrTypes);
+                    Tuple to = new Tuple(Phase3Utils.getAggTupleGroupByAttrString(groupByAttrValue, groupByAttr.offset, max,
+                            attrType[aggList[0].offset - 1]));
+                    if (Phase3Utils.createMaterializedView(materTableName)) {
+                        materHeapfile.insertRecord(to.returnTupleByteArray());
+                    } else {
+                        to.print(groupByAttrTypes);
+                    }
+                    max = Phase3Utils.getAttrVal(tuple, aggList[0].offset, attrType[aggList[0].offset - 1]);
                 }
-                max = Phase3Utils.getAttrVal(tuple, aggList[0].offset, attrType[aggList[0].offset - 1]);
+                previousGroupByAttrValue = groupByAttrValue;
+                entry = hashScan.get_next();
             }
-            previousGroupByAttrValue = groupByAttrValue;
-            entry = hashScan.get_next();
-        }
 
-        Tuple to = new Tuple(Phase3Utils.getAggTupleGroupByAttrString(groupByAttrValue, groupByAttr.offset, max,
-                attrType[aggList[0].offset - 1]));
-        if (Phase3Utils.createMaterializedView(materTableName)) {
-            materHeapfile.insertRecord(to.returnTupleByteArray());
-        } else {
-            to.print(groupByAttrTypes);
+            Tuple to = new Tuple(Phase3Utils.getAggTupleGroupByAttrString(groupByAttrValue, groupByAttr.offset, max,
+                    attrType[aggList[0].offset - 1]));
+            if (Phase3Utils.createMaterializedView(materTableName)) {
+                materHeapfile.insertRecord(to.returnTupleByteArray());
+            } else {
+                to.print(groupByAttrTypes);
+            }
+        } catch (Exception e) {
+            System.out.println("Error occurred while computing group by MAX!" + e);
+            e.printStackTrace();
         }
 
     }
@@ -383,6 +399,7 @@ public class GroupBywithHash {
     private void getAvg() throws Exception {
 
         attrInfo[] attrs = Phase3Utils.getAttrInfoGroupBy(attrType, groupByAttr, aggList);
+        attrs[1].attrType = new AttrType(AttrType.attrReal);
         Phase3Utils.createTable(materTableName, 2, attrs);
 
         if (attrType[groupByAttr.offset - 1].attrType == AttrType.attrInteger) {
@@ -400,39 +417,44 @@ public class GroupBywithHash {
         float sum = 0;
         int count = 0;
         float groupByAttrValue = 0;
-        hash.KeyDataEntry entry = hashScan.get_next();
-        while (entry != null) {
-            RID fetchRID = entry.data;
-            tuple = dbHeapFile.getRecord(fetchRID);
-            tuple = new Tuple(tuple.getTupleByteArray(), tuple.getOffset(), tuple.getLength());
-            tuple.setHdr(noOfColumns, attrType, strSize);
-            int index = groupByAttr.offset;
-            groupByAttrValue = Phase3Utils.getAttrVal(tuple, index, this.attrType[index - 1]);
-            if (previousGroupByAttrValue == Float.MAX_VALUE) {
-                sum = Phase3Utils.getAttrVal(tuple, aggList[0].offset, this.attrType[aggList[0].offset - 1]);
-            } else if (previousGroupByAttrValue == groupByAttrValue) {
-                float val = Phase3Utils.getAttrVal(tuple, aggList[0].offset, this.attrType[aggList[0].offset - 1]);
-                sum += val;
-            } else {
-                Tuple to = Phase3Utils.getAggTuple(previousGroupByAttrValue, groupByAttr.offset, sum / count, new AttrType(AttrType.attrReal), this.attrType);
-                if (Phase3Utils.createMaterializedView(materTableName)) {
-                    materHeapfile.insertRecord(to.returnTupleByteArray());
+        try {
+            hash.KeyDataEntry entry = hashScan.get_next();
+            while (entry != null) {
+                RID fetchRID = entry.data;
+                tuple = dbHeapFile.getRecord(fetchRID);
+                tuple = new Tuple(tuple.getTupleByteArray(), tuple.getOffset(), tuple.getLength());
+                tuple.setHdr(noOfColumns, attrType, strSize);
+                int index = groupByAttr.offset;
+                groupByAttrValue = Phase3Utils.getAttrVal(tuple, index, this.attrType[index - 1]);
+                if (previousGroupByAttrValue == Float.MAX_VALUE) {
+                    sum = Phase3Utils.getAttrVal(tuple, aggList[0].offset, this.attrType[aggList[0].offset - 1]);
+                } else if (previousGroupByAttrValue == groupByAttrValue) {
+                    float val = Phase3Utils.getAttrVal(tuple, aggList[0].offset, this.attrType[aggList[0].offset - 1]);
+                    sum += val;
                 } else {
-                    to.print(groupByAttrTypes);
+                    Tuple to = Phase3Utils.getAggTuple(previousGroupByAttrValue, groupByAttr.offset, sum / count, new AttrType(AttrType.attrReal), this.attrType);
+                    if (Phase3Utils.createMaterializedView(materTableName)) {
+                        materHeapfile.insertRecord(to.returnTupleByteArray());
+                    } else {
+                        to.print(groupByAttrTypes);
+                    }
+                    count = 0;
+                    sum = Phase3Utils.getAttrVal(tuple, aggList[0].offset, this.attrType[aggList[0].offset - 1]);
                 }
-                count = 0;
-                sum = Phase3Utils.getAttrVal(tuple, aggList[0].offset, this.attrType[aggList[0].offset - 1]);
+                count++;
+                previousGroupByAttrValue = groupByAttrValue;
+                entry = hashScan.get_next();
             }
-            count++;
-            previousGroupByAttrValue = groupByAttrValue;
-            entry = hashScan.get_next();
-        }
 
-        Tuple to = Phase3Utils.getAggTuple(previousGroupByAttrValue, groupByAttr.offset, sum / count, new AttrType(AttrType.attrReal), this.attrType);
-        if (Phase3Utils.createMaterializedView(materTableName)) {
-            materHeapfile.insertRecord(to.returnTupleByteArray());
-        } else {
-            to.print(groupByAttrTypes);
+            Tuple to = Phase3Utils.getAggTuple(previousGroupByAttrValue, groupByAttr.offset, sum / count, new AttrType(AttrType.attrReal), this.attrType);
+            if (Phase3Utils.createMaterializedView(materTableName)) {
+                materHeapfile.insertRecord(to.returnTupleByteArray());
+            } else {
+                to.print(groupByAttrTypes);
+            }
+        } catch (Exception e) {
+            System.out.println("Error occurred while computing group by avg!" + e);
+            e.printStackTrace();
         }
     }
 
@@ -443,57 +465,47 @@ public class GroupBywithHash {
         float sum = 0;
         int count = 0;
         String groupByAttrValue = "";
-        hash.KeyDataEntry entry = hashScan.get_next();
-        while (entry != null) {
-            RID fetchRID = entry.data;
-            tuple = dbHeapFile.getRecord(fetchRID);
-            tuple = new Tuple(tuple.getTupleByteArray(), tuple.getOffset(), tuple.getLength());
-            tuple.setHdr(noOfColumns, attrType, strSize);
-            int index = groupByAttr.offset;
-            groupByAttrValue = Phase3Utils.getAttrValString(tuple, index, this.attrType[index - 1]);
-            if (previousGroupByAttrValue.equals(Phase3Utils.GROUP_BY_ATTR_STRING_INITIALIZER)) {
-                sum = Phase3Utils.getAttrVal(tuple, aggList[0].offset, this.attrType[aggList[0].offset - 1]);
-            } else if (previousGroupByAttrValue.equals(groupByAttrValue)) {
-                float val = Phase3Utils.getAttrVal(tuple, aggList[0].offset, this.attrType[aggList[0].offset - 1]);
-                sum += val;
-            } else {
-                Tuple to = Phase3Utils.getAggTupleGroupByAttrString(previousGroupByAttrValue, groupByAttr.offset, sum / count, new AttrType(AttrType.attrReal));
-                if (Phase3Utils.createMaterializedView(materTableName)) {
-                    materHeapfile.insertRecord(to.returnTupleByteArray());
+        try {
+            hash.KeyDataEntry entry = hashScan.get_next();
+            while (entry != null) {
+                RID fetchRID = entry.data;
+                tuple = dbHeapFile.getRecord(fetchRID);
+                tuple = new Tuple(tuple.getTupleByteArray(), tuple.getOffset(), tuple.getLength());
+                tuple.setHdr(noOfColumns, attrType, strSize);
+                int index = groupByAttr.offset;
+                groupByAttrValue = Phase3Utils.getAttrValString(tuple, index, this.attrType[index - 1]);
+                if (previousGroupByAttrValue.equals(Phase3Utils.GROUP_BY_ATTR_STRING_INITIALIZER)) {
+                    sum = Phase3Utils.getAttrVal(tuple, aggList[0].offset, this.attrType[aggList[0].offset - 1]);
+                } else if (previousGroupByAttrValue.equals(groupByAttrValue)) {
+                    float val = Phase3Utils.getAttrVal(tuple, aggList[0].offset, this.attrType[aggList[0].offset - 1]);
+                    sum += val;
                 } else {
-                    to.print(groupByAttrTypes);
+                    Tuple to = Phase3Utils.getAggTupleGroupByAttrString(previousGroupByAttrValue, groupByAttr.offset, sum / count, new AttrType(AttrType.attrReal));
+                    if (Phase3Utils.createMaterializedView(materTableName)) {
+                        materHeapfile.insertRecord(to.returnTupleByteArray());
+                    } else {
+                        to.print(groupByAttrTypes);
+                    }
+                    count = 0;
+                    sum = Phase3Utils.getAttrVal(tuple, aggList[0].offset, this.attrType[aggList[0].offset - 1]);
                 }
-                count = 0;
-                sum = Phase3Utils.getAttrVal(tuple, aggList[0].offset, this.attrType[aggList[0].offset - 1]);
+                count++;
+                previousGroupByAttrValue = groupByAttrValue;
+                entry = hashScan.get_next();
             }
-            count++;
-            previousGroupByAttrValue = groupByAttrValue;
-            entry = hashScan.get_next();
-        }
-        Tuple to = Phase3Utils.getAggTupleGroupByAttrString(previousGroupByAttrValue, groupByAttr.offset, sum / count, new AttrType(AttrType.attrReal));
-        if (Phase3Utils.createMaterializedView(materTableName)) {
-            materHeapfile.insertRecord(to.returnTupleByteArray());
-        } else {
-            to.print(groupByAttrTypes);
+            Tuple to = Phase3Utils.getAggTupleGroupByAttrString(previousGroupByAttrValue, groupByAttr.offset, sum / count, new AttrType(AttrType.attrReal));
+            if (Phase3Utils.createMaterializedView(materTableName)) {
+                materHeapfile.insertRecord(to.returnTupleByteArray());
+            } else {
+                to.print(groupByAttrTypes);
+            }
+        } catch (Exception e) {
+            System.out.println("Error occurred while computing group by avg!" + e);
+            e.printStackTrace();
         }
     }
 
-    /**
-     *
-     *
-     *
-     *
-     *
-     *
-     *
-     * CHECK FOR THIS
-     *
-     *
-     *
-     *
-     *
-     *
-     */
+
     /**
      * @return list of tuples from each group which are skyline of that group based on agg_list as pref_list.
      * @throws Exception
@@ -522,105 +534,113 @@ public class GroupBywithHash {
     private void computeSkyGroupByAttrInt(AttrType[] groupByAttrTypes) throws Exception {
         Tuple tuple;
         float previousGroupByAttrValue = Float.MAX_VALUE;
-        Heapfile file = new Heapfile("SkylineComputation.in");
-        int[] prefList = new int[aggList.length];
-        for (int i = 0; i < aggList.length; i++) {
-            prefList[i] = aggList[i].offset;
-        }
-
-        hash.KeyDataEntry entry = hashScan.get_next();
-        while (entry != null) {
-            RID fetchRID = entry.data;
-            tuple = dbHeapFile.getRecord(fetchRID);
-            tuple = new Tuple(tuple.getTupleByteArray(), tuple.getOffset(), tuple.getLength());
-            tuple.setHdr(noOfColumns, attrType, strSize);
-            int index = groupByAttr.offset;
-            float groupByAttrValue = Phase3Utils.getAttrVal(tuple, index, attrType[index - 1]);
-            if (previousGroupByAttrValue == Float.MAX_VALUE) {
-                file.insertRecord(tuple.returnTupleByteArray());
-            } else if (previousGroupByAttrValue == groupByAttrValue) {
-                file.insertRecord(tuple.returnTupleByteArray());
-            } else {
-                FileScan scan = new FileScan("SkylineComputation.in", attrType, strSize, noOfColumns, noOfColumns, projList, null);
-                BlockNestedLoopsSky blockNestedLoopsSky = new BlockNestedLoopsSky(attrType, noOfColumns, strSize, scan, "SkylineComputation.in", prefList, prefList.length, nPages);
-                if (Phase3Utils.createMaterializedView(materTableName)) {
-                    Phase3Utils.insertIntoTable(blockNestedLoopsSky.getAllSkylineMembers(), materHeapfile);
-                } else {
-                    Phase3Utils.printTuples(blockNestedLoopsSky.getAllSkylineMembers(), groupByAttrTypes);
-                }
-
-                scan.close();
-                file.deleteFile();
-                file = new Heapfile("SkylineComputation.in");
-                file.insertRecord(tuple.returnTupleByteArray());
+        Heapfile file = null;
+        FileScan scan = null;
+        try {
+            file = new Heapfile("SkylineComputation.in");
+            hash.KeyDataEntry entry = hashScan.get_next();
+            int[] prefList = new int[aggList.length];
+            for (int i = 0; i < aggList.length; i++) {
+                prefList[i] = aggList[i].offset;
             }
-            previousGroupByAttrValue = groupByAttrValue;
-            entry = hashScan.get_next();
-        }
 
-        FileScan scan = new FileScan("SkylineComputation.in", attrType, strSize, noOfColumns, noOfColumns, projList, null);
-        BlockNestedLoopsSky blockNestedLoopsSky = new BlockNestedLoopsSky(attrType, noOfColumns, strSize, scan, "SkylineComputation.in", prefList, prefList.length, nPages);
-        if (Phase3Utils.createMaterializedView(materTableName)) {
-            Phase3Utils.insertIntoTable(blockNestedLoopsSky.getAllSkylineMembers(), materHeapfile);
-        } else {
-            Phase3Utils.printTuples(blockNestedLoopsSky.getAllSkylineMembers(), groupByAttrTypes);
+            while (entry != null) {
+                RID fetchRID = entry.data;
+                tuple = dbHeapFile.getRecord(fetchRID);
+                tuple = new Tuple(tuple.getTupleByteArray(), tuple.getOffset(), tuple.getLength());
+                tuple.setHdr(noOfColumns, attrType, strSize);
+                int index = groupByAttr.offset;
+                float groupByAttrValue = Phase3Utils.getAttrVal(tuple, index, attrType[index - 1]);
+                if (previousGroupByAttrValue == Float.MAX_VALUE) {
+                    file.insertRecord(tuple.returnTupleByteArray());
+                } else if (previousGroupByAttrValue == groupByAttrValue) {
+                    file.insertRecord(tuple.returnTupleByteArray());
+                } else {
+                    scan = new FileScan("SkylineComputation.in", attrType, strSize, noOfColumns, noOfColumns, projList, null);
+                    BlockNestedLoopsSky blockNestedLoopsSky = new BlockNestedLoopsSky(attrType, noOfColumns, strSize, scan, "SkylineComputation.in", prefList, prefList.length, nPages);
+                    if (Phase3Utils.createMaterializedView(materTableName)) {
+                        Phase3Utils.insertIntoTable(blockNestedLoopsSky.getAllSkylineMembers(), materHeapfile);
+                    } else {
+                        Phase3Utils.printTuples(blockNestedLoopsSky.getAllSkylineMembers(), groupByAttrTypes);
+                    }
+
+                    scan.close();
+                    file.deleteFile();
+                    file = new Heapfile("SkylineComputation.in");
+                    file.insertRecord(tuple.returnTupleByteArray());
+                }
+                previousGroupByAttrValue = groupByAttrValue;
+                entry = hashScan.get_next();
+            }
+
+            scan = new FileScan("SkylineComputation.in", attrType, strSize, noOfColumns, noOfColumns, projList, null);
+            BlockNestedLoopsSky blockNestedLoopsSky = new BlockNestedLoopsSky(attrType, noOfColumns, strSize, scan, "SkylineComputation.in", prefList, prefList.length, nPages);
+            if (Phase3Utils.createMaterializedView(materTableName)) {
+                Phase3Utils.insertIntoTable(blockNestedLoopsSky.getAllSkylineMembers(), materHeapfile);
+            } else {
+                Phase3Utils.printTuples(blockNestedLoopsSky.getAllSkylineMembers(), groupByAttrTypes);
+            }
+        } catch (Exception e) {
+            System.out.println("Error occurred while Group By Skyline Computation!");
+            e.printStackTrace();
+        } finally {
+            Phase3Utils.closeScan(scan);
         }
-        scan.close();
-        file.deleteFile();
-        /**
-         * last element
-         */
     }
 
     private void computeSkyGroupByAttrString(AttrType[] groupByAttrTypes) throws Exception {
         Tuple tuple;
         String previousGroupByAttrValue = Phase3Utils.GROUP_BY_ATTR_STRING_INITIALIZER;
-        Heapfile file = new Heapfile("SkylineComputation.in");
-        int[] prefList = new int[aggList.length];
-        for (int i = 0; i < aggList.length; i++) {
-            prefList[i] = aggList[i].offset;
-        }
-        hash.KeyDataEntry entry = hashScan.get_next();
-        while (entry != null) {
-            RID fetchRID = entry.data;
-            tuple = dbHeapFile.getRecord(fetchRID);
-            tuple = new Tuple(tuple.getTupleByteArray(), tuple.getOffset(), tuple.getLength());
-            tuple.setHdr(noOfColumns, attrType, strSize);
-            int index = groupByAttr.offset;
-            String groupByAttrValue = Phase3Utils.getAttrValString(tuple, index, attrType[index - 1]);
-            if (previousGroupByAttrValue.equals(Phase3Utils.GROUP_BY_ATTR_STRING_INITIALIZER)) {
-                file.insertRecord(tuple.returnTupleByteArray());
-            } else if (previousGroupByAttrValue.equals(groupByAttrValue)) {
-                file.insertRecord(tuple.returnTupleByteArray());
-            } else {
-                FileScan scan = new FileScan("SkylineComputation.in", attrType, strSize, noOfColumns, noOfColumns, projList, null);
-                BlockNestedLoopsSky blockNestedLoopsSky = new BlockNestedLoopsSky(attrType, noOfColumns, strSize, scan, "SkylineComputation.in", prefList, prefList.length, nPages);
-                if (Phase3Utils.createMaterializedView(materTableName)) {
-                    Phase3Utils.insertIntoTable(blockNestedLoopsSky.getAllSkylineMembers(), materHeapfile);
-                } else {
-                    Phase3Utils.printTuples(blockNestedLoopsSky.getAllSkylineMembers(), groupByAttrTypes);
-                }
-                scan.close();
-                file.deleteFile();
-                file = new Heapfile("SkylineComputation.in");
-                file.insertRecord(tuple.returnTupleByteArray());
+        Heapfile file = null;
+        FileScan scan = null;
+        try {
+            file = new Heapfile("SkylineComputation.in");
+            hash.KeyDataEntry entry = hashScan.get_next();
+            int[] prefList = new int[aggList.length];
+            for (int i = 0; i < aggList.length; i++) {
+                prefList[i] = aggList[i].offset;
             }
-            previousGroupByAttrValue = groupByAttrValue;
-            entry = hashScan.get_next();
-        }
+            while (entry != null) {
+                RID fetchRID = entry.data;
+                tuple = dbHeapFile.getRecord(fetchRID);
+                tuple = new Tuple(tuple.getTupleByteArray(), tuple.getOffset(), tuple.getLength());
+                tuple.setHdr(noOfColumns, attrType, strSize);
+                int index = groupByAttr.offset;
+                String groupByAttrValue = Phase3Utils.getAttrValString(tuple, index, attrType[index - 1]);
+                if (previousGroupByAttrValue.equals(Phase3Utils.GROUP_BY_ATTR_STRING_INITIALIZER)) {
+                    file.insertRecord(tuple.returnTupleByteArray());
+                } else if (previousGroupByAttrValue.equals(groupByAttrValue)) {
+                    file.insertRecord(tuple.returnTupleByteArray());
+                } else {
+                    scan = new FileScan("SkylineComputation.in", attrType, strSize, noOfColumns, noOfColumns, projList, null);
+                    BlockNestedLoopsSky blockNestedLoopsSky = new BlockNestedLoopsSky(attrType, noOfColumns, strSize, scan, "SkylineComputation.in", prefList, prefList.length, nPages);
+                    if (Phase3Utils.createMaterializedView(materTableName)) {
+                        Phase3Utils.insertIntoTable(blockNestedLoopsSky.getAllSkylineMembers(), materHeapfile);
+                    } else {
+                        Phase3Utils.printTuples(blockNestedLoopsSky.getAllSkylineMembers(), groupByAttrTypes);
+                    }
+                    Phase3Utils.closeScan(scan);
+                    file.deleteFile();
+                    file = new Heapfile("SkylineComputation.in");
+                    file.insertRecord(tuple.returnTupleByteArray());
+                }
+                previousGroupByAttrValue = groupByAttrValue;
+                entry = hashScan.get_next();
+            }
 
-        FileScan scan = new FileScan("SkylineComputation.in", attrType, strSize, noOfColumns, noOfColumns, projList, null);
-        BlockNestedLoopsSky blockNestedLoopsSky = new BlockNestedLoopsSky(attrType, noOfColumns, strSize, scan, "SkylineComputation.in", prefList, prefList.length, nPages);
-        if (Phase3Utils.createMaterializedView(materTableName)) {
-            Phase3Utils.insertIntoTable(blockNestedLoopsSky.getAllSkylineMembers(), materHeapfile);
-        } else {
-            Phase3Utils.printTuples(blockNestedLoopsSky.getAllSkylineMembers(), groupByAttrTypes);
+            scan = new FileScan("SkylineComputation.in", attrType, strSize, noOfColumns, noOfColumns, projList, null);
+            BlockNestedLoopsSky blockNestedLoopsSky = new BlockNestedLoopsSky(attrType, noOfColumns, strSize, scan, "SkylineComputation.in", prefList, prefList.length, nPages);
+            if (Phase3Utils.createMaterializedView(materTableName)) {
+                Phase3Utils.insertIntoTable(blockNestedLoopsSky.getAllSkylineMembers(), materHeapfile);
+            } else {
+                Phase3Utils.printTuples(blockNestedLoopsSky.getAllSkylineMembers(), groupByAttrTypes);
+            }
+        } catch (Exception e) {
+            System.out.println("Error occurred while Group By Skyline Computation!");
+            e.printStackTrace();
+        } finally {
+            Phase3Utils.closeScan(scan);
         }
-        scan.close();
-        file.deleteFile();
-        /**
-         * last element
-         */
     }
 
 }

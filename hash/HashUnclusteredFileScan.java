@@ -48,7 +48,7 @@ public class HashUnclusteredFileScan extends HashIndexFileScan implements Global
             bucket = new Heapfile(currentBucketName);
             bucketEntryCnt = bucket.getRecCnt();
             if(bucketEntryCnt!=0) {
-                System.out.println(currentBucketName + " ======="+ bucketEntryCnt + "elements");
+                //System.out.println(currentBucketName + " ======="+ bucketEntryCnt + "elements");
             }
         
             bucket_scan = bucket.openScan();
@@ -87,6 +87,8 @@ public class HashUnclusteredFileScan extends HashIndexFileScan implements Global
                     attrType[2] = new AttrType (AttrType.attrInteger);
                     
                     ridTuple.setHdr((short)3, attrType, attrSizes);
+                    ridTuple = new Tuple(ridTuple.size());
+                    ridTuple.setHdr((short)3, attrType, attrSizes);
                     entry.key = new IntegerKey(ridTuple.getIntFld(1));
                     // System.out.println("Scan Key"+ ridTuple.getIntFld(1));
                     // System.out.println("RID "+ ridTuple.getIntFld(2)+ ":"+ ridTuple.getIntFld(3));
@@ -95,6 +97,8 @@ public class HashUnclusteredFileScan extends HashIndexFileScan implements Global
                     attrType[1] = new AttrType (AttrType.attrInteger);
                     attrType[2] = new AttrType (AttrType.attrInteger);
 
+                    ridTuple.setHdr((short)3, attrType, attrSizes);
+                    ridTuple = new Tuple(ridTuple.size());
                     ridTuple.setHdr((short)3, attrType, attrSizes);
                     entry.key = new StringKey(ridTuple.getStrFld(1));
                     // System.out.println("Scan Key"+ ridTuple.getStrFld(1));
@@ -108,7 +112,7 @@ public class HashUnclusteredFileScan extends HashIndexFileScan implements Global
                 entry.data = new RID(insert_rid.pageNo,insert_rid.slotNo);
                 
                 if(bucketEntryCnt == 0) {
-                    System.out.println("This is the last entry");
+                    //System.out.println("This is the last entry");
                     header_names.remove();
                     
                     currentBucketCnt++;

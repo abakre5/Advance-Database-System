@@ -22,7 +22,7 @@ public class Phase3Utils {
     public final static int SIZE_OF_STRING = 32;
     public final static String GROUP_BY_ATTR_STRING_INITIALIZER = "INITIALIZER_GROUP_BY_ATTR";
 
-    private final static String INDEX_META_DATA_FILE = "INDEXMETADATAFILE1";
+    private final static String INDEX_META_DATA_FILE = "IMDeF";
     private final static AttrType[] attrTypesIndexMetaData =
             {new AttrType(AttrType.attrString), new AttrType(AttrType.attrInteger), new AttrType(AttrType.attrInteger)};
 
@@ -487,6 +487,16 @@ public class Phase3Utils {
             e.printStackTrace();
         }
         return btf;
+    }
+
+    public static void closeScan(FileScan scan) {
+        if (scan != null) {
+            scan.close();
+        }
+    }
+
+    public static String getClusteredHashIndexName(String RelationName, int KeyAttrIdx) {
+        return RelationName + IndexType.getStringForType(IndexType.Clustered_Hash) + Integer.toString(KeyAttrIdx);
     }
 
 }

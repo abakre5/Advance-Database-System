@@ -16,6 +16,7 @@ import global.*;
 import heap.*;
 import iterator.FileScan;
 import iterator.TupleRIDPair;
+import tests.Phase3Utils;
 
 public class ClusteredHashFile  implements GlobalConst {
     /* class constants */
@@ -46,7 +47,7 @@ public class ClusteredHashFile  implements GlobalConst {
         
 
         this.relationName = RelationName;
-        this.hashIndexName = getIndexName(RelationName, KeyAttrIdx);
+        this.hashIndexName = Phase3Utils.getClusteredHashIndexName(RelationName, KeyAttrIdx);
         this.headerFile = new Heapfile(getIndexHdrFileName(RelationName, KeyAttrIdx));
         this.keyAttrIndex = KeyAttrIdx;
         this.keyType = KeyType;
@@ -76,10 +77,6 @@ public class ClusteredHashFile  implements GlobalConst {
         }
 
 	}
-
-    private String getIndexName(String RelationName, int KeyAttrIdx) {
-        return RelationName + "-clustered-hash-" + KeyAttrIdx;
-    }
 
     private String getIndexHdrFileName(String RelationName, int KeyAttrIdx) {
         return RelationName + "-clustered-hash-" + KeyAttrIdx + ".hdr";

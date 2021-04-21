@@ -73,6 +73,7 @@ public class GroupBywithSort {
             System.err.println("Aggregation attributes does not support String attribute!");
             return;
         }
+
         this.materHeapfile = new Heapfile(materTableName);
 
         if (!isRelationSortedOnGroupByAttr(relationName)) {
@@ -368,8 +369,6 @@ public class GroupBywithSort {
 
     }
 
-    // TO-DO: Value of non groupbyattr and non agg_list attr handling currently it is 0.
-
     /**
      * @return list of tuples from each group having average of that group based on agg_list.
      * @throws Exception
@@ -466,22 +465,6 @@ public class GroupBywithSort {
     }
 
     /**
-     *
-     *
-     *
-     *
-     *
-     *
-     *
-     * CHECK FOR THIS
-     *
-     *
-     *
-     *
-     *
-     *
-     */
-    /**
      * @return list of tuples from each group which are skyline of that group based on agg_list as pref_list.
      * @throws Exception
      */
@@ -491,7 +474,7 @@ public class GroupBywithSort {
         for (int i = 0; i < noOfColumns; ++i) {
             attrs[i] = new attrInfo();
             attrs[i].attrType = new AttrType(attrType[i].attrType);
-            attrs[i].attrName = "Col" + i;
+            attrs[i].attrName = "Name";
             attrs[i].attrLen = (attrType[i].attrType == AttrType.attrInteger) ? Phase3Utils.SIZE_OF_INT : Phase3Utils.SIZE_OF_STRING;
         }
 
@@ -508,6 +491,7 @@ public class GroupBywithSort {
 
     private void computeSkyGroupByAttrInt(AttrType[] groupByAttrTypes) throws Exception {
         Heapfile file = null;
+        FileScan scanSky = null;
         try {
             file = new Heapfile("SkylineComputation.in");
             Tuple tuple;
@@ -525,14 +509,14 @@ public class GroupBywithSort {
                 } else if (previousGroupByAttrValue == groupByAttrValue) {
                     file.insertRecord(tuple.returnTupleByteArray());
                 } else {
-                    FileScan scan = new FileScan("SkylineComputation.in", attrType, strSize, noOfColumns, noOfColumns, projList, null);
+                    scanSky = new FileScan("SkylineComputation.in", attrType, strSize, noOfColumns, noOfColumns, projList, null);
                     BlockNestedLoopsSky blockNestedLoopsSky = new BlockNestedLoopsSky(attrType, noOfColumns, strSize, scan, "SkylineComputation.in", prefList, prefList.length, nPages);
                     if (Phase3Utils.createMaterializedView(materTableName)) {
                         Phase3Utils.insertIntoTable(blockNestedLoopsSky.getAllSkylineMembers(), materHeapfile);
                     } else {
                         Phase3Utils.printTuples(blockNestedLoopsSky.getAllSkylineMembers(), groupByAttrTypes);
                     }
-                    scan.close();
+                    Phase3Utils.closeScan(scanSky);
                     file.deleteFile();
                     file = new Heapfile("SkylineComputation.in");
                     file.insertRecord(tuple.returnTupleByteArray());
@@ -540,22 +524,20 @@ public class GroupBywithSort {
                 previousGroupByAttrValue = groupByAttrValue;
             }
 
-            if (scan != null) {
-                scan.close();
-            }
+            Phase3Utils.closeScan(scanSky);
 
-            FileScan scan = new FileScan("SkylineComputation.in", attrType, strSize, noOfColumns, noOfColumns, projList, null);
+            scanSky = new FileScan("SkylineComputation.in", attrType, strSize, noOfColumns, noOfColumns, projList, null);
             BlockNestedLoopsSky blockNestedLoopsSky = new BlockNestedLoopsSky(attrType, noOfColumns, strSize, scan, "SkylineComputation.in", prefList, prefList.length, nPages);
             if (Phase3Utils.createMaterializedView(materTableName)) {
                 Phase3Utils.insertIntoTable(blockNestedLoopsSky.getAllSkylineMembers(), materHeapfile);
             } else {
                 Phase3Utils.printTuples(blockNestedLoopsSky.getAllSkylineMembers(), groupByAttrTypes);
             }
-            scan.close();
-            file.deleteFile();
         } catch (Exception e) {
             System.out.println("Error occurred while computing group by skyline -> " + e.getMessage());
             e.printStackTrace();
+        } finally {
+            Phase3Utils.closeScan(scanSky);
             assert file != null;
             file.deleteFile();
         }
@@ -566,6 +548,7 @@ public class GroupBywithSort {
 
     private void computeSkyGroupByAttrString(AttrType[] groupByAttrTypes) throws Exception {
         Heapfile file = null;
+        FileScan scanSky = null;
         try {
             file = new Heapfile("SkylineComputation.in");
             Tuple tuple;
@@ -583,14 +566,14 @@ public class GroupBywithSort {
                 } else if (previousGroupByAttrValue.equals(groupByAttrValue)) {
                     file.insertRecord(tuple.returnTupleByteArray());
                 } else {
-                    FileScan scan = new FileScan("SkylineComputation.in", attrType, strSize, noOfColumns, noOfColumns, projList, null);
+                    scanSky = new FileScan("SkylineComputation.in", attrType, strSize, noOfColumns, noOfColumns, projList, null);
                     BlockNestedLoopsSky blockNestedLoopsSky = new BlockNestedLoopsSky(attrType, noOfColumns, strSize, scan, "SkylineComputation.in", prefList, prefList.length, nPages);
                     if (Phase3Utils.createMaterializedView(materTableName)) {
                         Phase3Utils.insertIntoTable(blockNestedLoopsSky.getAllSkylineMembers(), materHeapfile);
                     } else {
                         Phase3Utils.printTuples(blockNestedLoopsSky.getAllSkylineMembers(), groupByAttrTypes);
                     }
-                    scan.close();
+                    Phase3Utils.closeScan(scanSky);
                     file.deleteFile();
                     file = new Heapfile("SkylineComputation.in");
                     file.insertRecord(tuple.returnTupleByteArray());
@@ -598,22 +581,21 @@ public class GroupBywithSort {
                 previousGroupByAttrValue = groupByAttrValue;
             }
 
-            if (scan != null) {
-                scan.close();
-            }
+            Phase3Utils.closeScan(scanSky);
 
-            FileScan scan = new FileScan("SkylineComputation.in", attrType, strSize, noOfColumns, noOfColumns, projList, null);
+            scanSky = new FileScan("SkylineComputation.in", attrType, strSize, noOfColumns, noOfColumns, projList, null);
             BlockNestedLoopsSky blockNestedLoopsSky = new BlockNestedLoopsSky(attrType, noOfColumns, strSize, scan, "SkylineComputation.in", prefList, prefList.length, nPages);
             if (Phase3Utils.createMaterializedView(materTableName)) {
                 Phase3Utils.insertIntoTable(blockNestedLoopsSky.getAllSkylineMembers(), materHeapfile);
             } else {
                 Phase3Utils.printTuples(blockNestedLoopsSky.getAllSkylineMembers(), groupByAttrTypes);
             }
-            scan.close();
-            file.deleteFile();
+
         } catch (Exception e) {
             System.out.println("Error occurred while computing group by skyline -> " + e.getMessage());
             e.printStackTrace();
+        } finally {
+            Phase3Utils.closeScan(scanSky);
             assert file != null;
             file.deleteFile();
         }

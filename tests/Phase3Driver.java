@@ -1969,25 +1969,25 @@ public class Phase3Driver implements GlobalConst {
                     int indexAttr = Integer.parseInt(tokens[2]);
                     String tableName = tokens[1];
 
-                    if(Phase3Utils.isIndexExists(tableName, indexAttr, IndexType.B_ClusteredIndex)){
+                    if(Phase3Utils.isIndexExists(tableName, indexAttr, IndexType.B_ClusteredIndex )){
                         //print BTree code
                         printClusteredBtreeIndex(tableName, indexAttr);
 
-                    } else if (!Phase3Utils.isIndexExists(tableName, indexAttr, IndexType.B_ClusteredIndex)) {
+                    } else if (!Phase3Utils.isIndexExists(tableName, indexAttr, IndexType.B_ClusteredIndex )) {
                         System.out.println("No clustered Btree index");
                     } 
                     
                     if (Phase3Utils.isIndexExists(tableName, indexAttr, IndexType.Clustered_Hash)) {
                         printClusteredHashIndexKeys(tableName, indexAttr);
                     }
-                    if (Phase3Utils.isIndexExists(tableName, indexAttr, IndexType.Hash)){
+                    if (Phase3Utils.isIndexExists(tableName, indexAttr, IndexType.Hash )){
                         printUnclusteredHashIndex(tableName, indexAttr);
                     }
 
-                    if(Phase3Utils.isIndexExists(tableName, indexAttr, IndexType.B_Index)) {
+                    if(Phase3Utils.isIndexExists(tableName, indexAttr, IndexType.B_Index) ) {
                         printUnclusteredBtreeIndex(tableName, indexAttr);
 
-                    } else if(!Phase3Utils.isIndexExists(tableName, indexAttr, IndexType.B_Index)){
+                    } else if(!Phase3Utils.isIndexExists(tableName, indexAttr, IndexType.B_Index )){
                         System.out.println("No unclustered btree index");
 
                     }
