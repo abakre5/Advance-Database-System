@@ -141,7 +141,7 @@ public class ClusteredHashFile  implements GlobalConst {
             }
         }
         bucketIdx = getBucketIndex(value);
-        System.err.println("insert> bucketNum: " + bucketIdx);
+        //System.err.println("insert> bucketNum: " + bucketIdx);
         Heapfile bucketFile = this.buckets[bucketIdx];
         RID rid = null;
         try {
@@ -164,7 +164,7 @@ public class ClusteredHashFile  implements GlobalConst {
         }
 
         bucketIdx = getBucketIndex(key);
-        System.err.println("delete> bucketNum: " + bucketIdx);
+        //System.err.println("delete> bucketNum: " + bucketIdx);
         assert bucketIdx < this.numBuckets;
         try {
             Heapfile bucketFile = this.buckets[bucketIdx];
@@ -175,7 +175,7 @@ public class ClusteredHashFile  implements GlobalConst {
             while ((temp = scan.getNext(rid)) != null) {
                 tup.tupleCopy(temp);
                 if (tup.equals(t)) {
-                    System.out.println("clustered hash> found tuple to delete");
+                    //System.out.println("clustered hash> found tuple to delete");
                     status = bucketFile.deleteRecord(rid);
                     scan.closescan();
                     break;
