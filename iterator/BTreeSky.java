@@ -462,6 +462,7 @@ public class BTreeSky extends Iterator {
             }
             closeFlag = true;
         }
+        skyline.clear();
     }
 
     private void debug_printIndex(IndexScan iscan, int field_no){
@@ -578,6 +579,7 @@ public class BTreeSky extends Iterator {
         {
             bnlskyline = new BlockNestedLoopsSky(attrTypes, attrTypes.length, str_sizes, am, temp_file, pref_list, pref_list.length, n_buf_pgs);
             skyline.addAll(bnlskyline.getAllSkylineMembers());
+            candidate_file.deleteFile();
         }
         catch (Exception e)
         {
