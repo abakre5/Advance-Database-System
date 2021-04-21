@@ -394,7 +394,7 @@ public class Phase3Driver implements GlobalConst {
         return status;
     }
 
-    private static void deleteFromIndex(String tableName, int numAttr, Tuple t) {
+    private static void deleteFromIndex(String tableName, int numAttr, Tuple t, RID rid) {
         for(int i=1; i<=numAttr; i++) {
 
             if(Phase3Utils.isIndexExists(tableName,i, IndexType.B_ClusteredIndex)) {
@@ -408,9 +408,11 @@ public class Phase3Driver implements GlobalConst {
             if(Phase3Utils.isIndexExists(tableName,i, IndexType.Clustered_Hash)) {
 
             }
+
+            if(Phase3Utils.isIndexExists(tableName, i, IndexType.B_Index)){
+                deleteFromUnclusteredBtreeIndex(tableName, numAttr,i, rid, t);
+            }
         }
-
-
     }
     private static void insertIntoIndex(String tableName, int numAttr, RID rid, Tuple t) {
         for(int i=1; i<=numAttr; i++) {
@@ -1031,7 +1033,7 @@ public class Phase3Driver implements GlobalConst {
                 }
                 //System.err.println("tuple(rid=" + rid.hashCode() + ") equality: " + t.equals(delTuples.get(0)));
                 if (delTuples.contains(t)) {
-                    deleteFromIndex(tableName, numAttribs, t);
+                    deleteFromIndex(tableName, numAttribs, t, rid);
                     tupleDel = tableFile.deleteRecord(rid);
                     delTuples.remove(t);
                     numRowsDeleted++;
@@ -1517,6 +1519,46 @@ public class Phase3Driver implements GlobalConst {
             t.setHdr((short) numAttr, attrTypes, sizeArr);
             btree.KeyClass key = BT.createKeyFromTupleField(t, attrTypes, sizeArr, keyIndexAttr , BTREE_CLUSTERED_ORDER);
             btf.insert(key, rid);
+        } catch (Exception e) {
+            status = FAIL;
+            e.printStackTrace();
+        }
+
+        return status;
+    }
+
+    private static boolean deleteFromUnclusteredBtreeIndex(String tableName, int numAttr,int keyIndexAttr, RID rid, Tuple tuple)
+    {
+        boolean status = OK;
+        Tuple t = null;
+        BTreeFile btf = null;
+        RelDesc rec = new RelDesc();
+        AttrType[] attrTypes = null;
+        short[] sizeArr = null;
+        String indexFile = Phase3Utils.getUnClusteredBtreeIndexName(tableName, keyIndexAttr);
+        try {
+            numAttr = 0;
+            ExtendedSystemDefs.MINIBASE_RELCAT.getInfo(tableName, rec);
+            numAttr = rec.getAttrCnt();
+            attrTypes = new AttrType[numAttr];
+            sizeArr = new short[numAttr];
+
+            ExtendedSystemDefs.MINIBASE_ATTRCAT.getTupleStructure(tableName, numAttr, attrTypes, sizeArr);
+            t = new Tuple();
+            t.setHdr((short) numAttr, attrTypes, sizeArr);
+
+            assert keyIndexAttr <= numAttr;
+
+            btf = new BTreeFile(indexFile);
+        }catch (Exception e){
+            e.printStackTrace();
+        }
+
+        try {
+            t = new Tuple(tuple.getTupleByteArray(), tuple.getOffset(), tuple.getLength());
+            t.setHdr((short) numAttr, attrTypes, sizeArr);
+            btree.KeyClass key = BT.createKeyFromTupleField(t, attrTypes, sizeArr, keyIndexAttr , BTREE_CLUSTERED_ORDER);
+            btf.Delete(key, rid);
         } catch (Exception e) {
             status = FAIL;
             e.printStackTrace();
@@ -2514,7 +2556,7 @@ public class Phase3Driver implements GlobalConst {
                         temp.setHdr((short) attrTypes.length, attrTypes, strSizes);
                         if (isSameTuple(row, temp, attrs)) {
                             recordToBeDeleted.add(new RID(rid.pageNo, rid.slotNo));
-                            deleteFromIndex(tableName,numAttr, temp);
+                            deleteFromIndex(tableName,numAttr, temp, rid);
                         }
                     }
                     scan.closescan();
