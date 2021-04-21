@@ -12,17 +12,17 @@ import global.*;
 import heap.*;
 import index.IndexScan;
 import iterator.*;
+
+import java.util.*;
 import java.util.concurrent.TimeUnit;
 
 import java.io.*;
 import java.sql.Time;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Objects;
 
 import hash.*;
 import index.IndexUtils;
+import iterator.Iterator;
+
 public class Phase3Driver implements GlobalConst {
 
     /* class constants */
@@ -379,6 +379,13 @@ public class Phase3Driver implements GlobalConst {
             } else if (indexType == IndexType.Clustered_Hash) {
                 createClusteredHashIndex(tableName, indexAttr);
                 Phase3Utils.insertIndexEntry(tableName, indexAttr, indexType);
+                /*
+                 * Get all Indexes on a table -> index type as int and attribute index on which Index is created
+                List<TableIndexDesc> indexes = Phase3Utils.getIndexesOnTable(tableName);
+                for (TableIndexDesc index : indexes) {
+                    System.out.println("Index -> " + new IndexType(index.getType()) + " : " + index.getAttributeIndex());
+                }
+                */
             }
         }
 

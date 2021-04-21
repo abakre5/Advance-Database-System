@@ -10,6 +10,7 @@ import org.w3c.dom.Attr;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 
 import static tests.Phase3Driver.STR_SIZE;
@@ -20,12 +21,12 @@ public class Phase3Utils {
     public final static int SIZE_OF_STRING = 32;
     public final static String GROUP_BY_ATTR_STRING_INITIALIZER = "INITIALIZER_GROUP_BY_ATTR";
 
-    private final static String INDEX_META_DATA_FILE = "INDEXMETADATAFILE";
+    private final static String INDEX_META_DATA_FILE = "INDEXMETADATAFILE1";
     private final static AttrType[] attrTypesIndexMetaData =
-            {new AttrType(AttrType.attrString), new AttrType(AttrType.attrInteger), new AttrType(AttrType.attrString)};
+            {new AttrType(AttrType.attrString), new AttrType(AttrType.attrInteger), new AttrType(AttrType.attrInteger)};
 
 
-    private final static short[] strSizesIndexMetaData = {SIZE_OF_STRING, SIZE_OF_STRING};
+    private final static short[] strSizesIndexMetaData = {SIZE_OF_STRING};
 
 
     public static void writeToDisk() {
@@ -93,7 +94,7 @@ public class Phase3Utils {
         attrInfo[] attrs = new attrInfo[2];
         attrs[0] = new attrInfo();
         attrs[0].attrType = new AttrType(attrType[groupByAttr.offset - 1].attrType);
-        attrs[0].attrName = "Col" + 0;
+        attrs[0].attrName = "Name";
         attrs[0].attrLen = (attrType[groupByAttr.offset - 1].attrType == AttrType.attrInteger) ? Phase3Utils.SIZE_OF_INT : Phase3Utils.SIZE_OF_STRING;
 
         attrs[1] = new attrInfo();
@@ -246,7 +247,7 @@ public class Phase3Utils {
             tuple.setHdr((short) 3, attrTypesIndexMetaData, strSizesIndexMetaData);
             tuple.setStrFld(1, relationName);
             tuple.setIntFld(2, attrIndex);
-            tuple.setStrFld(3, new IndexType(indexTypeInt).toString());
+            tuple.setIntFld(3, indexTypeInt);
             file.insertRecord(tuple.returnTupleByteArray());
             System.out.println("Index inserted successfully in the catalog");
         } catch (Exception e) {
@@ -255,7 +256,7 @@ public class Phase3Utils {
 
     }
 
-    public static boolean isIndexExists(String relationName, int attrIndex, IndexType indexType) {
+    public static boolean isIndexExists(String relationName, int attrIndex, int indexType) {
         FileScan indexMetaDataFileScan = null;
         boolean isIndex = false;
         try {
@@ -267,7 +268,7 @@ public class Phase3Utils {
             indexMetaDataFileScan = new FileScan(INDEX_META_DATA_FILE, attrTypesIndexMetaData, strSizesIndexMetaData, (short) 3, 3, proj_list, null);
             Tuple tuple;
             while ((tuple = indexMetaDataFileScan.get_next()) != null) {
-                if (tuple.getStrFld(1).equals(relationName) && tuple.getIntFld(2) == attrIndex && tuple.getStrFld(3).equals(indexType.toString())) {
+                if (tuple.getStrFld(1).equals(relationName) && tuple.getIntFld(2) == attrIndex && tuple.getIntFld(3) == indexType) {
                     isIndex = true;
                     break;
                 }
@@ -282,6 +283,77 @@ public class Phase3Utils {
         }
         return isIndex;
     }
+
+    public static List<TableIndexDesc> getIndexesOnTable(String relationName) {
+        FileScan indexMetaDataFileScan = null;
+        List<TableIndexDesc> indexes = new ArrayList<>();
+        try {
+            FldSpec[] proj_list = new FldSpec[3];
+            for (int i = 0; i < 3; i++) {
+                proj_list[i] = new FldSpec(new RelSpec(RelSpec.outer), i + 1);
+            }
+
+            indexMetaDataFileScan = new FileScan(INDEX_META_DATA_FILE, attrTypesIndexMetaData, strSizesIndexMetaData, (short) 3, 3, proj_list, null);
+            Tuple tuple;
+            while ((tuple = indexMetaDataFileScan.get_next()) != null) {
+                if (tuple.getStrFld(1).equals(relationName)) {
+                    indexes.add(new TableIndexDesc(tuple.getIntFld(2), tuple.getIntFld(2)));
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("*** Error occurred while search for index in index catalog");
+            e.printStackTrace();
+        } finally {
+            if (indexMetaDataFileScan != null) {
+                indexMetaDataFileScan.close();
+            }
+        }
+        return indexes;
+    }
+
+
+    public static boolean deleteIndexFromCatalog(String relationName, int attrIndex, int indexType) throws IOException, HFException, HFBufMgrException, HFDiskMgrException {
+        FileScan indexMetaDataFileScan = null;
+        List<RID> indexToDelete = new ArrayList<>();
+        boolean isIndexDeleted = false;
+        try {
+            FldSpec[] proj_list = new FldSpec[3];
+            for (int i = 0; i < 3; i++) {
+                proj_list[i] = new FldSpec(new RelSpec(RelSpec.outer), i + 1);
+            }
+
+            indexMetaDataFileScan = new FileScan(INDEX_META_DATA_FILE, attrTypesIndexMetaData, strSizesIndexMetaData, (short) 3, 3, proj_list, null);
+            TupleRIDPair tupleRIDPair;
+            while ((tupleRIDPair = indexMetaDataFileScan.get_next1()) != null) {
+                Tuple tuple = tupleRIDPair.getTuple();
+                if (tuple.getStrFld(1).equals(relationName) && tuple.getIntFld(2) == attrIndex && tuple.getIntFld(3) == indexType) {
+                    indexToDelete.add(new RID(tupleRIDPair.getRID().pageNo, tupleRIDPair.getRID().slotNo));
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("*** Error occurred while search for index in index catalog");
+            e.printStackTrace();
+        } finally {
+            if (indexMetaDataFileScan != null) {
+                indexMetaDataFileScan.close();
+            }
+        }
+
+        if (indexToDelete.size() > 0) {
+            Heapfile file = new Heapfile(INDEX_META_DATA_FILE);
+            for (RID rid : indexToDelete) {
+                try {
+                    isIndexDeleted = true;
+                    file.deleteRecord(rid);
+                } catch (Exception e) {
+                    System.err.println("Error while deleting an index!");
+                }
+            }
+        }
+
+        return isIndexDeleted;
+    }
+
 
     public static String getUnclusteredHashIndexName(String tableName, int attrNo)
     {
