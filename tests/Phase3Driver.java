@@ -420,9 +420,14 @@ public class Phase3Driver implements GlobalConst {
                 InsertIntoUnclusteredHashIndex(tableName, numAttr, i, rid, t);
             }
 
+            if(Phase3Utils.isIndexExists(tableName,i, new IndexType(IndexType.B_Index))) {
+                insertIntoUnclusteredBtreeIndex(tableName, numAttr, i, rid, t);
+            }
+
             if(Phase3Utils.isIndexExists(tableName,i, new IndexType(IndexType.Clustered_Hash))) {
 
             }
+
         }
     }
 
@@ -650,6 +655,8 @@ public class Phase3Driver implements GlobalConst {
 
         return status;
     }
+
+
 
     private static boolean insertIntoClusteredBtreeIndex(String tableName, int numAttr, int keyIndexAttr, Tuple tuple)
     {
@@ -1427,6 +1434,46 @@ public class Phase3Driver implements GlobalConst {
         try {
             BT.printBTree(btf.getHeaderPage());
             BT.printAllLeafPages(btf.getHeaderPage());
+        } catch (Exception e) {
+            status = FAIL;
+            e.printStackTrace();
+        }
+
+        return status;
+    }
+
+    private static boolean insertIntoUnclusteredBtreeIndex(String tableName, int numAttr,int keyIndexAttr, RID rid, Tuple tuple)
+    {
+        boolean status = OK;
+        Tuple t = null;
+        BTreeFile btf = null;
+        RelDesc rec = new RelDesc();
+        AttrType[] attrTypes = null;
+        short[] sizeArr = null;
+        String indexFile = Phase3Utils.getUnClusteredBtreeIndexName(tableName, keyIndexAttr);
+        try {
+            numAttr = 0;
+            ExtendedSystemDefs.MINIBASE_RELCAT.getInfo(tableName, rec);
+            numAttr = rec.getAttrCnt();
+            attrTypes = new AttrType[numAttr];
+            sizeArr = new short[numAttr];
+
+            ExtendedSystemDefs.MINIBASE_ATTRCAT.getTupleStructure(tableName, numAttr, attrTypes, sizeArr);
+            t = new Tuple();
+            t.setHdr((short) numAttr, attrTypes, sizeArr);
+
+            assert keyIndexAttr <= numAttr;
+
+            btf = new BTreeFile(indexFile);
+        }catch (Exception e){
+            e.printStackTrace();
+        }
+
+        try {
+            t = new Tuple(tuple.getTupleByteArray(), tuple.getOffset(), tuple.getLength());
+            t.setHdr((short) numAttr, attrTypes, sizeArr);
+            btree.KeyClass key = BT.createKeyFromTupleField(t, attrTypes, sizeArr, keyIndexAttr , BTREE_CLUSTERED_ORDER);
+            btf.insert(key, rid);
         } catch (Exception e) {
             status = FAIL;
             e.printStackTrace();
