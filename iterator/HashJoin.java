@@ -129,6 +129,7 @@ public class HashJoin extends Iterator {
         RID rid = null;
         FileScan fscan = null;
         iHashList = new ArrayList<>();
+        Heapfile bucketFile = null;
 
         FldSpec[] proj = new FldSpec[nInnerRecs];
         for (int i = 1; i <= nInnerRecs; i++) {
@@ -166,7 +167,7 @@ public class HashJoin extends Iterator {
                     iHashList.add(bucket);
                 }
 
-                Heapfile bucketFile = new Heapfile(bucket_name);
+                bucketFile = new Heapfile(bucket_name);
                 rid = bucketFile.insertRecord(data.getTupleByteArray());
                 data = fscan.get_next();
             }
@@ -180,6 +181,7 @@ public class HashJoin extends Iterator {
         RID rid = null;
         FileScan fscan = null;
         oHashList = new ArrayList<>();
+        Heapfile bucketFile = null;
 
         FldSpec[] proj = new FldSpec[nOuterRecs];
         for (int i = 1; i <= nOuterRecs; i++) {
@@ -216,7 +218,7 @@ public class HashJoin extends Iterator {
                     oHashList.add(bucket);
                 }
 
-                Heapfile bucketFile = new Heapfile(bucket_name);
+                bucketFile = new Heapfile(bucket_name);
                 rid = bucketFile.insertRecord(data.getTupleByteArray());
 
                 data = outer.get_next();
@@ -229,14 +231,18 @@ public class HashJoin extends Iterator {
     private void performHashJoin() throws HashJoinException, HFDiskMgrException, InvalidSlotNumberException, InvalidTupleSizeException, HFBufMgrException, IOException {
         // Pick corresponding buckets
         Heapfile joinFile = null;
+        Heapfile innerFile = null;
+        Heapfile outerFile = null;
+        FileScan outerScan = null;
+        NestedLoopsJoins nlj = null;
         try {
             joinFile = new Heapfile("hashJoinFile.in");
 
             for (int hash : oHashList) {
                 String innerFileName = "inner_hash_bucket_"+hash;
-                Heapfile innerFile = new Heapfile(innerFileName);
+                innerFile = new Heapfile(innerFileName);
                 String outerFileName = "outer_hash_bucket_"+hash;
-                Heapfile outerFile = new Heapfile(outerFileName);
+                outerFile = new Heapfile(outerFileName);
 
                 // Check if the buckets actually contain any tuples
                 if(innerFile.getRecCnt() == 0 || outerFile.getRecCnt() == 0) {
@@ -245,10 +251,10 @@ public class HashJoin extends Iterator {
 
                 FldSpec[] oProj = getProjection(nOuterRecs);
 
-                FileScan outerScan = new FileScan(outerFileName, outerTypes, outerStrSizes, (short) nOuterRecs, nOuterRecs, oProj, null);
+                outerScan = new FileScan(outerFileName, outerTypes, outerStrSizes, (short) nOuterRecs, nOuterRecs, oProj, null);
 
                 // Perform NLJ
-                NestedLoopsJoins nlj = new NestedLoopsJoins(outerTypes, nOuterRecs, outerStrSizes, innerTypes,
+                nlj = new NestedLoopsJoins(outerTypes, nOuterRecs, outerStrSizes, innerTypes,
                         nInnerRecs, innerStrSizes, n_buf_pgs, outerScan,
                         innerFileName, OutputFilter, RightFilter, perm_mat,
                         nOutFlds);
@@ -269,7 +275,6 @@ public class HashJoin extends Iterator {
 
                 nlj.close();
                 outerScan.close();
-//                cntr++;
             }
         } catch (Exception e) {
             throw new HashJoinException(e, "Create new heapfile failed.");

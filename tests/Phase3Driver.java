@@ -2756,6 +2756,9 @@ public class Phase3Driver implements GlobalConst {
                 tt = joinItr.get_next();
             }
 
+            // Close the iterator
+            joinItr.close();
+
             // Persist the output table to disk
             if (outputTable != null) {
                 flushToDisk();
