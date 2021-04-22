@@ -341,9 +341,11 @@ class JoinsDriver implements GlobalConst {
         FldSpec mrgAttr1 = new FldSpec(new RelSpec(RelSpec.outer), 3);
         FldSpec mrgAttr2 = new FldSpec(new RelSpec(RelSpec.outer), 2);
 
-        TopK_NRAJoin join = new TopK_NRAJoin(Stypes, 4, Ssizes, joinAttr1,
-                mrgAttr1, Rtypes, 3, Rsizes, joinAttr2, mrgAttr2, "sailors.in",
-                "reserves.in", 6, 100, "");
+        //This test is no longer valid as NRA does not work without index create index on table or use phase3 driver to test.
+//
+//        TopK_NRAJoin join = new TopK_NRAJoin(Stypes, 4, Ssizes, joinAttr1,
+//                mrgAttr1, Rtypes, 3, Rsizes, joinAttr2, mrgAttr2, "sailors.in",
+//                "reserves.in", 6, 100, "", );
 
     }
     public void Query3() throws IOException, PageNotReadException, WrongPermat, JoinsException, InvalidTypeException, TupleUtilsException, UnknowAttrType, FileScanException, PredEvalException, InvalidTupleSizeException, InvalidRelation, FieldNumberOutOfBoundException {
@@ -385,10 +387,10 @@ class JoinsDriver implements GlobalConst {
         FldSpec joinAttr2 = new FldSpec(new RelSpec(RelSpec.outer), 3);
         FldSpec mrgAttr1 = new FldSpec(new RelSpec(RelSpec.outer), 3);
         FldSpec mrgAttr2 = new FldSpec(new RelSpec(RelSpec.outer), 2);
-
-        TopK_NRAJoinString join = new TopK_NRAJoinString(Stypes, 4, Ssizes, joinAttr1,
-                mrgAttr1, Rtypes, 3, Rsizes, joinAttr2, mrgAttr2, "sailors.in",
-                "reserves.in", 6, 100 , "");
+//
+//        TopK_NRAJoinString join = new TopK_NRAJoinString(Stypes, 4, Ssizes, joinAttr1,
+//                mrgAttr1, Rtypes, 3, Rsizes, joinAttr2, mrgAttr2, "sailors.in",
+//                "reserves.in", 6, 100 , "");
 
     }
 

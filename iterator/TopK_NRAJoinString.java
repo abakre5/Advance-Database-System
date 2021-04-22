@@ -2,8 +2,10 @@ package iterator;
 
 import bufmgr.PageNotReadException;
 import global.AttrType;
+import global.IndexType;
 import global.RID;
 import heap.*;
+import index.IndexScan;
 
 import java.io.IOException;
 import java.util.*;
@@ -33,9 +35,11 @@ public class TopK_NRAJoinString {
     boolean containsDuplicates = false;
     Heapfile materialisedTable = null;
     String materialisedTableName = "";
+    IndexScan outerIndexScan;
+    IndexScan innerIndexScan;
 
 
-    public TopK_NRAJoinString(AttrType[] in1, int len_in1, short[] t1_str_sizes, FldSpec joinAttr1, FldSpec mergeAttr1, AttrType[] in2, int len_in2, short[] t2_str_sizes, FldSpec joinAttr2, FldSpec mergeAttr2, String relationName1, String relationName2, int k, int n_pages, String materialisedTableName) throws IOException, PageNotReadException, WrongPermat, JoinsException, InvalidTypeException, TupleUtilsException, UnknowAttrType, FileScanException, PredEvalException, InvalidTupleSizeException, InvalidRelation, FieldNumberOutOfBoundException {
+    public TopK_NRAJoinString(AttrType[] in1, int len_in1, short[] t1_str_sizes, FldSpec joinAttr1, FldSpec mergeAttr1, AttrType[] in2, int len_in2, short[] t2_str_sizes, FldSpec joinAttr2, FldSpec mergeAttr2, String relationName1, String relationName2, int k, int n_pages, String materialisedTableName, IndexScan outerIndexScan, IndexScan innerIndexScan) throws IOException, PageNotReadException, WrongPermat, JoinsException, InvalidTypeException, TupleUtilsException, UnknowAttrType, FileScanException, PredEvalException, InvalidTupleSizeException, InvalidRelation, FieldNumberOutOfBoundException {
         this.in1 = in1;
         this.len_in1 = len_in1;
         this.t1_str_sizes = t1_str_sizes;
@@ -50,6 +54,8 @@ public class TopK_NRAJoinString {
         this.relationName2 = relationName2;
         this.k = k;
         this.n_pages = n_pages;
+        this.outerIndexScan = outerIndexScan;
+        this.innerIndexScan = innerIndexScan;
         if(!materialisedTableName.equals("")){
             try {
                 this.materialisedTableName = materialisedTableName;
@@ -67,8 +73,10 @@ public class TopK_NRAJoinString {
     }
 
     private void computeKJoin() throws Exception {
-        FileScan relation1 = getFileScan(relationName1, (short) len_in1, in1, t1_str_sizes);
-        FileScan relation2 = getFileScan(relationName2, (short) len_in2, in2, t2_str_sizes);
+        IndexScan relation1 = outerIndexScan;
+        FileScan relation3 = getFileScan(relationName1, (short) len_in1, in1, t1_str_sizes);
+        IndexScan relation2 = innerIndexScan;
+        FileScan relation4 = getFileScan(relationName2, (short) len_in2, in2, t2_str_sizes);
         String joinAttributeValue1 = null;
         String joinAttributeValue2 = null;
         float mergeAttributeValue1 = 0;
@@ -190,7 +198,7 @@ public class TopK_NRAJoinString {
                     e.printStackTrace();
                 }
                 if (topKCandidate.get(index).getRidRel1() != null) {
-                    t1 = relation1.fetchRecord(topKCandidate.get(index).getRidRel1());
+                    t1 = relation3.fetchRecord(topKCandidate.get(index).getRidRel1());
                 }
                 Tuple rid_tuple = new Tuple(t1.getTupleByteArray(), t1.getOffset(), t1.getLength());
                 rid_tuple.setHdr((short) in1.length, in1, t1_str_sizes);
@@ -204,7 +212,7 @@ public class TopK_NRAJoinString {
                     e.printStackTrace();
                 }
                 if (topKCandidate.get(index).getRidRel2() != null) {
-                    t2 = relation2.fetchRecord(topKCandidate.get(index).getRidRel2());
+                    t2 = relation4.fetchRecord(topKCandidate.get(index).getRidRel2());
 
                 }
                 Tuple rid_tuple2 = new Tuple(t2.getTupleByteArray(), t2.getOffset(), t2.getLength());
