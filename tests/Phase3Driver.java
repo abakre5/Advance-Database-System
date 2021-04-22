@@ -1587,7 +1587,7 @@ public class Phase3Driver implements GlobalConst {
 
     private static boolean deleteFromClusteredHashIndex(String TableName, int NumAttrs, int IndexAttr, Tuple Tup) {
         boolean status = OK;
-        System.out.printf("deleteFromClusteredHashIndex> numAttr=%d; indexAttr=%d\n", NumAttrs, IndexAttr);
+        //System.out.printf("deleteFromClusteredHashIndex> numAttr=%d; indexAttr=%d\n", NumAttrs, IndexAttr);
         try {
             AttrType[] attrTypes = new AttrType[NumAttrs];
             short[] strSize = new short[NumAttrs];
