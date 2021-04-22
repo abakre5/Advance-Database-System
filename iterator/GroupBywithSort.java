@@ -406,7 +406,7 @@ public class GroupBywithSort {
                 float val = Phase3Utils.getAttrVal(tuple, aggList[0].offset, this.attrType[aggList[0].offset - 1]);
                 sum += val;
             } else {
-                Tuple to = Phase3Utils.getAggTuple(previousGroupByAttrValue, groupByAttr.offset, sum / count, new AttrType(AttrType.attrReal), this.attrType);
+                Tuple to = new Tuple(Phase3Utils.getAggTuple(previousGroupByAttrValue, groupByAttr.offset, sum / count, new AttrType(AttrType.attrReal), this.attrType));
                 if (Phase3Utils.createMaterializedView(materTableName)) {
                     materHeapfile.insertRecord(to.returnTupleByteArray());
                 } else {
@@ -419,7 +419,7 @@ public class GroupBywithSort {
             previousGroupByAttrValue = groupByAttrValue;
         }
 
-        Tuple to = Phase3Utils.getAggTuple(previousGroupByAttrValue, groupByAttr.offset, sum / count, new AttrType(AttrType.attrReal), this.attrType);
+        Tuple to = new Tuple(Phase3Utils.getAggTuple(previousGroupByAttrValue, groupByAttr.offset, sum / count, new AttrType(AttrType.attrReal), this.attrType));
         if (Phase3Utils.createMaterializedView(materTableName)) {
             materHeapfile.insertRecord(to.returnTupleByteArray());
         } else {
@@ -444,7 +444,7 @@ public class GroupBywithSort {
                 float val = Phase3Utils.getAttrVal(tuple, aggList[0].offset, this.attrType[aggList[0].offset - 1]);
                 sum += val;
             } else {
-                Tuple to = Phase3Utils.getAggTupleGroupByAttrString(previousGroupByAttrValue, groupByAttr.offset, sum / count, new AttrType(AttrType.attrReal));
+                Tuple to = new Tuple(Phase3Utils.getAggTupleGroupByAttrString(previousGroupByAttrValue, groupByAttr.offset, sum / count, new AttrType(AttrType.attrReal)));
                 if (Phase3Utils.createMaterializedView(materTableName)) {
                     materHeapfile.insertRecord(to.returnTupleByteArray());
                 } else {
@@ -456,7 +456,7 @@ public class GroupBywithSort {
             count++;
             previousGroupByAttrValue = groupByAttrValue;
         }
-        Tuple to = Phase3Utils.getAggTupleGroupByAttrString(previousGroupByAttrValue, groupByAttr.offset, sum / count, new AttrType(AttrType.attrReal));
+        Tuple to = new Tuple(Phase3Utils.getAggTupleGroupByAttrString(previousGroupByAttrValue, groupByAttr.offset, sum / count, new AttrType(AttrType.attrReal)));
         if (Phase3Utils.createMaterializedView(materTableName)) {
             materHeapfile.insertRecord(to.returnTupleByteArray());
         } else {

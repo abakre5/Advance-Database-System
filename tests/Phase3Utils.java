@@ -156,7 +156,7 @@ public class Phase3Utils {
         Tuple t = new Tuple();
         try {
             AttrType[] attrTypes = {attrType[groupByAttr - 1], aggAttrType};
-            short[] strSizes = new short[1];
+            short[] strSizes = {Phase3Utils.SIZE_OF_STRING};
             try {
                 t.setHdr((short) 2, attrTypes, strSizes);
             } catch (Exception e) {
