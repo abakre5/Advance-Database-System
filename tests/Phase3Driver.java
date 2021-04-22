@@ -1378,7 +1378,7 @@ public class Phase3Driver implements GlobalConst {
         return true;
     }
 
-    private static boolean createUnclusteredBtreeIndex(String tableName, int indexAttr)
+    public static boolean createUnclusteredBtreeIndex(String tableName, int indexAttr)
     {
         boolean status = OK;
         Tuple t = null;
@@ -2363,6 +2363,10 @@ public class Phase3Driver implements GlobalConst {
 
     }
 
+    /**
+     * Perform Group by operation
+     * @param tokens
+     */
     private static void performGroupBy(String[] tokens) {
         /**
          * Collect arguments
@@ -2404,7 +2408,6 @@ public class Phase3Driver implements GlobalConst {
                 groupBywithSort = new GroupBywithSort(iteratorDesc.getAttrType(),
                         iteratorDesc.getNumAttr(), iteratorDesc.getStrSizes(), iteratorDesc.getScan(), groupByAttrFldSpec, aggListFldSpec,
                         aggType, iteratorDesc.getProjlist(), iteratorDesc.getNumAttr(), nPages, tableNameT, tableName);
-                groupBywithSort.getAggregateResult();
             } catch (Exception e) {
                 e.printStackTrace();
             } finally {

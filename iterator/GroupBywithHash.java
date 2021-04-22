@@ -53,12 +53,12 @@ public class GroupBywithHash {
      * @param proj_list     Projection of each attribute in the relation
      * @param n_out_flds    no of fields in the relation
      * @param n_pages       N_PAGES
-     * @param tableNameT
+     * @param materTableName
      * @throws Exception
      */
     public GroupBywithHash(AttrType[] in1, int len_in1, short[] t1_str_sizes,
                            String tableName, FldSpec group_by_attr, FldSpec[] agg_list,
-                           AggType agg_type, FldSpec[] proj_list, int n_out_flds, int n_pages, String tableNameT) throws IOException, HFException, HFBufMgrException, HFDiskMgrException, FileScanException, TupleUtilsException, InvalidRelation, JoinsException, FieldNumberOutOfBoundException, PageNotReadException, WrongPermat, InvalidTypeException, InvalidTupleSizeException, PredEvalException, UnknowAttrType, InvalidSlotNumberException {
+                           AggType agg_type, FldSpec[] proj_list, int n_out_flds, int n_pages, String materTableName) throws IOException, HFException, HFBufMgrException, HFDiskMgrException, FileScanException, TupleUtilsException, InvalidRelation, JoinsException, FieldNumberOutOfBoundException, PageNotReadException, WrongPermat, InvalidTypeException, InvalidTupleSizeException, PredEvalException, UnknowAttrType, InvalidSlotNumberException {
         this.attrType = in1;
         this.noOfColumns = (short) len_in1;
         this.strSize = t1_str_sizes;
@@ -69,7 +69,7 @@ public class GroupBywithHash {
         this.projList = proj_list;
         this.nOutFields = n_out_flds;
         this.nPages = n_pages;
-        this.materTableName = tableNameT;
+        this.materTableName = materTableName;
         this.materHeapfile = null;
 
         if (Phase3Utils.aggListContainsStringAttr(agg_list, in1)) {
@@ -77,7 +77,7 @@ public class GroupBywithHash {
             return;
         }
 
-        if (Phase3Utils.createMaterializedView(tableNameT)) {
+        if (Phase3Utils.createMaterializedView(materTableName)) {
             this.materHeapfile = new Heapfile(materTableName);
         }
 
@@ -169,6 +169,14 @@ public class GroupBywithHash {
 
     }
 
+
+    /**
+     *
+     * Generate list of tuples from each group which is min(int) of that group based on agg_list.
+     *
+     * @param groupByAttrTypes attributes in final output relation
+     * @throws Exception
+     */
     private void computeMinGroupByAttrInt(AttrType[] groupByAttrTypes) throws Exception {
         Tuple tuple;
         float previousGroupByAttrValue = Float.MIN_VALUE;
@@ -226,6 +234,13 @@ public class GroupBywithHash {
         System.out.println("No of rows in group by " + rows);
     }
 
+
+    /**
+     * Generate list of tuples from each group which is min(String) of that group based on agg_list.
+     *
+     * @param groupByAttrTypes attributes in final output relation
+     * @throws Exception
+     */
     private void computeMinGroupByAttrString(AttrType[] groupByAttrTypes) throws Exception {
         Tuple tuple;
         String previousGroupByAttrValue = Phase3Utils.GROUP_BY_ATTR_STRING_INITIALIZER;
@@ -294,6 +309,13 @@ public class GroupBywithHash {
 
     }
 
+
+    /**
+     * Generate list of tuples from each group which is max(int) of that group based on agg_list.
+     *
+     * @param groupByAttrTypes attributes in final output relation
+     * @throws Exception
+     */
     private void computeMaxGroupByAttrInt(AttrType[] groupByAttrTypes) throws Exception {
         Tuple tuple;
         float previousGroupByAttrValue = Float.MAX_VALUE;
@@ -344,6 +366,12 @@ public class GroupBywithHash {
         System.out.println("No of rows in group by " + rows);
     }
 
+    /**
+     * Generate list of tuples from each group which is Max(String) of that group based on agg_list.
+     *
+     * @param groupByAttrTypes attributes in final output relation
+     * @throws Exception
+     */
     private void computeMaxGroupByAttrString(AttrType[] groupByAttrTypes) throws Exception {
         Tuple tuple;
         String previousGroupByAttrValue = Phase3Utils.GROUP_BY_ATTR_STRING_INITIALIZER;
@@ -417,6 +445,13 @@ public class GroupBywithHash {
 
     }
 
+
+    /**
+     * Generate list of tuples from each group which is avg(int) of that group based on agg_list.
+     *
+     * @param groupByAttrTypes attributes in final output relation
+     * @throws Exception
+     */
     private void computeAvgGroupByAttrInt(AttrType[] groupByAttrTypes) throws Exception {
         Tuple tuple;
         float previousGroupByAttrValue = Float.MAX_VALUE;
@@ -469,7 +504,12 @@ public class GroupBywithHash {
         System.out.println("No of rows in group by " + rows);
     }
 
-
+    /**
+     * Generate list of tuples from each group which is avg(String) of that group based on agg_list.
+     *
+     * @param groupByAttrTypes attributes in final output relation
+     * @throws Exception
+     */
     private void computeAvgGroupByAttrString(AttrType[] groupByAttrTypes) throws Exception {
         Tuple tuple;
         String previousGroupByAttrValue = Phase3Utils.GROUP_BY_ATTR_STRING_INITIALIZER;
@@ -546,6 +586,12 @@ public class GroupBywithHash {
 
     }
 
+    /**
+     * Generate list of tuples from each group which is sky(int) of that group based on agg_list.
+     *
+     * @param groupByAttrTypes attributes in final output relation
+     * @throws Exception
+     */
     private void computeSkyGroupByAttrInt(AttrType[] groupByAttrTypes) throws Exception {
         Tuple tuple;
         float previousGroupByAttrValue = Float.MAX_VALUE;
@@ -603,6 +649,12 @@ public class GroupBywithHash {
         }
     }
 
+    /**
+     * Generate list of tuples from each group which is sky(String) of that group based on agg_list.
+     *
+     * @param groupByAttrTypes attributes in final output relation
+     * @throws Exception
+     */
     private void computeSkyGroupByAttrString(AttrType[] groupByAttrTypes) throws Exception {
         Tuple tuple;
         String previousGroupByAttrValue = Phase3Utils.GROUP_BY_ATTR_STRING_INITIALIZER;

@@ -109,7 +109,7 @@ public class HashUnclusteredFileScan extends HashIndexFileScan implements Global
                 entry.data = new RID(insert_rid.pageNo,insert_rid.slotNo);
                 
                 if(bucketEntryCnt == 0) {
-                    System.out.println("This is the last entry");
+                    //System.out.println("This is the last entry");
                     header_names.remove();
                     
                     currentBucketCnt++;

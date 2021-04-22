@@ -11,6 +11,7 @@ import hash.ClusteredHashFileScan;
 import heap.*;
 import index.IndexScan;
 import index.IndexUtils;
+import index.InvalidSelectionException;
 import tests.IteratorDesc;
 import tests.Phase3Driver;
 import tests.Phase3Utils;
@@ -21,7 +22,7 @@ import java.io.IOException;
 /**
  * @author Abhishek Bakare
  */
-public class GroupBywithSort {
+public class GroupbywithBtree {
 
     private final AttrType[] attrType;
     private final short noOfColumns;
@@ -34,12 +35,14 @@ public class GroupBywithSort {
     private final int nOutFields;
     private final int nPages;
     private final String materTableName;
+    private final Heapfile dbHeapFile;
 
     private static final String SortedRelationName = "SortedTuples132";
+    private final String relationName;
+    private BTFileScan scanB;
     private Heapfile materHeapfile;
 
     private Heapfile sortedTuples;
-    private FileScan scan;
 
     /**
      * Perform Group by operation on a relation using @Sort class of the Minibase.
@@ -54,10 +57,10 @@ public class GroupBywithSort {
      * @param proj_list     Projection of each attribute in the relation
      * @param n_out_flds    no of fields in the relation
      * @param n_pages       N_PAGES
-     * @param materTableName materialize table name
+     * @param materTableName
      * @throws Exception
      */
-    public GroupBywithSort(AttrType[] in1, int len_in1, short[] t1_str_sizes,
+    public GroupbywithBtree(AttrType[] in1, int len_in1, short[] t1_str_sizes,
                            FileScan am1, FldSpec group_by_attr, FldSpec[] agg_list,
                            AggType agg_type, FldSpec[] proj_list, int n_out_flds, int n_pages, String materTableName, String relationName) throws Exception {
         this.attrType = in1;
@@ -71,93 +74,31 @@ public class GroupBywithSort {
         this.nOutFields = n_out_flds;
         this.nPages = n_pages;
         this.materTableName = materTableName;
-
+        this.dbHeapFile = new Heapfile(relationName);
+        this.relationName = relationName;
         this.materHeapfile = null;
+        this.scanB = null;
 
         if (Phase3Utils.aggListContainsStringAttr(agg_list, in1)) {
             System.err.println("Aggregation attributes does not support String attribute!");
             return;
         }
+         if (Phase3Utils.createMaterializedView(materTableName)) {
+             materHeapfile = new Heapfile(materTableName);
+         }
 
-        if (Phase3Utils.isIndexExists(relationName, group_by_attr.offset, IndexType.B_Index)) {
-            System.out.println("Computing using unclustered btree ... ");
-            new GroupbywithBtree(attrType,
-                    noOfColumns,strSize, am1, group_by_attr, agg_list,
-                    agg_type, proj_list,n_out_flds, nPages, materTableName, relationName).getAggregateResult();
-            return;
-        }
-
-
-
-        this.materHeapfile = new Heapfile(materTableName);
-
-        if (!isRelationSortedOnGroupByAttr(relationName)) {
-            System.out.println("Sorting Relation based on group by Attr.");
-            sortRelation();
-            System.out.println("Sorting finished!");
-        } else {
-            System.out.println("Relation is already sorted on Group By Attr.");
-            scan = itr;
-        }
-        getAggregateResult();
-    }
-    /**
-     *
-     * @return if relation is sorted or not on group by attribute
-     * @throws Exception
-     */
-    private boolean isRelationSortedOnGroupByAttr(String relationName) throws Exception {
-        FileScan sortItr = new FileScan(relationName, attrType, strSize, noOfColumns, noOfColumns, projList, null);
-        Tuple curr = sortItr.get_next();
-        while (curr != null) {
-            curr = new Tuple(curr);
-            Tuple next = sortItr.get_next();
-            if (next != null) {
-                next = new Tuple(next);
-                int isT1GreaterThanT2 = TupleUtils.CompareTupleWithTuple(attrType[groupByAttr.offset - 1], curr, groupByAttr.offset, next, groupByAttr.offset);
-                if (isT1GreaterThanT2 == 1) {
-                    return false;
-                }
-            }
-            curr = next;
-        }
-        sortItr.close();
-        return true;
-    }
-
-    /**
-     * Perform sort on the given relation and stores sort result in a new heap file.
-     *
-     * @throws Exception
-     */
-    private void sortRelation() throws IOException, SortException {
-        Sort sortedRelation = null;
-        try {
-            TupleOrder order = new TupleOrder(TupleOrder.Ascending);
-            sortedRelation = new Sort(attrType, noOfColumns, strSize, itr, groupByAttr.offset, order, noOfColumns, nPages);
-            sortedTuples = new Heapfile(SortedRelationName);
-            Tuple tuple = null;
-            while ((tuple = sortedRelation.get_next()) != null) {
-                sortedTuples.insertRecord(new Tuple(tuple).returnTupleByteArray());
-            }
-            scan = new FileScan(SortedRelationName, attrType, strSize,
-                    noOfColumns, noOfColumns, projList, null);
-        } catch (Exception e) {
-            System.out.println("Error occurred while sorting -> " + e.getMessage());
-            e.printStackTrace();
-        } finally {
-            assert sortedRelation != null;
-            sortedRelation.close();
-        }
     }
 
     /**
      * @return a list of tuples for the desired aggregation operator.
      * @throws Exception
      */
-    public void getAggregateResult() {
+    public void getAggregateResult() throws Exception {
+        String indexFile = Phase3Utils.getUnClusteredBtreeIndexName(relationName, groupByAttr.offset);
+
+        scanB = (BTFileScan) IndexUtils.BTree_scan(null, new BTreeFile(indexFile));
         try {
-        System.out.println("Computing " + aggType.toString() + " ...");
+            System.out.println("Computing " + aggType.toString() + " ...");
             switch (aggType.aggType) {
                 case AggType.aggMax:
                     getMax();
@@ -182,7 +123,11 @@ public class GroupBywithSort {
             }
         } finally {
             System.out.println("Done computing group by operation!");
-            scan.close();
+
+            /**
+             * ASKKKKKKKKKKKKKK
+             */
+//            scanB.DestroyBTreeFileScan();
         }
     }
 
@@ -190,7 +135,7 @@ public class GroupBywithSort {
      * @return list of tuples from each group which is min of that group based on agg_list.
      * @throws Exception
      */
-    private void getMin() throws IOException, InvalidTypeException, PageNotReadException, JoinsException, PredEvalException, WrongPermat, UnknowAttrType, InvalidTupleSizeException, FieldNumberOutOfBoundException, TupleUtilsException, SpaceNotAvailableException, HFException, HFBufMgrException, InvalidSlotNumberException, HFDiskMgrException, Catalogrelexists, Catalogmissparam, Catalognomem, RelCatalogException, Cataloghferror, Catalogdupattrs, Catalogioerror {
+    private void getMin() throws Exception {
 
         attrInfo[] attrs = Phase3Utils.getAttrInfoGroupBy(attrType, groupByAttr, aggList);
         Phase3Utils.createTable(materTableName, 2, attrs);
@@ -205,36 +150,29 @@ public class GroupBywithSort {
 
     }
 
+
     /**
      *
      * Generate list of tuples from each group which is min(int) of that group based on agg_list.
      *
      * @param groupByAttrTypes attributes in final output relation
-     * @throws JoinsException
-     * @throws IOException
-     * @throws InvalidTupleSizeException
-     * @throws InvalidTypeException
-     * @throws PageNotReadException
-     * @throws PredEvalException
-     * @throws UnknowAttrType
-     * @throws FieldNumberOutOfBoundException
-     * @throws WrongPermat
-     * @throws TupleUtilsException
-     * @throws InvalidSlotNumberException
-     * @throws SpaceNotAvailableException
-     * @throws HFException
-     * @throws HFBufMgrException
-     * @throws HFDiskMgrException
+     * @throws Exception
      */
-    private void computeMinGroupByAttrInt(AttrType[] groupByAttrTypes) throws JoinsException, IOException, InvalidTupleSizeException, InvalidTypeException, PageNotReadException, PredEvalException, UnknowAttrType, FieldNumberOutOfBoundException, WrongPermat, TupleUtilsException, InvalidSlotNumberException, SpaceNotAvailableException, HFException, HFBufMgrException, HFDiskMgrException {
+    private void computeMinGroupByAttrInt(AttrType[] groupByAttrTypes) throws Exception {
         Tuple tuple;
         float previousGroupByAttrValue = Float.MIN_VALUE;
         Tuple minTuple = null;
         float min = Float.MAX_VALUE;
         float groupByAttrValue = 0;
         int rows = 0;
-        while ((tuple = scan.get_next()) != null) {
-            tuple = new Tuple(tuple);
+
+
+        KeyDataEntry temp;
+        while ((temp = scanB.get_next()) != null) {
+            RID rid = ((LeafData) temp.data).getData();
+            tuple = dbHeapFile.getRecord(rid);
+            tuple = new Tuple(tuple.getTupleByteArray(), tuple.getOffset(), tuple.getLength());
+            tuple.setHdr(noOfColumns, attrType, strSize);
             int index = groupByAttr.offset;
             groupByAttrValue = Phase3Utils.getAttrVal(tuple, index, attrType[index - 1]);
             if (previousGroupByAttrValue == Float.MIN_VALUE) {
@@ -272,33 +210,25 @@ public class GroupBywithSort {
         System.out.println("No of rows in group by " + rows);
     }
 
+
     /**
      * Generate list of tuples from each group which is min(String) of that group based on agg_list.
      *
      * @param groupByAttrTypes attributes in final output relation
-     * @throws JoinsException
-     * @throws IOException
-     * @throws InvalidTupleSizeException
-     * @throws InvalidTypeException
-     * @throws PageNotReadException
-     * @throws PredEvalException
-     * @throws UnknowAttrType
-     * @throws FieldNumberOutOfBoundException
-     * @throws WrongPermat
-     * @throws TupleUtilsException
-     * @throws InvalidSlotNumberException
-     * @throws SpaceNotAvailableException
-     * @throws HFException
-     * @throws HFBufMgrException
-     * @throws HFDiskMgrException
+     * @throws Exception
      */
-    private void computeMinGroupByAttrString(AttrType[] groupByAttrTypes) throws JoinsException, IOException, InvalidTupleSizeException, InvalidTypeException, PageNotReadException, PredEvalException, UnknowAttrType, FieldNumberOutOfBoundException, WrongPermat, TupleUtilsException, InvalidSlotNumberException, SpaceNotAvailableException, HFException, HFBufMgrException, HFDiskMgrException {
+    private void computeMinGroupByAttrString(AttrType[] groupByAttrTypes) throws Exception {
         Tuple tuple;
         String previousGroupByAttrValue = Phase3Utils.GROUP_BY_ATTR_STRING_INITIALIZER;
         float min = Float.MAX_VALUE;
         String groupByAttrValue = "";
         int rows = 0;
-        while ((tuple = scan.get_next()) != null) {
+        KeyDataEntry temp;
+        while ((temp = scanB.get_next()) != null) {
+            RID rid = ((LeafData) temp.data).getData();
+            tuple = dbHeapFile.getRecord(rid);
+            tuple = new Tuple(tuple.getTupleByteArray(), tuple.getOffset(), tuple.getLength());
+            tuple.setHdr(noOfColumns, attrType, strSize);
             tuple = new Tuple(tuple);
             int index = groupByAttr.offset;
             groupByAttrValue = Phase3Utils.getAttrValString(tuple, index, attrType[index - 1]);
@@ -335,7 +265,7 @@ public class GroupBywithSort {
      * @return list of tuples from each group which is max of that group based on agg_list.
      * @throws Exception
      */
-    private void getMax() throws IOException, InvalidTypeException, PageNotReadException, JoinsException, PredEvalException, WrongPermat, UnknowAttrType, InvalidTupleSizeException, FieldNumberOutOfBoundException, TupleUtilsException, SpaceNotAvailableException, HFException, HFBufMgrException, InvalidSlotNumberException, HFDiskMgrException, Catalogrelexists, Catalogmissparam, Catalognomem, RelCatalogException, Cataloghferror, Catalogdupattrs, Catalogioerror {
+    private void getMax() throws Exception {
 
         attrInfo[] attrs = Phase3Utils.getAttrInfoGroupBy(attrType, groupByAttr, aggList);
         Phase3Utils.createTable(materTableName, 2, attrs);
@@ -354,30 +284,20 @@ public class GroupBywithSort {
      * Generate list of tuples from each group which is max(int) of that group based on agg_list.
      *
      * @param groupByAttrTypes attributes in final output relation
-     * @throws JoinsException
-     * @throws IOException
-     * @throws InvalidTupleSizeException
-     * @throws InvalidTypeException
-     * @throws PageNotReadException
-     * @throws PredEvalException
-     * @throws UnknowAttrType
-     * @throws FieldNumberOutOfBoundException
-     * @throws WrongPermat
-     * @throws InvalidSlotNumberException
-     * @throws SpaceNotAvailableException
-     * @throws HFException
-     * @throws HFBufMgrException
-     * @throws HFDiskMgrException
-     * @throws TupleUtilsException
+     * @throws Exception
      */
-    private void computeMaxGroupByAttrInt(AttrType[] groupByAttrTypes) throws JoinsException, IOException, InvalidTupleSizeException, InvalidTypeException, PageNotReadException, PredEvalException, UnknowAttrType, FieldNumberOutOfBoundException, WrongPermat, InvalidSlotNumberException, SpaceNotAvailableException, HFException, HFBufMgrException, HFDiskMgrException, TupleUtilsException {
+    private void computeMaxGroupByAttrInt(AttrType[] groupByAttrTypes) throws Exception {
         Tuple tuple;
         Float previousGroupByAttrValue = Float.MAX_VALUE;
         float max = Float.MIN_VALUE;
 
         float groupByAttrValue = 0;
-        while ((tuple = scan.get_next()) != null) {
-            tuple = new Tuple(tuple);
+        KeyDataEntry temp;
+        while ((temp = scanB.get_next()) != null) {
+            RID rid = ((LeafData) temp.data).getData();
+            tuple = dbHeapFile.getRecord(rid);
+            tuple = new Tuple(tuple.getTupleByteArray(), tuple.getOffset(), tuple.getLength());
+            tuple.setHdr(noOfColumns, attrType, strSize);
             int index = groupByAttr.offset;
             groupByAttrValue = Phase3Utils.getAttrVal(tuple, index, attrType[index - 1]);
             if (previousGroupByAttrValue == Float.MAX_VALUE) {
@@ -406,35 +326,24 @@ public class GroupBywithSort {
         }
     }
 
-
     /**
      * Generate list of tuples from each group which is Max(String) of that group based on agg_list.
      *
      * @param groupByAttrTypes attributes in final output relation
-     * @throws JoinsException
-     * @throws IOException
-     * @throws InvalidTupleSizeException
-     * @throws InvalidTypeException
-     * @throws PageNotReadException
-     * @throws PredEvalException
-     * @throws UnknowAttrType
-     * @throws FieldNumberOutOfBoundException
-     * @throws WrongPermat
-     * @throws InvalidSlotNumberException
-     * @throws SpaceNotAvailableException
-     * @throws HFException
-     * @throws HFBufMgrException
-     * @throws HFDiskMgrException
-     * @throws TupleUtilsException
+     * @throws Exception
      */
-    private void computeMaxGroupByAttrString(AttrType[] groupByAttrTypes) throws JoinsException, IOException, InvalidTupleSizeException, InvalidTypeException, PageNotReadException, PredEvalException, UnknowAttrType, FieldNumberOutOfBoundException, WrongPermat, InvalidSlotNumberException, SpaceNotAvailableException, HFException, HFBufMgrException, HFDiskMgrException, TupleUtilsException {
+    private void computeMaxGroupByAttrString(AttrType[] groupByAttrTypes) throws Exception {
         Tuple tuple;
         String previousGroupByAttrValue = Phase3Utils.GROUP_BY_ATTR_STRING_INITIALIZER;
         float max = Float.MIN_VALUE;
 
         String groupByAttrValue = "";
-        while ((tuple = scan.get_next()) != null) {
-            tuple = new Tuple(tuple);
+        KeyDataEntry temp;
+        while ((temp = scanB.get_next()) != null) {
+            RID rid = ((LeafData) temp.data).getData();
+            tuple = dbHeapFile.getRecord(rid);
+            tuple = new Tuple(tuple.getTupleByteArray(), tuple.getOffset(), tuple.getLength());
+            tuple.setHdr(noOfColumns, attrType, strSize);
             int index = groupByAttr.offset;
             groupByAttrValue = Phase3Utils.getAttrValString(tuple, index, attrType[index - 1]);
             if (previousGroupByAttrValue.equals(Phase3Utils.GROUP_BY_ATTR_STRING_INITIALIZER)) {
@@ -469,7 +378,7 @@ public class GroupBywithSort {
      * @return list of tuples from each group having average of that group based on agg_list.
      * @throws Exception
      */
-    private void getAvg() throws IOException, InvalidTypeException, PageNotReadException, JoinsException, PredEvalException, WrongPermat, UnknowAttrType, InvalidTupleSizeException, FieldNumberOutOfBoundException, TupleUtilsException, SpaceNotAvailableException, HFException, HFBufMgrException, InvalidSlotNumberException, HFDiskMgrException, Catalogrelexists, Catalogmissparam, Catalognomem, RelCatalogException, Cataloghferror, Catalogdupattrs, Catalogioerror {
+    private void getAvg() throws Exception {
 
         attrInfo[] attrs = Phase3Utils.getAttrInfoGroupBy(attrType, groupByAttr, aggList);
         attrs[1].attrType = new AttrType(AttrType.attrReal);
@@ -486,34 +395,25 @@ public class GroupBywithSort {
 
     }
 
+
     /**
      * Generate list of tuples from each group which is avg(int) of that group based on agg_list.
      *
      * @param groupByAttrTypes attributes in final output relation
-     * @throws JoinsException
-     * @throws IOException
-     * @throws InvalidTupleSizeException
-     * @throws InvalidTypeException
-     * @throws PageNotReadException
-     * @throws PredEvalException
-     * @throws UnknowAttrType
-     * @throws FieldNumberOutOfBoundException
-     * @throws WrongPermat
-     * @throws InvalidSlotNumberException
-     * @throws SpaceNotAvailableException
-     * @throws HFException
-     * @throws HFBufMgrException
-     * @throws HFDiskMgrException
-     * @throws TupleUtilsException
+     * @throws Exception
      */
-    private void computeAvgGroupByAttrInt(AttrType[] groupByAttrTypes) throws JoinsException, IOException, InvalidTupleSizeException, InvalidTypeException, PageNotReadException, PredEvalException, UnknowAttrType, FieldNumberOutOfBoundException, WrongPermat, InvalidSlotNumberException, SpaceNotAvailableException, HFException, HFBufMgrException, HFDiskMgrException, TupleUtilsException {
+    private void computeAvgGroupByAttrInt(AttrType[] groupByAttrTypes) throws Exception {
         Tuple tuple;
         float previousGroupByAttrValue = Float.MAX_VALUE;
         float sum = 0;
         int count = 0;
         float groupByAttrValue = 0;
-        while ((tuple = scan.get_next()) != null) {
-            tuple = new Tuple(tuple);
+        KeyDataEntry temp;
+        while ((temp = scanB.get_next()) != null) {
+            RID rid = ((LeafData) temp.data).getData();
+            tuple = dbHeapFile.getRecord(rid);
+            tuple = new Tuple(tuple.getTupleByteArray(), tuple.getOffset(), tuple.getLength());
+            tuple.setHdr(noOfColumns, attrType, strSize);
             int index = groupByAttr.offset;
             groupByAttrValue = Phase3Utils.getAttrVal(tuple, index, this.attrType[index - 1]);
             if (previousGroupByAttrValue == Float.MAX_VALUE) {
@@ -548,30 +448,20 @@ public class GroupBywithSort {
      * Generate list of tuples from each group which is avg(String) of that group based on agg_list.
      *
      * @param groupByAttrTypes attributes in final output relation
-     * @throws JoinsException
-     * @throws IOException
-     * @throws InvalidTupleSizeException
-     * @throws InvalidTypeException
-     * @throws PageNotReadException
-     * @throws PredEvalException
-     * @throws UnknowAttrType
-     * @throws FieldNumberOutOfBoundException
-     * @throws WrongPermat
-     * @throws InvalidSlotNumberException
-     * @throws SpaceNotAvailableException
-     * @throws HFException
-     * @throws HFBufMgrException
-     * @throws HFDiskMgrException
-     * @throws TupleUtilsException
+     * @throws Exception
      */
-    private void computeAvgGroupByAttrString(AttrType[] groupByAttrTypes) throws JoinsException, IOException, InvalidTupleSizeException, InvalidTypeException, PageNotReadException, PredEvalException, UnknowAttrType, FieldNumberOutOfBoundException, WrongPermat, InvalidSlotNumberException, SpaceNotAvailableException, HFException, HFBufMgrException, HFDiskMgrException, TupleUtilsException {
+    private void computeAvgGroupByAttrString(AttrType[] groupByAttrTypes) throws Exception {
         Tuple tuple;
         String previousGroupByAttrValue = Phase3Utils.GROUP_BY_ATTR_STRING_INITIALIZER;
         float sum = 0;
         int count = 0;
         String groupByAttrValue = "";
-        while ((tuple = scan.get_next()) != null) {
-            tuple = new Tuple(tuple);
+        KeyDataEntry temp;
+        while ((temp = scanB.get_next()) != null) {
+            RID rid = ((LeafData) temp.data).getData();
+            tuple = dbHeapFile.getRecord(rid);
+            tuple = new Tuple(tuple.getTupleByteArray(), tuple.getOffset(), tuple.getLength());
+            tuple.setHdr(noOfColumns, attrType, strSize);
             int index = groupByAttr.offset;
             groupByAttrValue = Phase3Utils.getAttrValString(tuple, index, this.attrType[index - 1]);
             if (previousGroupByAttrValue.equals(Phase3Utils.GROUP_BY_ATTR_STRING_INITIALIZER)) {
@@ -642,8 +532,12 @@ public class GroupBywithSort {
             for (int i = 0; i < aggList.length; i++) {
                 prefList[i] = aggList[i].offset;
             }
-            while ((tuple = scan.get_next()) != null) {
-                tuple = new Tuple(tuple);
+            KeyDataEntry temp;
+            while ((temp = scanB.get_next()) != null) {
+                RID rid = ((LeafData) temp.data).getData();
+                tuple = dbHeapFile.getRecord(rid);
+                tuple = new Tuple(tuple.getTupleByteArray(), tuple.getOffset(), tuple.getLength());
+                tuple.setHdr(noOfColumns, attrType, strSize);
                 int index = groupByAttr.offset;
                 float groupByAttrValue = Phase3Utils.getAttrVal(tuple, index, attrType[index - 1]);
                 if (previousGroupByAttrValue == Float.MAX_VALUE) {
@@ -688,6 +582,7 @@ public class GroupBywithSort {
          */
     }
 
+
     /**
      * Generate list of tuples from each group which is sky(String) of that group based on agg_list.
      *
@@ -705,8 +600,12 @@ public class GroupBywithSort {
             for (int i = 0; i < aggList.length; i++) {
                 prefList[i] = aggList[i].offset;
             }
-            while ((tuple = scan.get_next()) != null) {
-                tuple = new Tuple(tuple);
+            KeyDataEntry temp;
+            while ((temp = scanB.get_next()) != null) {
+                RID rid = ((LeafData) temp.data).getData();
+                tuple = dbHeapFile.getRecord(rid);
+                tuple = new Tuple(tuple.getTupleByteArray(), tuple.getOffset(), tuple.getLength());
+                tuple.setHdr(noOfColumns, attrType, strSize);
                 int index = groupByAttr.offset;
                 String groupByAttrValue = Phase3Utils.getAttrValString(tuple, index, attrType[index - 1]);
                 if (previousGroupByAttrValue.equals(Phase3Utils.GROUP_BY_ATTR_STRING_INITIALIZER)) {
@@ -758,9 +657,7 @@ public class GroupBywithSort {
      * @throws Exception
      */
     public void close() throws HFDiskMgrException, InvalidTupleSizeException, IOException, InvalidSlotNumberException, FileAlreadyDeletedException, HFBufMgrException {
-        if (sortedTuples != null) {
-            sortedTuples.deleteFile();
-        }
+
     }
 
 }
