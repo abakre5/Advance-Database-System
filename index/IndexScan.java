@@ -15,8 +15,7 @@ import heap.*;
 import java.io.*;
 
 import static global.GlobalConst.INVALID_PAGE;
-
-//TODO:Pawan add type in index scan
+b
 /**
  * Index Scan iterator will directly access the required tuple using
  * the provided key. It will also perform selections and projections.
@@ -28,7 +27,7 @@ public class IndexScan extends Iterator {
     /**
      * class constructor. set up the index scan.
      *
-     * @param index     type of the index (B_Index, Hash)
+     * @param index     type of the index (B_Index, B_ClusteredIndex, Hash)
      * @param relName   name of the input relation
      * @param indName   name of the input index
      * @param types     array of types in this relation

@@ -151,7 +151,7 @@ public class BTreeClusteredFile extends ClusteredIndexFile
 
 
     /**
-     * BTreeFile class
+     * BTreeClusteredFile class
      * an index file with given filename should already exist; this opens it.
      *
      * @param filename the B+ tree file name. Input parameter.
@@ -225,6 +225,24 @@ public class BTreeClusteredFile extends ClusteredIndexFile
 
     }
 
+    /**
+     * if index file exists, open it; else create it.
+     *
+     * @param filename       file name. Input parameter.
+     * @param keytype        the type of key. Input parameter.
+     * @param keysize        the maximum size of a key. Input parameter.
+     * @param delete_fashion full delete or naive delete. Input parameter.
+     *                       It is either DeleteFashion.NAIVE_DELETE or
+     *                       DeleteFashion.FULL_DELETE.
+     * @param heapFileName   Name of data file
+     * @param attributeTypes Attribute Types of tuples which are being stored
+     * @param fieldNumber    field on which index is created.
+     * @param keyMultiplier  This decides order of keys which is being stored in btree(ASC or DESC)
+     * @throws GetFileEntryException  can not get file
+     * @throws ConstructPageException page constructor failed
+     * @throws IOException            error from lower layer
+     * @throws AddFileEntryException  can not add file into DB
+     */
     public BTreeClusteredFile(String filename, int keytype,
                               int keysize, int delete_fashion, String heapFileName, AttrType[] attributeTypes,
                               short[] attributeSizes, int fieldNumber, int keyMultiplier)
@@ -363,10 +381,10 @@ public class BTreeClusteredFile extends ClusteredIndexFile
 
 
     /**
-     * insert record with the given key and rid
+     * insert record with the given key and pageId
      *
      * @param key the key of the record. Input parameter.
-     * @param rid the rid of the record. Input parameter.
+     * @param padeId the pageId of the record. Input parameter.
      * @throws KeyTooLongException     key size exceeds the max keysize.
      * @throws KeyNotMatchException    key is not integer key nor string key
      * @throws IOException             error from the lower layer
@@ -934,11 +952,11 @@ public class BTreeClusteredFile extends ClusteredIndexFile
 
 
     /**
-     * delete leaf entry  given its <key, rid> pair.
-     * `rid' is IN the data entry; it is not the id of the data entry)
+     * delete clustered leaf entry  given its <key, pid> pair.
+     * `pid' is IN the data entry; it is not the id of the data entry)
      *
-     * @param key the key in pair <key, rid>. Input Parameter.
-     * @param rid the rid in pair <key, rid>. Input Parameter.
+     * @param key the key in pair <key, pid>. Input Parameter.
+     * @param rid the rid in pair <key, pid>. Input Parameter.
      * @return true if deleted. false if no such record.
      * @throws DeleteFashionException    neither full delete nor naive delete
      * @throws LeafRedistributeException redistribution error in leaf pages
@@ -958,7 +976,6 @@ public class BTreeClusteredFile extends ClusteredIndexFile
      * @throws IndexSearchException      error in search in index pages
      * @throws IOException               error from the lower layer
      */
-
     @java.lang.Override
     public boolean Delete(KeyClass key, PageId pageId)
             throws DeleteFashionException,
@@ -1718,7 +1735,7 @@ public class BTreeClusteredFile extends ClusteredIndexFile
      * create a scan with given keys
      * Cases:
      * (1) lo_key = null, hi_key = null
-     * scan the whole index
+     * scan the whole indexp
      * (2) lo_key = null, hi_key!= null
      * range scan from min to the hi_key
      * (3) lo_key!= null, hi_key = null
@@ -1812,21 +1829,23 @@ public class BTreeClusteredFile extends ClusteredIndexFile
         this.heapfile = hf;
     }
 
+    /**
+     * This function inserts tuple in already existing clustered btree index
+     * @param tuple Record to be inserted
+     * @param key   Key of record to be inserted
+     * @param fieldNumber Field number on which index is created.
+     * @param multiplier This value gets multiplied with key for maintaining order(ASC or DESC)
+     * @return RID of inserted tuple.
+     */
     public RID insertTuple(Tuple tuple, KeyClass key, int fieldNumber, int multiplier){
         RID rid  = new RID();
         PageId pageId = new PageId();
 
         //Index is already created, find a page where insertion can be made
-        //TODO:Pawan some entries are getting inserted randomly on pages where space is available.
         BTClusteredFileScan btClusteredFileScan = null;
         try {
             btClusteredFileScan = new_scan(key, null);
             KeyDataEntry entry  = btClusteredFileScan.get_next();
-//            while (entry != null){
-//                PageId pagedId = ((ClusteredLeafData)entry.data).getData();
-//                System.out.println("Page no having records in range : " + pagedId);
-//                entry = btClusteredFileScan.get_next();
-//            }
             if(entry == null){
                 btClusteredFileScan = new_scan(null, null);
                 entry  = btClusteredFileScan.get_next();
@@ -1835,11 +1854,6 @@ public class BTreeClusteredFile extends ClusteredIndexFile
 
         } catch (Exception e) {
             e.printStackTrace();
-        }
-
-        if(pageId.pid == INVALID_PAGE)
-        {
-            //throw new PageNotFoundException("Invalid page number provided");
         }
 
         HFPage hfPage = new HFPage();
@@ -1901,6 +1915,18 @@ public class BTreeClusteredFile extends ClusteredIndexFile
         return rid;
     }
 
+    /**
+     *
+     * @param existingPage HFPage which contains records
+     * @param newPage       New HFPage which is empty
+     * @param tupleSize     size of a single tuple
+     * @return boolean result of operation.
+     * @throws InvalidSlotNumberException
+     * @throws IOException
+     * @throws InvalidTupleSizeException
+     * @throws InvalidTypeException
+     * @throws FieldNumberOutOfBoundException
+     */
     private boolean redistributeRecords(HFPage existingPage, HFPage newPage, int tupleSize) throws InvalidSlotNumberException,
             IOException, InvalidTupleSizeException, InvalidTypeException, FieldNumberOutOfBoundException {
         RID rid = existingPage.firstRecord();
@@ -1932,6 +1958,18 @@ public class BTreeClusteredFile extends ClusteredIndexFile
         return true;
     }
 
+
+    /**
+     *
+     * @param tuple Record to be deleted
+     * @return result of operation
+     * @throws HFDiskMgrException
+     * @throws HFException
+     * @throws HFBufMgrException
+     * @throws InvalidSlotNumberException
+     * @throws InvalidTupleSizeException
+     * @throws Exception
+     */
     public boolean deleteFromIndex(Tuple tuple)
             throws HFDiskMgrException, HFException, HFBufMgrException, InvalidSlotNumberException, InvalidTupleSizeException, Exception
     {
@@ -2030,7 +2068,9 @@ public class BTreeClusteredFile extends ClusteredIndexFile
         return null;
     }
 
-
+    /**
+     * Prints structure of clustered index files
+     */
     public void printBTree(){
         try {
             BT.printBTree(this.getHeaderPage());
@@ -2039,6 +2079,9 @@ public class BTreeClusteredFile extends ClusteredIndexFile
         }
     }
 
+    /**
+     * Prints index pages and clustered leaf pages of clustered index files
+     */
     public void printAllLeafPages(){
         try {
             BT.printAllLeafPages(this.getHeaderPage());

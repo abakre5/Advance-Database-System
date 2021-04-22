@@ -19,15 +19,9 @@ public class IndexUtils {
         HashIndexFileScan indScan;
 
         indScan = indFile.new_scan();
-        
+
         return indScan;
     }
-
-
-
-
-
-
 
 
     /**
@@ -152,11 +146,10 @@ public class IndexUtils {
 
                 case AttrType.attrReal:
 
-                    if (((FloatKey)key1).getKey().floatValue() < ((FloatKey)key2).getKey().floatValue()) {
-                    indScan = ((BTreeFile)indFile).new_scan(key1, key2);
-                    }
-                    else {
-                    indScan = ((BTreeFile)indFile).new_scan(key2, key1);
+                    if (((FloatKey) key1).getKey().floatValue() < ((FloatKey) key2).getKey().floatValue()) {
+                        indScan = ((BTreeFile) indFile).new_scan(key1, key2);
+                    } else {
+                        indScan = ((BTreeFile) indFile).new_scan(key2, key1);
                     }
                     return indScan;
 
@@ -195,9 +188,9 @@ public class IndexUtils {
                 if (choice == 1) return new IntegerKey(new Integer(cd.operand1.integer));
                 else return new IntegerKey(new Integer(cd.operand2.integer));
             case AttrType.attrReal:
-              // need FloatKey class in bt.java
-              if (choice == 1) return new FloatKey(new Float(cd.operand1.real));
-              else return new FloatKey(new Float(cd.operand2.real));
+                // need FloatKey class in bt.java
+                if (choice == 1) return new FloatKey(new Float(cd.operand1.real));
+                else return new FloatKey(new Float(cd.operand2.real));
 
             default:
                 throw new UnknownKeyTypeException("IndexUtils.java: Only Integer and String keys are supported so far");
@@ -205,128 +198,142 @@ public class IndexUtils {
 
     }
 
+    /**
+     * BTreeClusteredScan opens a BTree scan based on selection conditions
+     *
+     * @param selects conditions to apply
+     * @param indFile the index (BTreeClusteredFile) file
+     * @return an instance of IndexFileScan (BTreeClusteredFile)
+     * @throws IOException               from lower layer
+     * @throws UnknownKeyTypeException   only int and string keys are supported
+     * @throws InvalidSelectionException selection conditions (selects) not valid
+     * @throws KeyNotMatchException      Keys do not match
+     * @throws UnpinPageException        unpin page failed
+     * @throws PinPageException          pin page failed
+     * @throws IteratorException         iterator exception
+     * @throws ConstructPageException    failed to construct a header page
+     */
     public static IndexFileScan BTreeClusteredScan(CondExpr[] selects, ClusteredIndexFile indFile)
-    throws IOException,
-    UnknownKeyTypeException,
-    InvalidSelectionException,
-    KeyNotMatchException,
-    UnpinPageException,
-    PinPageException,
-    IteratorException,
-    ConstructPageException {
-IndexFileScan indScan;
+            throws IOException,
+            UnknownKeyTypeException,
+            InvalidSelectionException,
+            KeyNotMatchException,
+            UnpinPageException,
+            PinPageException,
+            IteratorException,
+            ConstructPageException {
+        IndexFileScan indScan;
 
-if (selects == null || selects[0] == null) {
-    indScan = ((BTreeClusteredFile) indFile).new_scan(null, null);
-    return indScan;
-}
-
-if (selects[1] == null) {
-    if (selects[0].type1.attrType != AttrType.attrSymbol && selects[0].type2.attrType != AttrType.attrSymbol) {
-        throw new InvalidSelectionException("IndexUtils.java: Invalid selection condition");
-    }
-
-    KeyClass key;
-
-    // symbol = value
-    if (selects[0].op.attrOperator == AttrOperator.aopEQ) {
-        if (selects[0].type1.attrType != AttrType.attrSymbol) {
-            key = getValue(selects[0], selects[0].type1, 1);
-            indScan = ((BTreeClusteredFile) indFile).new_scan(key, key);
-        } else {
-            key = getValue(selects[0], selects[0].type2, 2);
-            indScan = ((BTreeClusteredFile) indFile).new_scan(key, key);
+        if (selects == null || selects[0] == null) {
+            indScan = ((BTreeClusteredFile) indFile).new_scan(null, null);
+            return indScan;
         }
-        return indScan;
-    }
 
-    // symbol < value or symbol <= value
-    if (selects[0].op.attrOperator == AttrOperator.aopLT || selects[0].op.attrOperator == AttrOperator.aopLE) {
-        if (selects[0].type1.attrType != AttrType.attrSymbol) {
-            key = getValue(selects[0], selects[0].type1, 1);
-            indScan = ((BTreeClusteredFile) indFile).new_scan(null, key);
+        if (selects[1] == null) {
+            if (selects[0].type1.attrType != AttrType.attrSymbol && selects[0].type2.attrType != AttrType.attrSymbol) {
+                throw new InvalidSelectionException("IndexUtils.java: Invalid selection condition");
+            }
+
+            KeyClass key;
+
+            // symbol = value
+            if (selects[0].op.attrOperator == AttrOperator.aopEQ) {
+                if (selects[0].type1.attrType != AttrType.attrSymbol) {
+                    key = getValue(selects[0], selects[0].type1, 1);
+                    indScan = ((BTreeClusteredFile) indFile).new_scan(key, key);
+                } else {
+                    key = getValue(selects[0], selects[0].type2, 2);
+                    indScan = ((BTreeClusteredFile) indFile).new_scan(key, key);
+                }
+                return indScan;
+            }
+
+            // symbol < value or symbol <= value
+            if (selects[0].op.attrOperator == AttrOperator.aopLT || selects[0].op.attrOperator == AttrOperator.aopLE) {
+                if (selects[0].type1.attrType != AttrType.attrSymbol) {
+                    key = getValue(selects[0], selects[0].type1, 1);
+                    indScan = ((BTreeClusteredFile) indFile).new_scan(null, key);
+                } else {
+                    key = getValue(selects[0], selects[0].type2, 2);
+                    indScan = ((BTreeClusteredFile) indFile).new_scan(null, key);
+                }
+                return indScan;
+            }
+
+            // symbol > value or symbol >= value
+            if (selects[0].op.attrOperator == AttrOperator.aopGT || selects[0].op.attrOperator == AttrOperator.aopGE) {
+                if (selects[0].type1.attrType != AttrType.attrSymbol) {
+                    key = getValue(selects[0], selects[0].type1, 1);
+                    indScan = ((BTreeClusteredFile) indFile).new_scan(key, null);
+                } else {
+                    key = getValue(selects[0], selects[0].type2, 2);
+                    indScan = ((BTreeClusteredFile) indFile).new_scan(key, null);
+                }
+                return indScan;
+            }
+
+            // error if reached here
+            System.err.println("Error -- in IndexUtils.BTree_scan()");
+            return null;
         } else {
-            key = getValue(selects[0], selects[0].type2, 2);
-            indScan = ((BTreeClusteredFile) indFile).new_scan(null, key);
-        }
-        return indScan;
-    }
+            // selects[1] != null, must be a range query
+            if (selects[0].type1.attrType != AttrType.attrSymbol && selects[0].type2.attrType != AttrType.attrSymbol) {
+                throw new InvalidSelectionException("IndexUtils.java: Invalid selection condition");
+            }
+            if (selects[1].type1.attrType != AttrType.attrSymbol && selects[1].type2.attrType != AttrType.attrSymbol) {
+                throw new InvalidSelectionException("IndexUtils.java: Invalid selection condition");
+            }
 
-    // symbol > value or symbol >= value
-    if (selects[0].op.attrOperator == AttrOperator.aopGT || selects[0].op.attrOperator == AttrOperator.aopGE) {
-        if (selects[0].type1.attrType != AttrType.attrSymbol) {
-            key = getValue(selects[0], selects[0].type1, 1);
-            indScan = ((BTreeClusteredFile) indFile).new_scan(key, null);
-        } else {
-            key = getValue(selects[0], selects[0].type2, 2);
-            indScan = ((BTreeClusteredFile) indFile).new_scan(key, null);
-        }
-        return indScan;
-    }
+            // which symbol is higher??
+            KeyClass key1, key2;
+            AttrType type;
 
-    // error if reached here
-    System.err.println("Error -- in IndexUtils.BTree_scan()");
-    return null;
-} else {
-    // selects[1] != null, must be a range query
-    if (selects[0].type1.attrType != AttrType.attrSymbol && selects[0].type2.attrType != AttrType.attrSymbol) {
-        throw new InvalidSelectionException("IndexUtils.java: Invalid selection condition");
-    }
-    if (selects[1].type1.attrType != AttrType.attrSymbol && selects[1].type2.attrType != AttrType.attrSymbol) {
-        throw new InvalidSelectionException("IndexUtils.java: Invalid selection condition");
-    }
-
-    // which symbol is higher??
-    KeyClass key1, key2;
-    AttrType type;
-
-    if (selects[0].type1.attrType != AttrType.attrSymbol) {
-        key1 = getValue(selects[0], selects[0].type1, 1);
-        type = selects[0].type1;
-    } else {
-        key1 = getValue(selects[0], selects[0].type2, 2);
-        type = selects[0].type2;
-    }
-    if (selects[1].type1.attrType != AttrType.attrSymbol) {
-        key2 = getValue(selects[1], selects[1].type1, 1);
-    } else {
-        key2 = getValue(selects[1], selects[1].type2, 2);
-    }
-
-    switch (type.attrType) {
-        case AttrType.attrString:
-            if (((StringKey) key1).getKey().compareTo(((StringKey) key2).getKey()) < 0) {
-                indScan = ((BTreeClusteredFile) indFile).new_scan(key1, key2);
+            if (selects[0].type1.attrType != AttrType.attrSymbol) {
+                key1 = getValue(selects[0], selects[0].type1, 1);
+                type = selects[0].type1;
             } else {
-                indScan = ((BTreeClusteredFile) indFile).new_scan(key2, key1);
+                key1 = getValue(selects[0], selects[0].type2, 2);
+                type = selects[0].type2;
             }
-            return indScan;
-
-        case AttrType.attrInteger:
-            if (((IntegerKey) key1).getKey().intValue() < ((IntegerKey) key2).getKey().intValue()) {
-                indScan = ((BTreeClusteredFile) indFile).new_scan(key1, key2);
+            if (selects[1].type1.attrType != AttrType.attrSymbol) {
+                key2 = getValue(selects[1], selects[1].type1, 1);
             } else {
-                indScan = ((BTreeClusteredFile) indFile).new_scan(key2, key1);
+                key2 = getValue(selects[1], selects[1].type2, 2);
             }
-            return indScan;
 
-        case AttrType.attrReal:
+            switch (type.attrType) {
+                case AttrType.attrString:
+                    if (((StringKey) key1).getKey().compareTo(((StringKey) key2).getKey()) < 0) {
+                        indScan = ((BTreeClusteredFile) indFile).new_scan(key1, key2);
+                    } else {
+                        indScan = ((BTreeClusteredFile) indFile).new_scan(key2, key1);
+                    }
+                    return indScan;
 
-            if (((FloatKey)key1).getKey().floatValue() < ((FloatKey)key2).getKey().floatValue()) {
-                indScan = ((BTreeClusteredFile)indFile).new_scan(key1, key2);
+                case AttrType.attrInteger:
+                    if (((IntegerKey) key1).getKey().intValue() < ((IntegerKey) key2).getKey().intValue()) {
+                        indScan = ((BTreeClusteredFile) indFile).new_scan(key1, key2);
+                    } else {
+                        indScan = ((BTreeClusteredFile) indFile).new_scan(key2, key1);
+                    }
+                    return indScan;
+
+                case AttrType.attrReal:
+
+                    if (((FloatKey) key1).getKey().floatValue() < ((FloatKey) key2).getKey().floatValue()) {
+                        indScan = ((BTreeClusteredFile) indFile).new_scan(key1, key2);
+                    } else {
+                        indScan = ((BTreeClusteredFile) indFile).new_scan(key2, key1);
+                    }
+                    return indScan;
+
+                default:
+                    // error condition
+                    throw new UnknownKeyTypeException("IndexUtils.java: Only Integer and String keys are supported so far");
             }
-            else {
-                indScan = ((BTreeClusteredFile)indFile).new_scan(key2, key1);
-            }
-            return indScan;
+        } // end of else
 
-        default:
-            // error condition
-            throw new UnknownKeyTypeException("IndexUtils.java: Only Integer and String keys are supported so far");
     }
-} // end of else
-
-}
 
 }
 
