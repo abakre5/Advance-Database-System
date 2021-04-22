@@ -424,8 +424,6 @@ public class GroupBywithHash {
         System.out.println("No of rows in group by " + rows);
     }
 
-    // TO-DO: Value of non groupbyattr and non agg_list attr handling currently it is 0.
-
     /**
      * @return list of tuples from each group having average of that group based on agg_list.
      * @throws Exception
