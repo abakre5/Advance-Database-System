@@ -15,7 +15,6 @@ import heap.*;
 import java.io.*;
 
 import static global.GlobalConst.INVALID_PAGE;
-b
 /**
  * Index Scan iterator will directly access the required tuple using
  * the provided key. It will also perform selections and projections.
