@@ -2296,10 +2296,10 @@ public class Phase3Driver implements GlobalConst {
             System.arraycopy(outIteratorDesc.getAttrType(), 0, jTypes, 0, outIteratorDesc.getNumAttr());
             System.arraycopy(innerIteratorDesc.getAttrType(), 0, jTypes, outIteratorDesc.getNumAttr(), innerIteratorDesc.getNumAttr());
 
-            for (int i = 0; i < outIteratorDesc.getNumAttr() + innerIteratorDesc.getNumAttr(); i++){
-                System.out.println(fieldNames[i]);
-                System.out.println(jTypes[i].attrType);
-            }
+//            for (int i = 0; i < outIteratorDesc.getNumAttr() + innerIteratorDesc.getNumAttr(); i++){
+//                System.out.println(fieldNames[i]);
+//                System.out.println(jTypes[i].attrType);
+//            }
 
             try {
                 Phase3Utils.createOutputTable(materialTableName, fieldNames, jTypes, outIteratorDesc.getNumAttr()+innerIteratorDesc.getNumAttr());
@@ -2381,8 +2381,7 @@ public class Phase3Driver implements GlobalConst {
                             outJoinAttr, outMrgAttr,
                             innerIteratorDesc.getAttrType(), innerIteratorDesc.getNumAttr(), innerIteratorDesc.getStrSizes(),
                             innerJoinAttr, innerMrgAttr,
-
-                            "newOutRelation", "newInnerRelation", k, nPages, materialTableName);
+                            Phase3Utils.getClusteredBtreeHeapName(outTableName, outMergeAttrNumber), Phase3Utils.getClusteredBtreeHeapName(innerTableName, innerMergeAttrNumber), k, nPages, materialTableName, scan, scan1);
 
                 } catch (IOException | FileScanException | InvalidRelation | TupleUtilsException | WrongPermat | InvalidTypeException | PageNotReadException | FieldNumberOutOfBoundException | PredEvalException | UnknowAttrType | InvalidTupleSizeException | JoinsException e) {
                     e.printStackTrace();
