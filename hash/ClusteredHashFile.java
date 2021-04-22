@@ -86,7 +86,7 @@ public class ClusteredHashFile  implements GlobalConst {
       * This method returns a tuple which can be used to read/write
       * tuples from hash bucket file
       */
-    public Tuple getBucketFileTupleStructure()
+    private Tuple getBucketFileTupleStructure()
     {
 
         /* a bucket file tuple stores PageID of buckets' heapfiles */
@@ -177,7 +177,7 @@ public class ClusteredHashFile  implements GlobalConst {
                 if (tup.equals(t)) {
                     //System.out.println("clustered hash> found tuple to delete");
                     status = bucketFile.deleteRecord(rid);
-                    scan.closescan();
+                    //scan.closescan();
                     break;
                 }
             }

@@ -14,6 +14,10 @@ import java.util.*;
 
 import static global.AttrType.*;
 
+/**
+ * This class handles the logic to find the top K joined elements for given two relations using NRA Algorithm.
+ * @author magraw12
+ */
 public class TopK_NRAJoin {
 
     List<CandidateDetailsNRAReal> topKCandidate = new ArrayList<>();
@@ -61,8 +65,6 @@ public class TopK_NRAJoin {
             try {
                 this.materialisedTableName = materialisedTableName;
                 this.materialisedTable  = new Heapfile(materialisedTableName);
-//                 attrInfo[] attrs = Phase3Utils.getAttrInfoGroupBy(attrType, groupByAttr, aggList);
-//                 Phase3Utils.createTable(materialisedTableName, len_in1 + len_in2, );
             } catch (HFException | HFBufMgrException | HFDiskMgrException e) {
                 System.out.println("File creation for materialised file failed.");
                 e.printStackTrace();
@@ -75,7 +77,10 @@ public class TopK_NRAJoin {
         }
     }
 
-
+    /**
+     * this methods comapres the tuples from both the relations with the candidate tuples to find the top k tuple.
+     * @throws Exception
+     */
     private void computeKJoin() throws Exception {
         IndexScan relation1 = outerIndexScan;
         FileScan relation3 = getFileScan(relationName1, (short) len_in1, in1, t1_str_sizes);
@@ -87,7 +92,6 @@ public class TopK_NRAJoin {
         float mergeAttributeValue2 = 0;
 
         FldSpec[] proj_list = new FldSpec[len_in1 + len_in2];
-//        System.out.println("con=ming till here ");
         for (int i = 1; i <= len_in1; i++) {
             proj_list[i - 1] = new FldSpec(new RelSpec(RelSpec.outer), i);
         }
@@ -95,11 +99,6 @@ public class TopK_NRAJoin {
             proj_list[len_in1 + i - 1] = new FldSpec(new RelSpec(RelSpec.innerRel),  i);
         }
 
-
-
-        if (false) {
-            // if given relation does not have clustered index then return zero
-        } else {
             TupleRIDPair tupleRIDRelation1 = relation1.get_next1();
             TupleRIDPair tupleRIDRelation2 = relation2.get_next1();
 
@@ -110,9 +109,6 @@ public class TopK_NRAJoin {
                     tupleRelation1 = tupleRIDRelation1.getTuple();
                     AttrType x = in1[joinAttr1.offset - 1];
                     switch (x.attrType) {
-                        case attrString:
-                            //return "attrString";
-                            break;
                         case attrInteger:
                             joinAttributeValue1 = (float) tupleRelation1.getIntFld(joinAttr1.offset);
                             break;
@@ -135,9 +131,6 @@ public class TopK_NRAJoin {
                     tupleRelation2 = tupleRIDRelation2.getTuple();
                     AttrType x = in1[joinAttr1.offset - 1];
                     switch (x.attrType) {
-                        case attrString:
-                            //return "attrString";
-                            break;
                         case attrInteger:
                             joinAttributeValue2 = (float) tupleRelation2.getIntFld(joinAttr2.offset);
                             break;
@@ -183,12 +176,10 @@ public class TopK_NRAJoin {
                             addToTopKCandidateIndexList(topKCandidate.size(), candidateDetailsNRAReal.getLowerBound(), candidateDetailsNRAReal.getUpperBound());
                             topKCandidate.add(candidateDetailsNRAReal);
                         }
-                        // check this assignment is correct or not.
                         relation2TuplePartOfCandidateList = true;
                     }
 
                     if (!relation2TuplePartOfCandidateList) {
-                        //DOn't use default value as 1000 for upper bound use value of first tuple if complementry relation. - solved.
                         CandidateDetailsNRAReal tmp = new CandidateDetailsNRAReal(null, tupleRIDRelation2.getRID(), new float[]{0, mergeAttributeValue2}, new float[]{mergeAttributeValue1, mergeAttributeValue2}, false, true, joinAttributeValue2);
                         addToTopKCandidateIndexList(topKCandidate.size(), tmp.getLowerBound(), tmp.getUpperBound());
                         topKCandidate.add(tmp);
@@ -207,7 +198,6 @@ public class TopK_NRAJoin {
                 tupleRIDRelation1 = relation1.get_next1();
                 tupleRIDRelation2 = relation2.get_next1();
 
-//                System.out.println("Number of elements in the candidate list : " + topKCandidate.size());
             }
 
             int counter = 1;
@@ -225,8 +215,6 @@ public class TopK_NRAJoin {
                 }
                 Tuple rid_tuple = new Tuple(t1.getTupleByteArray(), t1.getOffset(), t1.getLength());
                 rid_tuple.setHdr((short) in1.length, in1, t1_str_sizes);
-//                System.out.println("Printed tuple for t1 : "  + rid_tuple.getIntFld(1) + " " + rid_tuple.getStrFld(2) + " " + rid_tuple.getIntFld(3) + " " + rid_tuple.getFloFld(4));
-//                rid_tuple.print(in1);
                 Tuple t2 = new Tuple();
                 try {
                     t2.setHdr((short) in2.length, in2, t2_str_sizes);
@@ -240,8 +228,6 @@ public class TopK_NRAJoin {
                 }
                 Tuple rid_tuple2 = new Tuple(t2.getTupleByteArray(), t2.getOffset(), t2.getLength());
                 rid_tuple2.setHdr((short) in2.length, in2, t2_str_sizes);
-//                rid_tuple2.print(in2);
-//                System.out.println("Printed tuple for tuple 2  : "  + rid_tuple2.getIntFld(1) + " " + rid_tuple2.getIntFld(2) + " " + rid_tuple2.getStrFld(3));
                 Tuple tuple = new Tuple();
                 AttrType[] temp = new AttrType[len_in1 + len_in2];
                 TupleUtils.setup_op_tuple(tuple, temp,
@@ -261,11 +247,17 @@ public class TopK_NRAJoin {
                 }
                 counter++;
             }
-        }
+
         relation1.close();
         relation2.close();
     }
 
+    /**
+     * update the candidate index list.
+     * @param index - index of candidate in the candidate list
+     * @param lowerBound - lower bound of candidate.
+     * @param upperBound - upper bound of candidate.
+     */
     public void updateTopKCandidateIndexList(int index, float[] lowerBound, float[] upperBound) {
         for (ArrayList<Float> itr : topKCandidateIndexList) {
             if (itr.get(2) == index) {
@@ -275,6 +267,12 @@ public class TopK_NRAJoin {
         }
     }
 
+    /**
+     * Adds given tuple to candidate list.
+     * @param index - index of candidate in the candidate list
+     * @param lowerBound - lower bound of candidate.
+     * @param upperBound - upper bound of candidate.
+     */
     public void addToTopKCandidateIndexList(int index, float[] lowerBound, float[] upperBound) {
         ArrayList<Float> tmp = new ArrayList<>();
         tmp.add(lowerBound[0] + lowerBound[1]);
@@ -283,6 +281,13 @@ public class TopK_NRAJoin {
         topKCandidateIndexList.add(tmp);
     }
 
+    /**
+     * Method compares the tuple in relation 1 with join candidates in the candidate list.
+     * @param joinAttributeValue1 join attribute value.
+     * @param mergeAttributeValue1  merge attribute value.
+     * @param tuple1Rid RID given tuple.
+     * @return list of new candidates.
+     */
     private Set<CandidateDetailsNRAReal> checkTupleWithTopKCandidate(float joinAttributeValue1, float mergeAttributeValue1, RID tuple1Rid) {
         int i = 0;
         Set<CandidateDetailsNRAReal> tmp = new LinkedHashSet<>();
@@ -290,9 +295,6 @@ public class TopK_NRAJoin {
             boolean candidateFlagToUpdateTheBounds = true;
             if (candidateDetails.getIdentifier() == joinAttributeValue1) {
                 if (!candidateDetails.isRelation1Seen()) {
-                    // add one if condition to check if( setRelation1Seen != true) to handle duplicates.
-                    // else part of this new if should add new entry to the list.
-                    // check if u need to reset all the boolean values.
                     candidateDetails.updateUpperBound(0, mergeAttributeValue1);
                     candidateDetails.updateLowerBound(0, mergeAttributeValue1);
                     candidateDetails.setRelation1Seen(true);
@@ -323,6 +325,13 @@ public class TopK_NRAJoin {
         return tmp;
     }
 
+    /**
+     * method compares the tuple in relation 2 with join candidates in the candidate list.
+     * @param joinAttributeValue2 - join attribute value.
+     * @param mergeAttributeValue2 - merge attribute value.
+     * @param tuple2RID - RID of the given tuple.
+     * @return - list of new candidates.
+     */
     private Set<CandidateDetailsNRAReal> checkTupleWithTopKCandidate2(float joinAttributeValue2, float mergeAttributeValue2, RID tuple2RID) {
         int i = 0;
         Set<CandidateDetailsNRAReal> tmp = new LinkedHashSet<>();
@@ -330,10 +339,6 @@ public class TopK_NRAJoin {
             boolean candidateFlagToUpdateTheBounds = true;
             if (candidateDetails.getIdentifier() == joinAttributeValue2) {
                 if (!candidateDetails.isRelation2Seen()) {
-                    // add one if condition to check if( setRelation2Seen != true) to handle duplicates.
-                    // further check does the old entry have relation1 data if yes you will need that data.
-                    // Create new entry with new R2 and old R1 data.
-                    // check if u need to reset all the boolean values.
                     candidateDetails.updateUpperBound(1, mergeAttributeValue2);
                     candidateDetails.updateLowerBound(1, mergeAttributeValue2);
                     candidateDetails.setRelation2Seen(true);
@@ -384,30 +389,5 @@ public class TopK_NRAJoin {
         scan = new FileScan(relationName, attrTypes, stringSizes,
                 noOfColumns, noOfColumns, pProjection, null);
         return scan;
-    }
-
-    public void  printTableHeader(String tableName, int numAttr){
-        AttrDesc[] attrs = new AttrDesc[numAttr];
-        try {
-            int numAttrCat = ExtendedSystemDefs.MINIBASE_ATTRCAT.getRelInfo(tableName, 0, attrs);
-            /* if number of attributes from datafile doesn't match catalog */
-            if (numAttrCat != numAttr) {
-                System.err.println("*** error: schema datafile and relation schema mismatch");
-            }
-        } catch (Catalogindexnotfound e) {
-            System.err.printf("*** error relation '%s' mismatch\n", tableName);
-        } catch (Exception e) {
-            System.err.println("*** error " + e);
-            e.printStackTrace();
-        }
-        System.out.println();
-        int pos = 0;
-        for (int i = 0; pos < numAttr; ++i) {
-            i = i % numAttr;
-            if (attrs[i].attrPos - 1 == pos) {
-                System.out.printf("%-20s", attrs[i].attrName);
-                ++pos;
-            }
-        }
     }
 }

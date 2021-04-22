@@ -107,16 +107,6 @@ public class HashJoin5a extends Iterator {
 
         perm_mat = proj_list;
 
-//
-//        try {
-//            t_size = TupleUtils.setup_op_tuple(Jtuple, Jtypes,
-//                    in1, len_in1, in2, len_in2,
-//                    t1_str_sizes, t2_str_sizes,
-//                    proj_list, nOutFlds);
-//        } catch (TupleUtilsException e) {
-//            throw new HashJoinException(e, "TupleUtilsException is caught by NestedLoopsJoins.java");
-//        }
-
         try {
             hf = new Heapfile(relationName2);
         } catch (Exception e) {
@@ -148,7 +138,6 @@ public class HashJoin5a extends Iterator {
                 } catch (Exception e) {
                     throw new HashJoinException(e, "Create new heapfile failed.");
                 }
-
                 FileScan fileScan = getFileScan("hashJoinFile.in", (short) (nOutFlds+1), temp11,  temp11_res_str_sizes);
                 Tuple tuple = fileScan.get_next();
                 int index = 0;
@@ -174,6 +163,9 @@ public class HashJoin5a extends Iterator {
                     tuple1.print(temp11);
                     tuple1 = fileScan1.get_next();
                 }
+                fileScan1.close();
+                fileScan1.deleteFile();
+                close();
 
             } catch (Exception e) {
                 throw new HashJoinException(e, "Create new heapfile failed.");
@@ -198,6 +190,7 @@ public class HashJoin5a extends Iterator {
         RID rid = null;
         FileScan fscan = null;
         iHashList = new ArrayList<>();
+        Heapfile bucketFile = null;
 
         FldSpec[] proj = new FldSpec[in2_len];
         for (int i = 1; i <= in2_len; i++) {
@@ -236,7 +229,7 @@ public class HashJoin5a extends Iterator {
                     iHashList.add(bucket);
                 }
 
-                Heapfile bucketFile = new Heapfile(bucket_name);
+                bucketFile = new Heapfile(bucket_name);
                 rid = bucketFile.insertRecord(data.getTupleByteArray());
                 data = fscan.get_next();
             }
@@ -250,6 +243,7 @@ public class HashJoin5a extends Iterator {
         RID rid = null;
         FileScan fscan = null;
         oHashList = new ArrayList<>();
+        Heapfile bucketFile = null;
 
         FldSpec[] proj = new FldSpec[in1_len];
         for (int i = 1; i <= in1_len; i++) {
@@ -286,7 +280,7 @@ public class HashJoin5a extends Iterator {
                     oHashList.add(bucket);
                 }
 
-                Heapfile bucketFile = new Heapfile(bucket_name);
+                 bucketFile = new Heapfile(bucket_name);
                 rid = bucketFile.insertRecord(data.getTupleByteArray());
 
                 data = outer.get_next();
@@ -307,14 +301,19 @@ public class HashJoin5a extends Iterator {
         ArrayList<ArrayList<Float>> topKCandidateIndexList = new ArrayList<ArrayList<Float>>();
         int index = 0;
         Heapfile joinFile = null;
+        Heapfile innerFile = null;
+        Heapfile outerFile = null;
+        FileScan outerScan;
+        NestedLoopsJoins nlj;
+
         try {
             joinFile = new Heapfile("hashJoinFile.in");
 
             for (int hash : oHashList) {
                 String innerFileName = "inner_hash_bucket_"+hash;
-                Heapfile innerFile = new Heapfile(innerFileName);
+                innerFile = new Heapfile(innerFileName);
                 String outerFileName = "outer_hash_bucket_"+hash;
-                Heapfile outerFile = new Heapfile(outerFileName);
+                outerFile = new Heapfile(outerFileName);
 
                 // Check if the buckets actually contain any tuples
                 if(innerFile.getRecCnt() == 0 || outerFile.getRecCnt() == 0) {
@@ -324,10 +323,10 @@ public class HashJoin5a extends Iterator {
                 // Perform NLJ
                 FldSpec[] oProj = getProjection(in1_len);
 
-                FileScan outerScan = new FileScan(outerFileName, _in1, t1_str_sizescopy, (short) in1_len, in1_len, oProj, null);
+                outerScan = new FileScan(outerFileName, _in1, t1_str_sizescopy, (short) in1_len, in1_len, oProj, null);
 
                 // Perform NLJ
-                NestedLoopsJoins nlj = new NestedLoopsJoins(_in1, in1_len, t1_str_sizescopy, _in2,
+                nlj = new NestedLoopsJoins(_in1, in1_len, t1_str_sizescopy, _in2,
                         in2_len, t2_str_sizescopy, n_buf_pgs, outerScan,
                         innerFileName, OutputFilter, RightFilter, perm_mat,
                         nOutFlds);
@@ -430,6 +429,9 @@ public class HashJoin5a extends Iterator {
                 f = new Heapfile(fileName);
                 f.deleteFile();
             }
+            String fileName = "hashJoinFile.in";
+            f = new Heapfile(fileName);
+            f.deleteFile();
         } catch (Exception e) {
             throw new HashJoinException(e, "Create new heapfile failed.");
         }
