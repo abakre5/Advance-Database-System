@@ -2679,6 +2679,12 @@ public class Phase3Driver implements GlobalConst {
         return true;
     }
 
+    /**
+     * Performs join operation based on input tokens
+     *
+     * @param tokens    Input parameters passed by user
+     * @return  True if function is executed successfully, else false
+     */
     private static boolean performJoin(String[] tokens) {
         String joinType = tokens[1].toLowerCase();
         String outerTableName = tokens[2].toLowerCase();
@@ -2689,7 +2695,6 @@ public class Phase3Driver implements GlobalConst {
         String outputTable = null;
         Iterator joinItr = null;
 
-        // Currently supporting only equality
         String op = tokens[6];
 
         if (tokens.length > 8) {
@@ -2804,10 +2809,12 @@ public class Phase3Driver implements GlobalConst {
             int cnt = 0;
             while (tt != null) {
                 t.tupleCopy(tt);
-                printTuple(t, jTypes);
+
                 if (outputTable != null) {
                     // If we want to write to table, do it
                     hf.insertRecord(t.getTupleByteArray());
+                } else {
+                    printTuple(t, jTypes);
                 }
 
                 cnt++;
