@@ -101,7 +101,7 @@ public class GroupBywithHash {
             Phase3Utils.insertIndexEntry(tableName, group_by_attr.offset, IndexType.Hash);
             System.out.println("Hash Index created on group by attr -> " + groupByAttr.offset);
         } else {
-            hashFile = new HashFile(tableName, hashIndexName, group_by_attr.offset, IndexType.Hash, 0, dbHeapFile,attrType, strSize, noOfColumns);
+            hashFile = new HashFile(tableName, hashIndexName, group_by_attr.offset, attrType[groupByAttr.offset - 1].attrType, 0, dbHeapFile,attrType, strSize, noOfColumns);
             System.out.println("Reusing hash index created on group by attr -> " + groupByAttr.offset);
         }
     }
@@ -179,10 +179,8 @@ public class GroupBywithHash {
         try {
             hash.KeyDataEntry entry = hashScan.get_next();
             while (entry != null) {
-                System.out.println("Yay");
                 RID fetchRID = entry.data;
                 tuple = dbHeapFile.getRecord(fetchRID);
-                System.out.println("Tuple -> " + tuple);
                 tuple = new Tuple(tuple.getTupleByteArray(), tuple.getOffset(), tuple.getLength());
                 tuple.setHdr(noOfColumns, attrType, strSize);
                 int index = groupByAttr.offset;
@@ -302,6 +300,7 @@ public class GroupBywithHash {
         float max = Float.MIN_VALUE;
 
         float groupByAttrValue = 0;
+        int rows = 0;
         try {
             hash.KeyDataEntry entry = hashScan.get_next();
             while (entry != null) {
@@ -325,10 +324,12 @@ public class GroupBywithHash {
                         to.print(groupByAttrTypes);
                     }
                     max = Phase3Utils.getAttrVal(tuple, aggList[0].offset, attrType[aggList[0].offset - 1]);
+                    rows++;
                 }
                 previousGroupByAttrValue = groupByAttrValue;
                 entry = hashScan.get_next();
             }
+            rows++;
             Tuple to = new Tuple(Phase3Utils.getAggTuple(groupByAttrValue, groupByAttr.offset, max,
                     attrType[aggList[0].offset - 1], attrType));
             if (Phase3Utils.createMaterializedView(materTableName)) {
@@ -340,6 +341,7 @@ public class GroupBywithHash {
             System.out.println("Error occurred while computing group by MAX!" + e);
             e.printStackTrace();
         }
+        System.out.println("No of rows in group by " + rows);
     }
 
     private void computeMaxGroupByAttrString(AttrType[] groupByAttrTypes) throws Exception {
@@ -348,6 +350,7 @@ public class GroupBywithHash {
         float max = Float.MIN_VALUE;
 
         String groupByAttrValue = "";
+        int rows = 0;
         try {
             hash.KeyDataEntry entry = hashScan.get_next();
             while (entry != null) {
@@ -370,6 +373,7 @@ public class GroupBywithHash {
                     } else {
                         to.print(groupByAttrTypes);
                     }
+                    rows++;
                     max = Phase3Utils.getAttrVal(tuple, aggList[0].offset, attrType[aggList[0].offset - 1]);
                 }
                 previousGroupByAttrValue = groupByAttrValue;
@@ -383,11 +387,13 @@ public class GroupBywithHash {
             } else {
                 to.print(groupByAttrTypes);
             }
+            rows++;
         } catch (Exception e) {
             System.out.println("Error occurred while computing group by MAX!" + e);
             e.printStackTrace();
         }
 
+        System.out.println("No of rows in group by " + rows);
     }
 
     // TO-DO: Value of non groupbyattr and non agg_list attr handling currently it is 0.
@@ -417,6 +423,7 @@ public class GroupBywithHash {
         float sum = 0;
         int count = 0;
         float groupByAttrValue = 0;
+        int rows = 0;
         try {
             hash.KeyDataEntry entry = hashScan.get_next();
             while (entry != null) {
@@ -439,6 +446,7 @@ public class GroupBywithHash {
                         to.print(groupByAttrTypes);
                     }
                     count = 0;
+                    rows++;
                     sum = Phase3Utils.getAttrVal(tuple, aggList[0].offset, this.attrType[aggList[0].offset - 1]);
                 }
                 count++;
@@ -452,10 +460,13 @@ public class GroupBywithHash {
             } else {
                 to.print(groupByAttrTypes);
             }
+            rows++;
         } catch (Exception e) {
             System.out.println("Error occurred while computing group by avg!" + e);
             e.printStackTrace();
         }
+
+        System.out.println("No of rows in group by " + rows);
     }
 
 
@@ -465,6 +476,7 @@ public class GroupBywithHash {
         float sum = 0;
         int count = 0;
         String groupByAttrValue = "";
+        int rows = 0;
         try {
             hash.KeyDataEntry entry = hashScan.get_next();
             while (entry != null) {
@@ -486,6 +498,7 @@ public class GroupBywithHash {
                     } else {
                         to.print(groupByAttrTypes);
                     }
+                    rows++;
                     count = 0;
                     sum = Phase3Utils.getAttrVal(tuple, aggList[0].offset, this.attrType[aggList[0].offset - 1]);
                 }
@@ -499,10 +512,12 @@ public class GroupBywithHash {
             } else {
                 to.print(groupByAttrTypes);
             }
+            rows++;
         } catch (Exception e) {
             System.out.println("Error occurred while computing group by avg!" + e);
             e.printStackTrace();
         }
+        System.out.println("No of rows in group by " + rows);
     }
 
 

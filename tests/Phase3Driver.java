@@ -1836,6 +1836,11 @@ public class Phase3Driver implements GlobalConst {
             addCmdToHist = true;
             tokens = commandLine.split("\\s+");
             cmd = tokens[0].toLowerCase();
+
+            /**
+             * Page Counter Initialize
+             */
+            PageCounter.init();
             switch (cmd) {
                 case "?":
                 case "help": {
@@ -2103,6 +2108,7 @@ public class Phase3Driver implements GlobalConst {
                     break;
                 }
             }
+            Phase3Utils.printPageCount();
             if (addCmdToHist) {
                 addCmdToHist(commandLine);
             }

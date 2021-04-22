@@ -3,6 +3,7 @@ package tests;
 import btree.BTreeFile;
 import bufmgr.PageNotReadException;
 import catalog.*;
+import diskmgr.PageCounter;
 import global.*;
 import heap.*;
 import index.IndexScan;
@@ -499,4 +500,8 @@ public class Phase3Utils {
         return RelationName + IndexType.getStringForType(IndexType.Clustered_Hash) + Integer.toString(KeyAttrIdx);
     }
 
+    public static void printPageCount() {
+        System.out.println("Reads: " + PageCounter.getReadCounter());
+        System.out.println("Write: " + PageCounter.getWriteCounter());
+    }
 }
