@@ -206,7 +206,7 @@ public class GroupBywithHash {
                         minTuple = tuple;
                     }
                 } else {
-                    Tuple to = new Tuple(Phase3Utils.getAggTuple(groupByAttrValue, groupByAttr.offset, min,
+                    Tuple to = new Tuple(Phase3Utils.getAggTuple(previousGroupByAttrValue, groupByAttr.offset, min,
                             attrType[aggList[0].offset - 1], attrType));
                     min = Phase3Utils.getAttrVal(tuple, aggList[0].offset, attrType[aggList[0].offset - 1]);
                     minTuple = tuple;
@@ -265,7 +265,7 @@ public class GroupBywithHash {
                     float val = Phase3Utils.getAttrVal(tuple, aggList[0].offset, attrType[aggList[0].offset - 1]);
                     min = Math.min(val, min);
                 } else {
-                    Tuple to = new Tuple(Phase3Utils.getAggTupleGroupByAttrString(groupByAttrValue, groupByAttr.offset, min,
+                    Tuple to = new Tuple(Phase3Utils.getAggTupleGroupByAttrString(previousGroupByAttrValue, groupByAttr.offset, min,
                             attrType[aggList[0].offset - 1]));
                     if (Phase3Utils.createMaterializedView(materTableName)) {
                         materHeapfile.insertRecord(to.returnTupleByteArray());
@@ -341,7 +341,7 @@ public class GroupBywithHash {
                     float val = Phase3Utils.getAttrVal(tuple, aggList[0].offset, attrType[aggList[0].offset - 1]);
                     max = Math.max(val, max);
                 } else {
-                    Tuple to = new Tuple(Phase3Utils.getAggTuple(groupByAttrValue, groupByAttr.offset, max,
+                    Tuple to = new Tuple(Phase3Utils.getAggTuple(previousGroupByAttrValue, groupByAttr.offset, max,
                             attrType[aggList[0].offset - 1], attrType));
                     if (Phase3Utils.createMaterializedView(materTableName)) {
                         materHeapfile.insertRecord(to.returnTupleByteArray());
@@ -397,7 +397,7 @@ public class GroupBywithHash {
                     float val = Phase3Utils.getAttrVal(tuple, aggList[0].offset, attrType[aggList[0].offset - 1]);
                     max = Math.max(val, max);
                 } else {
-                    Tuple to = new Tuple(Phase3Utils.getAggTupleGroupByAttrString(groupByAttrValue, groupByAttr.offset, max,
+                    Tuple to = new Tuple(Phase3Utils.getAggTupleGroupByAttrString(previousGroupByAttrValue, groupByAttr.offset, max,
                             attrType[aggList[0].offset - 1]));
                     if (Phase3Utils.createMaterializedView(materTableName)) {
                         materHeapfile.insertRecord(to.returnTupleByteArray());
