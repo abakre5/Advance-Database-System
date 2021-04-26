@@ -358,29 +358,34 @@ public class IndexNestedLoopsJoins extends Iterator {
                     innerRidList = hashf.searchHashIndexForJoin(key);
                 }
 
-                RID inRid = innerRidList.get(0);
-
-                // get inner tuple using this RID
-                Tuple tt = new Tuple();
-                tt.setHdr((short) nInnerRecs, innerTypes, innerStrSizes);
-
-                int size = tt.size();
-
-                t = new Tuple(size);
-                t.setHdr((short) nInnerRecs, innerTypes, innerStrSizes);
-
-                tt = heapf.getRecord(inRid);
-                t.tupleCopy(tt);
-
-                innerRidList.remove(0);
-                if (innerRidList.size() == 0) {
+                if (innerRidList.isEmpty()) {
                     get_from_outer = true;
                     innerRidList = null;
-                }
+                } else {
+                    RID inRid = innerRidList.get(0);
 
-                if (t != null) {
-                    Projection.Join(outer_tuple, outerTypes, t, innerTypes, Jtuple, perm_mat, nOutFlds);
-                    return Jtuple;
+                    // get inner tuple using this RID
+                    Tuple tt = new Tuple();
+                    tt.setHdr((short) nInnerRecs, innerTypes, innerStrSizes);
+
+                    int size = tt.size();
+
+                    t = new Tuple(size);
+                    t.setHdr((short) nInnerRecs, innerTypes, innerStrSizes);
+
+                    tt = heapf.getRecord(inRid);
+                    t.tupleCopy(tt);
+
+                    innerRidList.remove(0);
+                    if (innerRidList.isEmpty()) {
+                        get_from_outer = true;
+                        innerRidList = null;
+                    }
+
+                    if (t != null) {
+                        Projection.Join(outer_tuple, outerTypes, t, innerTypes, Jtuple, perm_mat, nOutFlds);
+                        return Jtuple;
+                    }
                 }
 
             } catch (Exception e) {
