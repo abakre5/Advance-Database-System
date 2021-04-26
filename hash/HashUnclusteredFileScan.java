@@ -109,7 +109,7 @@ public class HashUnclusteredFileScan extends HashIndexFileScan implements Global
                 entry.data = new RID(insert_rid.pageNo,insert_rid.slotNo);
                 
                 if(bucketEntryCnt == 0) {
-                    System.out.println("This is the last entry");
+                   // System.out.println("This is the last entry");
                     header_names.remove();
                     
                     currentBucketCnt++;
@@ -119,7 +119,7 @@ public class HashUnclusteredFileScan extends HashIndexFileScan implements Global
                 }
                 
                 if(entry == null){
-                    System.out.println("Null entry");
+                //   System.out.println("Null entry");
                     return null;
                 }
                 return entry;   
@@ -129,7 +129,7 @@ public class HashUnclusteredFileScan extends HashIndexFileScan implements Global
         } catch(Exception e) {
             e.printStackTrace();
         }
-        System.out.println("Returned from here");
+        //System.out.println("Returned from here");
         return null;
     }
 
