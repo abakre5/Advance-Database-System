@@ -1378,7 +1378,7 @@ public class Phase3Driver implements GlobalConst {
         return true;
     }
 
-    private static boolean createUnclusteredBtreeIndex(String tableName, int indexAttr)
+    public static boolean createUnclusteredBtreeIndex(String tableName, int indexAttr)
     {
         boolean status = OK;
         Tuple t = null;
@@ -2235,8 +2235,10 @@ public class Phase3Driver implements GlobalConst {
         Phase3Utils.writeToDisk();
     }
 
-    //    – TOPKJOIN HASH/NRA K OTABLENAME O J ATT NO O M ATT NO ITABLENAME I JATT NO I MATT NO NPAGES
-//[MATER OUTTABLENAME]
+    /**
+     *Driver function to perform nra and hash based top k.
+     * @param tokens - list of cmd args.
+     */
     private static void performTopK(String[] tokens) {
         boolean isHashBased = tokens[1].equalsIgnoreCase("HASH");
         int k = Integer.parseInt(tokens[2]);
@@ -2253,7 +2255,7 @@ public class Phase3Driver implements GlobalConst {
         }
         System.out.println("K : " + k + " \noutTableName = " + outTableName + " \noutJoinAttr = " + outJoinAttrNumber +
                 " \noutMergeAttr = " + outMergeAttrNumber
-                + " \ninnerTableName: " + innerTableName + " innerJoinAttr: " + innerJoinAttrNumber +
+                + " \ninnerTableName: " + innerTableName + " \ninnerJoinAttr: " + innerJoinAttrNumber +
                 " \ninnerMergeAttr: " + innerMergeAttrNumber +
                 " \nnPages : " + nPages + " \nmaterialTableName : " + materialTableName);
 
@@ -2296,10 +2298,6 @@ public class Phase3Driver implements GlobalConst {
             System.arraycopy(outIteratorDesc.getAttrType(), 0, jTypes, 0, outIteratorDesc.getNumAttr());
             System.arraycopy(innerIteratorDesc.getAttrType(), 0, jTypes, outIteratorDesc.getNumAttr(), innerIteratorDesc.getNumAttr());
 
-//            for (int i = 0; i < outIteratorDesc.getNumAttr() + innerIteratorDesc.getNumAttr(); i++){
-//                System.out.println(fieldNames[i]);
-//                System.out.println(jTypes[i].attrType);
-//            }
 
             try {
                 Phase3Utils.createOutputTable(materialTableName, fieldNames, jTypes, outIteratorDesc.getNumAttr()+innerIteratorDesc.getNumAttr());
@@ -2315,44 +2313,6 @@ public class Phase3Driver implements GlobalConst {
         FldSpec innerJoinAttr = new FldSpec(new RelSpec(RelSpec.outer), innerJoinAttrNumber);
         FldSpec innerMrgAttr = new FldSpec(new RelSpec(RelSpec.outer), innerMergeAttrNumber);
 
-//        FileScan fOut = null;
-//        FileScan fInner = null;
-//        try {
-//             fOut = getFileScan(outTableName, outIteratorDesc.getNumAttr(), outIteratorDesc.getAttrType(), outIteratorDesc.getStrSizes());
-//             fInner = getFileScan(innerTableName, innerIteratorDesc.getNumAttr(), innerIteratorDesc.getAttrType(), innerIteratorDesc.getStrSizes());
-//        } catch (IOException | FileScanException | TupleUtilsException | InvalidRelation e) {
-//            e.printStackTrace();
-//        }
-
-//        try {
-//            sortRelation(outIteratorDesc.getAttrType(),  outIteratorDesc.getNumAttr(), outIteratorDesc.getStrSizes(),fOut ,
-//                    outMergeAttrNumber, 100, "newOutRelation");
-//            sortRelation(innerIteratorDesc.getAttrType(),  innerIteratorDesc.getNumAttr(), innerIteratorDesc.getStrSizes(),fInner ,
-//                    innerMergeAttrNumber, 100, "newInnerRelation");
-//        } catch (IOException | SortException e) {
-//            e.printStackTrace();
-//        }
-
-//        List<TableIndexDesc> indexesOnTable = Phase3Utils.getIndexesOnTable(outTableName);
-//        for (TableIndexDesc tableIndexDesc : indexesOnTable){
-//            System.out.println("type of index : " +tableIndexDesc.getType());
-//            System.out.println("index Attribute number : " +tableIndexDesc.getAttributeIndex());
-//        }
-//
-//        if (Phase3Utils.isIndexExists(outTableName, outMergeAttrNumber, IndexType.B_ClusteredIndex)){
-//            System.out.println("Index exists for both Merge attribute");
-//        } else {
-//            System.out.println("Index does not exists for Merge attribute");
-//
-//        }
-//
-//
-//        if (Phase3Utils.isIndexExists(innerTableName, innerMergeAttrNumber, IndexType.B_ClusteredIndex)){
-//            System.out.println("  222 Index exists for Merge attribute");
-//        } else {
-//            System.out.println(" 22 Index does not exists for Merge attribute");
-//
-//        }
         if (isHashBased){
             System.out.println("Hash based top k join is performed : ");
 
@@ -2403,6 +2363,10 @@ public class Phase3Driver implements GlobalConst {
 
     }
 
+    /**
+     * Perform Group by operation
+     * @param tokens
+     */
     private static void performGroupBy(String[] tokens) {
         /**
          * Collect arguments
@@ -2444,7 +2408,6 @@ public class Phase3Driver implements GlobalConst {
                 groupBywithSort = new GroupBywithSort(iteratorDesc.getAttrType(),
                         iteratorDesc.getNumAttr(), iteratorDesc.getStrSizes(), iteratorDesc.getScan(), groupByAttrFldSpec, aggListFldSpec,
                         aggType, iteratorDesc.getProjlist(), iteratorDesc.getNumAttr(), nPages, tableNameT, tableName);
-                groupBywithSort.getAggregateResult();
             } catch (Exception e) {
                 e.printStackTrace();
             } finally {
@@ -2679,6 +2642,12 @@ public class Phase3Driver implements GlobalConst {
         return true;
     }
 
+    /**
+     * Performs join operation based on input tokens
+     *
+     * @param tokens    Input parameters passed by user
+     * @return  True if function is executed successfully, else false
+     */
     private static boolean performJoin(String[] tokens) {
         String joinType = tokens[1].toLowerCase();
         String outerTableName = tokens[2].toLowerCase();
@@ -2689,7 +2658,6 @@ public class Phase3Driver implements GlobalConst {
         String outputTable = null;
         Iterator joinItr = null;
 
-        // Currently supporting only equality
         String op = tokens[6];
 
         if (tokens.length > 8) {
@@ -2804,10 +2772,12 @@ public class Phase3Driver implements GlobalConst {
             int cnt = 0;
             while (tt != null) {
                 t.tupleCopy(tt);
-                printTuple(t, jTypes);
+
                 if (outputTable != null) {
                     // If we want to write to table, do it
                     hf.insertRecord(t.getTupleByteArray());
+                } else {
+                    printTuple(t, jTypes);
                 }
 
                 cnt++;

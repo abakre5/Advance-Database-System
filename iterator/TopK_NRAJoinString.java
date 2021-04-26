@@ -241,14 +241,6 @@ public class TopK_NRAJoinString {
         }
     }
 
-    private void printTuple(Tuple t) throws Exception {
-        int num_fields = t.noOfFlds();
-        for (int i = 0; i < num_fields; ++i) {
-            System.out.printf("%f ", t.getFloFld(i + 1));
-        }
-        System.out.println("");
-    }
-
     public void updateTopKCandidateIndexList(int index, float[] lowerBound, float[] upperBound) {
         for (ArrayList<Float> itr : topKCandidateIndexList) {
             if (itr.get(2) == index) {

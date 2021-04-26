@@ -22,7 +22,6 @@ import static tests.Phase3Utils.*;
  * This file contains an implementation of Index Nested Loops Join
  * @author rrgore
  */
-
 public class IndexNestedLoopsJoins extends Iterator {
 
     private AttrType outerTypes[], innerTypes[];
@@ -65,7 +64,8 @@ public class IndexNestedLoopsJoins extends Iterator {
      * @param proj_list    shows what input fields go where in the output tuple
      * @param n_out_flds   number of outer relation fileds
      * @throws IOException         some I/O fault
-     * @throws NestedLoopException exception from this class
+     * @throws IndexNestedLoopException exception from this class
+     * @throws NestedLoopException exception from Nested Loop Join
      */
     public IndexNestedLoopsJoins(AttrType in1[],
                             int len_in1,
@@ -80,7 +80,7 @@ public class IndexNestedLoopsJoins extends Iterator {
                             CondExpr rightFilter[],
                             FldSpec proj_list[],
                             int n_out_flds
-    ) throws IOException, IndexNestedLoopException, GetFileEntryException, NestedLoopException, Catalogindexnotfound, Catalogattrnotfound, Catalogmissparam, Cataloghferror, Catalognomem, IndexCatalogException, Catalogioerror, Catalogrelnotfound, AttrCatalogException {
+    ) throws IOException, IndexNestedLoopException, NestedLoopException {
         outerTypes = new AttrType[in1.length];
         innerTypes = new AttrType[in2.length];
         System.arraycopy(in1, 0, outerTypes, 0, in1.length);
@@ -157,48 +157,22 @@ public class IndexNestedLoopsJoins extends Iterator {
         }
     }
 
-    private PageId get_file_entry(String filename)
-            throws GetFileEntryException {
-        try {
-            return SystemDefs.JavabaseDB.get_file_entry(filename);
-        } catch (Exception e) {
-            e.printStackTrace();
-            throw new GetFileEntryException(e, "");
-        }
-    }
-
     /**
-     * Creates a FileScan on the given relation
-     * @param fileName              Name of the relation file
-     * @param isOuter               Is relation inner or outer?
-     * @return                      FileScan on the given relation
-     * @throws IOException          exception from this class
-     * @throws FileScanException    exception from this class
-     * @throws TupleUtilsException  exception from this class
-     * @throws InvalidRelation      exception from this class
+     * @return The joined tuple is returned
+     * @throws IOException               I/O errors
+     * @throws JoinsException            some join exception
+     * @throws IndexException            exception from super class
+     * @throws InvalidTupleSizeException invalid tuple size
+     * @throws InvalidTypeException      tuple type not valid
+     * @throws PageNotReadException      exception from lower layer
+     * @throws TupleUtilsException       exception from using tuple utilities
+     * @throws PredEvalException         exception from PredEval class
+     * @throws SortException             sort exception
+     * @throws LowMemException           memory error
+     * @throws UnknowAttrType            attribute type unknown
+     * @throws UnknownKeyTypeException   key type unknown
+     * @throws Exception                 other exceptions
      */
-    private FileScan getFileScan(String fileName, boolean isOuter) throws IOException, FileScanException, TupleUtilsException, InvalidRelation {
-        FileScan scan;
-
-        if( isOuter ) {
-            FldSpec[] Pprojection = new FldSpec[nOuterRecs];
-            for (int i = 1; i <= nOuterRecs; i++) {
-                Pprojection[i - 1] = new FldSpec(new RelSpec(RelSpec.outer), i);
-            }
-            scan = new FileScan(fileName, outerTypes, outerStrSizes,
-                    (short) nOuterRecs, nOuterRecs, Pprojection, null);
-        } else {
-            FldSpec[] Pprojection = new FldSpec[nInnerRecs];
-            for (int i = 1; i <= nInnerRecs; i++) {
-                Pprojection[i - 1] = new FldSpec(new RelSpec(RelSpec.outer), i);
-            }
-            scan = new FileScan(fileName, innerTypes, innerStrSizes,
-                    (short) nInnerRecs, nInnerRecs, Pprojection, null);
-        }
-
-        return scan;
-    }
-
     public Tuple get_next() throws IOException, JoinsException, IndexException, InvalidTupleSizeException, InvalidTypeException, PageNotReadException, TupleUtilsException, PredEvalException, SortException, LowMemException, UnknowAttrType, UnknownKeyTypeException, Exception {
         if (nlj != null) {
             return nlj.get_next();
@@ -302,6 +276,12 @@ public class IndexNestedLoopsJoins extends Iterator {
         }
     }
 
+    /**
+     * Gets next joined tuple when hash index is present on the inner relation
+     *
+     * @return The joined tuple is returned
+     * @throws Exception other exceptions
+     */
     public Tuple hashGetNext() throws Exception {
         if (done)
             return null;
@@ -403,6 +383,15 @@ public class IndexNestedLoopsJoins extends Iterator {
         } while (true);
     }
 
+    /**
+     * implement the abstract method close() from super class Iterator
+     * to finish cleaning up
+     *
+     * @throws IOException    I/O error from lower layers
+     * @throws JoinsException join error from lower layers
+     * @throws IndexException index access error
+     * @throws SortException error while sorting
+     */
     public void close() throws IOException, JoinsException, SortException, IndexException {
         if (!closeFlag) {
 
