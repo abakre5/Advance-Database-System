@@ -39,6 +39,7 @@ public class GroupBywithHash {
 
     private Heapfile hashBucketTuples;
     private HashIndexFileScan hashScan;
+    private int countX;
 
     /**
      * Perform Group by operation on a relation using @Sort class of the Minibase.
@@ -71,6 +72,7 @@ public class GroupBywithHash {
         this.nPages = n_pages;
         this.materTableName = materTableName;
         this.materHeapfile = null;
+        this.countX = 0;
 
         if (Phase3Utils.aggListContainsStringAttr(agg_list, in1)) {
             System.err.println("Aggregation attributes does not support String attribute!");
@@ -136,6 +138,7 @@ public class GroupBywithHash {
                     getSkyline();
                     break;
             }
+            countX = 0;
         } catch (Exception e) {
             System.out.println("Error occurred -> " + e.getMessage());
             e.printStackTrace();
@@ -617,6 +620,8 @@ public class GroupBywithHash {
                 } else {
                     scan = new FileScan("SkylineComputation.in", attrType, strSize, noOfColumns, noOfColumns, projList, null);
                     BlockNestedLoopsSky blockNestedLoopsSky = new BlockNestedLoopsSky(attrType, noOfColumns, strSize, scan, "SkylineComputation.in", prefList, prefList.length, nPages);
+                    countX += blockNestedLoopsSky.getAllSkylineMembers().size();
+                    System.out.println("No of skyline for group " + (int)previousGroupByAttrValue  + " are " + blockNestedLoopsSky.getAllSkylineMembers().size());
                     if (Phase3Utils.createMaterializedView(materTableName)) {
                         Phase3Utils.insertIntoTable(blockNestedLoopsSky.getAllSkylineMembers(), materHeapfile);
                     } else {
@@ -634,6 +639,8 @@ public class GroupBywithHash {
 
             scan = new FileScan("SkylineComputation.in", attrType, strSize, noOfColumns, noOfColumns, projList, null);
             BlockNestedLoopsSky blockNestedLoopsSky = new BlockNestedLoopsSky(attrType, noOfColumns, strSize, scan, "SkylineComputation.in", prefList, prefList.length, nPages);
+            countX += blockNestedLoopsSky.getAllSkylineMembers().size();
+            System.out.println("No of skyline for group " + (int)previousGroupByAttrValue  + " are " + blockNestedLoopsSky.getAllSkylineMembers().size());
             if (Phase3Utils.createMaterializedView(materTableName)) {
                 Phase3Utils.insertIntoTable(blockNestedLoopsSky.getAllSkylineMembers(), materHeapfile);
             } else {
@@ -679,6 +686,8 @@ public class GroupBywithHash {
                 } else {
                     scan = new FileScan("SkylineComputation.in", attrType, strSize, noOfColumns, noOfColumns, projList, null);
                     BlockNestedLoopsSky blockNestedLoopsSky = new BlockNestedLoopsSky(attrType, noOfColumns, strSize, scan, "SkylineComputation.in", prefList, prefList.length, nPages);
+                    countX += blockNestedLoopsSky.getAllSkylineMembers().size();
+                    System.out.println("No of skyline for group " + previousGroupByAttrValue  + " are " + blockNestedLoopsSky.getAllSkylineMembers().size());
                     if (Phase3Utils.createMaterializedView(materTableName)) {
                         Phase3Utils.insertIntoTable(blockNestedLoopsSky.getAllSkylineMembers(), materHeapfile);
                     } else {
@@ -695,6 +704,8 @@ public class GroupBywithHash {
 
             scan = new FileScan("SkylineComputation.in", attrType, strSize, noOfColumns, noOfColumns, projList, null);
             BlockNestedLoopsSky blockNestedLoopsSky = new BlockNestedLoopsSky(attrType, noOfColumns, strSize, scan, "SkylineComputation.in", prefList, prefList.length, nPages);
+            countX += blockNestedLoopsSky.getAllSkylineMembers().size();
+            System.out.println("No of skyline for group " + previousGroupByAttrValue  + " are " + blockNestedLoopsSky.getAllSkylineMembers().size());
             if (Phase3Utils.createMaterializedView(materTableName)) {
                 Phase3Utils.insertIntoTable(blockNestedLoopsSky.getAllSkylineMembers(), materHeapfile);
             } else {

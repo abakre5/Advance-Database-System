@@ -15,6 +15,8 @@ import static global.AttrType.attrInteger;
 import static global.AttrType.attrReal;
 
 public class HashJoin5a extends Iterator {
+    private Heapfile materialisedTable;
+    private String materialisedTableName;
     private AttrType _in1[], _in2[];
     private int in1_len, in2_len;
     private Iterator outer;
@@ -48,11 +50,11 @@ public class HashJoin5a extends Iterator {
             AttrType[] in2, int len_in2, short[] t2_str_sizes,
             FldSpec joinAttr2,
             FldSpec mergeAttr2,
-            java.lang.String relationName1,
-            java.lang.String relationName2,
+            String relationName1,
+            String relationName2,
             int k,
-            int n_pages
-    ) throws IOException, NestedLoopException, HashJoinException {
+            int n_pages,
+            String materialisedTableName) throws IOException, NestedLoopException, HashJoinException {
 
         _in1 = new AttrType[in1.length];
         _in2 = new AttrType[in2.length];
@@ -64,6 +66,15 @@ public class HashJoin5a extends Iterator {
         this.joinAttr2 = joinAttr2;
         this.mergeAttr1 = mergeAttr1;
         this.mergeAttr2 = mergeAttr2;
+        if(!materialisedTableName.equals("")){
+            try {
+                this.materialisedTableName = materialisedTableName;
+                this.materialisedTable = new Heapfile(materialisedTableName);
+            } catch (HFException | HFBufMgrException | HFDiskMgrException e) {
+                System.out.println("File creation for materialised file failed.");
+                e.printStackTrace();
+            }
+        }
 
 
         try {
@@ -160,7 +171,12 @@ public class HashJoin5a extends Iterator {
                 System.out.println("************* Final Output**************");
 
                 while (tuple1 != null){
-                    tuple1.print(temp11);
+                    if (materialisedTable!= null){
+                        materialisedTable.insertRecord(tuple1.getTupleByteArray());
+                        System.out.println("Adding to file");
+                    } else {
+                        tuple1.print(temp11);
+                    }
                     tuple1 = fileScan1.get_next();
                 }
                 fileScan1.close();

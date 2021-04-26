@@ -40,6 +40,7 @@ public class GroupBywithSort {
 
     private Heapfile sortedTuples;
     private FileScan scan;
+    private int countX;
 
     /**
      * Perform Group by operation on a relation using @Sort class of the Minibase.
@@ -73,6 +74,7 @@ public class GroupBywithSort {
         this.materTableName = materTableName;
 
         this.materHeapfile = null;
+        this.countX = 0;
 
         if (Phase3Utils.aggListContainsStringAttr(agg_list, in1)) {
             System.err.println("Aggregation attributes does not support String attribute!");
@@ -172,6 +174,8 @@ public class GroupBywithSort {
                     getSkyline();
                     break;
             }
+            System.out.println("No of results: " + countX);
+            countX = 0;
         } catch (Exception e) {
             System.out.println("Error occurred -> " + e.getMessage());
             e.printStackTrace();
@@ -257,6 +261,7 @@ public class GroupBywithSort {
                     to.print(groupByAttrTypes);
                 }
                 rows++;
+                countX++;
             }
             previousGroupByAttrValue = groupByAttrValue;
         }
@@ -269,6 +274,7 @@ public class GroupBywithSort {
         } else {
             to.print(groupByAttrTypes);
         }
+        countX++;
         System.out.println("No of rows in group by " + rows);
     }
 
@@ -315,6 +321,7 @@ public class GroupBywithSort {
                 } else {
                     to.print(groupByAttrTypes);
                 }
+                countX++;
                 min = Phase3Utils.getAttrVal(tuple, aggList[0].offset, attrType[aggList[0].offset - 1]);
                 rows++;
             }
@@ -328,6 +335,7 @@ public class GroupBywithSort {
         } else {
             to.print(groupByAttrTypes);
         }
+        countX++;
         System.out.println("No of rows in group by " + rows);
     }
 
@@ -393,6 +401,7 @@ public class GroupBywithSort {
                 } else {
                     to.print(groupByAttrTypes);
                 }
+                countX++;
                 max = Phase3Utils.getAttrVal(tuple, aggList[0].offset, attrType[aggList[0].offset - 1]);
             }
             previousGroupByAttrValue = groupByAttrValue;
@@ -404,6 +413,7 @@ public class GroupBywithSort {
         } else {
             to.print(groupByAttrTypes);
         }
+        countX++;
     }
 
 
@@ -450,6 +460,7 @@ public class GroupBywithSort {
                 } else {
                     to.print(groupByAttrTypes);
                 }
+                countX++;
                 max = Phase3Utils.getAttrVal(tuple, aggList[0].offset, attrType[aggList[0].offset - 1]);
             }
             previousGroupByAttrValue = groupByAttrValue;
@@ -462,6 +473,7 @@ public class GroupBywithSort {
         } else {
             to.print(groupByAttrTypes);
         }
+        countX++;
 
     }
 
@@ -528,6 +540,7 @@ public class GroupBywithSort {
                 } else {
                     to.print(groupByAttrTypes);
                 }
+                countX++;
                 count = 0;
                 sum = Phase3Utils.getAttrVal(tuple, aggList[0].offset, this.attrType[aggList[0].offset - 1]);
             }
@@ -541,6 +554,7 @@ public class GroupBywithSort {
         } else {
             to.print(groupByAttrTypes);
         }
+        countX++;
     }
 
 
@@ -586,6 +600,7 @@ public class GroupBywithSort {
                 } else {
                     to.print(groupByAttrTypes);
                 }
+                countX++;
                 count = 0;
                 sum = Phase3Utils.getAttrVal(tuple, aggList[0].offset, this.attrType[aggList[0].offset - 1]);
             }
@@ -598,6 +613,7 @@ public class GroupBywithSort {
         } else {
             to.print(groupByAttrTypes);
         }
+        countX++;
     }
 
     /**
@@ -610,7 +626,7 @@ public class GroupBywithSort {
         for (int i = 0; i < noOfColumns; ++i) {
             attrs[i] = new attrInfo();
             attrs[i].attrType = new AttrType(attrType[i].attrType);
-            attrs[i].attrName = "Name";
+            attrs[i].attrName = "Col" + i;
             attrs[i].attrLen = (attrType[i].attrType == AttrType.attrInteger) ? Phase3Utils.SIZE_OF_INT : Phase3Utils.SIZE_OF_STRING;
         }
 
@@ -653,6 +669,8 @@ public class GroupBywithSort {
                 } else {
                     scanSky = new FileScan("SkylineComputation.in", attrType, strSize, noOfColumns, noOfColumns, projList, null);
                     BlockNestedLoopsSky blockNestedLoopsSky = new BlockNestedLoopsSky(attrType, noOfColumns, strSize, scanSky, "SkylineComputation.in", prefList, prefList.length, nPages);
+                    countX += blockNestedLoopsSky.getAllSkylineMembers().size();
+                    System.out.println("No of skyline for group " + (int)previousGroupByAttrValue + " are " + blockNestedLoopsSky.getAllSkylineMembers().size());
                     if (Phase3Utils.createMaterializedView(materTableName)) {
                         Phase3Utils.insertIntoTable(blockNestedLoopsSky.getAllSkylineMembers(), materHeapfile);
                     } else {
@@ -670,6 +688,8 @@ public class GroupBywithSort {
 
             scanSky = new FileScan("SkylineComputation.in", attrType, strSize, noOfColumns, noOfColumns, projList, null);
             BlockNestedLoopsSky blockNestedLoopsSky = new BlockNestedLoopsSky(attrType, noOfColumns, strSize, scanSky, "SkylineComputation.in", prefList, prefList.length, nPages);
+            countX += blockNestedLoopsSky.getAllSkylineMembers().size();
+            System.out.println("No of skyline for group " + (int)previousGroupByAttrValue  + " are " + blockNestedLoopsSky.getAllSkylineMembers().size());
             if (Phase3Utils.createMaterializedView(materTableName)) {
                 Phase3Utils.insertIntoTable(blockNestedLoopsSky.getAllSkylineMembers(), materHeapfile);
             } else {
@@ -716,6 +736,8 @@ public class GroupBywithSort {
                 } else {
                     scanSky = new FileScan("SkylineComputation.in", attrType, strSize, noOfColumns, noOfColumns, projList, null);
                     BlockNestedLoopsSky blockNestedLoopsSky = new BlockNestedLoopsSky(attrType, noOfColumns, strSize, scanSky, "SkylineComputation.in", prefList, prefList.length, nPages);
+                    countX += blockNestedLoopsSky.getAllSkylineMembers().size();
+                    System.out.println("No of skyline for group " + previousGroupByAttrValue  + " are " + blockNestedLoopsSky.getAllSkylineMembers().size());
                     if (Phase3Utils.createMaterializedView(materTableName)) {
                         Phase3Utils.insertIntoTable(blockNestedLoopsSky.getAllSkylineMembers(), materHeapfile);
                     } else {
@@ -733,6 +755,8 @@ public class GroupBywithSort {
 
             scanSky = new FileScan("SkylineComputation.in", attrType, strSize, noOfColumns, noOfColumns, projList, null);
             BlockNestedLoopsSky blockNestedLoopsSky = new BlockNestedLoopsSky(attrType, noOfColumns, strSize, scanSky, "SkylineComputation.in", prefList, prefList.length, nPages);
+            countX += blockNestedLoopsSky.getAllSkylineMembers().size();
+            System.out.println("No of skyline for group " + previousGroupByAttrValue  + " are " + blockNestedLoopsSky.getAllSkylineMembers().size());
             if (Phase3Utils.createMaterializedView(materTableName)) {
                 Phase3Utils.insertIntoTable(blockNestedLoopsSky.getAllSkylineMembers(), materHeapfile);
             } else {

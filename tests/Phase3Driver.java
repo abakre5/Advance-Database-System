@@ -2064,8 +2064,13 @@ public class Phase3Driver implements GlobalConst {
                 }
                 case "groupby": {
                     System.out.println((java.util.Arrays.toString(tokens)));
-                    performGroupBy(tokens);
-                    Phase3Utils.writeToDisk();
+                    try {
+                        performGroupBy(tokens);
+                        Phase3Utils.writeToDisk();
+                    } catch (Exception e) {
+                        System.err.println("Following error occurred while performing GROUPBY -> " + e.getMessage());
+                        e.printStackTrace();
+                    }
                     System.out.println("---------------------------------------------------------------------------------");
                     break;
                 }
@@ -2099,6 +2104,7 @@ public class Phase3Driver implements GlobalConst {
                         break;
                     }
                     performTopK(tokens);
+                    Phase3Utils.writeToDisk();
                     break;
                 }
                 default: {
@@ -2285,25 +2291,51 @@ public class Phase3Driver implements GlobalConst {
                 catalogmissparam.printStackTrace();
             }
 
-            String[] fieldNames = new String[outIteratorDesc.getNumAttr() + innerIteratorDesc.getNumAttr()];
-            for (int i=0; i<outIteratorDesc.getNumAttr(); i++) {
-                fieldNames[i] = outTableName + "."+ outerAttrs[i].attrName + "." + (i+1);
-            }
-            for (int i=0; i<innerIteratorDesc.getNumAttr(); i++) {
-                fieldNames[i+outIteratorDesc.getNumAttr()] = innerTableName +"."+innerAttrs[i].attrName + "."+ (i+outIteratorDesc.getNumAttr()+1);
-            }
+            if(!isHashBased) {
+
+                String[] fieldNames = new String[outIteratorDesc.getNumAttr() + innerIteratorDesc.getNumAttr()];
+                for (int i=0; i<outIteratorDesc.getNumAttr(); i++) {
+                    fieldNames[i] = outTableName + "."+ outerAttrs[i].attrName + "." + (i+1);
+                }
+                for (int i=0; i<innerIteratorDesc.getNumAttr(); i++) {
+                    fieldNames[i+outIteratorDesc.getNumAttr()] = innerTableName +"."+innerAttrs[i].attrName + "."+ (i+outIteratorDesc.getNumAttr()+1);
+                }
 
 
-            AttrType[] jTypes = new AttrType[outIteratorDesc.getNumAttr()+innerIteratorDesc.getNumAttr()];
-            System.arraycopy(outIteratorDesc.getAttrType(), 0, jTypes, 0, outIteratorDesc.getNumAttr());
-            System.arraycopy(innerIteratorDesc.getAttrType(), 0, jTypes, outIteratorDesc.getNumAttr(), innerIteratorDesc.getNumAttr());
+                AttrType[] jTypes = new AttrType[outIteratorDesc.getNumAttr()+innerIteratorDesc.getNumAttr()];
+                System.arraycopy(outIteratorDesc.getAttrType(), 0, jTypes, 0, outIteratorDesc.getNumAttr());
+                System.arraycopy(innerIteratorDesc.getAttrType(), 0, jTypes, outIteratorDesc.getNumAttr(), innerIteratorDesc.getNumAttr());
 
 
-            try {
-                Phase3Utils.createOutputTable(materialTableName, fieldNames, jTypes, outIteratorDesc.getNumAttr()+innerIteratorDesc.getNumAttr());
-            } catch (Exception e) {
-                System.out.println("relation Creation failed for material table");
-                e.printStackTrace();
+                try {
+                    Phase3Utils.createOutputTable(materialTableName, fieldNames, jTypes, outIteratorDesc.getNumAttr()+innerIteratorDesc.getNumAttr());
+                } catch (Exception e) {
+                    System.out.println("relation Creation failed for material table");
+                    e.printStackTrace();
+                }
+            } else {
+
+                String[] fieldNames = new String[outIteratorDesc.getNumAttr() + innerIteratorDesc.getNumAttr() + 1];
+                for (int i=0; i<outIteratorDesc.getNumAttr(); i++) {
+                    fieldNames[i] = outTableName + "."+ outerAttrs[i].attrName + "." + (i+1);
+                }
+                for (int i=0; i<innerIteratorDesc.getNumAttr(); i++) {
+                    fieldNames[i+outIteratorDesc.getNumAttr()] = innerTableName +"."+innerAttrs[i].attrName + "."+ (i+outIteratorDesc.getNumAttr()+1);
+                }
+
+                fieldNames[fieldNames.length - 1] = outTableName + "."+ " AVG " + "." + (fieldNames.length);
+
+                AttrType[] jTypes = new AttrType[outIteratorDesc.getNumAttr()+innerIteratorDesc.getNumAttr() + 1];
+                System.arraycopy(outIteratorDesc.getAttrType(), 0, jTypes, 0, outIteratorDesc.getNumAttr());
+                System.arraycopy(innerIteratorDesc.getAttrType(), 0, jTypes, outIteratorDesc.getNumAttr(), innerIteratorDesc.getNumAttr());
+                jTypes[jTypes.length - 1] = new AttrType(AttrType.attrReal);
+
+                try {
+                    Phase3Utils.createOutputTable(materialTableName, fieldNames, jTypes, outIteratorDesc.getNumAttr()+innerIteratorDesc.getNumAttr() + 1);
+                } catch (Exception e) {
+                    System.out.println("relation Creation failed for material table");
+                    e.printStackTrace();
+                }
             }
 
         }
@@ -2321,7 +2353,7 @@ public class Phase3Driver implements GlobalConst {
                         outJoinAttr, outMrgAttr,
                         innerIteratorDesc.getAttrType(), innerIteratorDesc.getNumAttr(), innerIteratorDesc.getStrSizes(),
                         innerJoinAttr, innerMrgAttr,
-                        outTableName, innerTableName, k, nPages);
+                        outTableName, innerTableName, k, nPages, materialTableName);
 
             } catch (IOException | NestedLoopException | HashJoinException e) {
                 e.printStackTrace();
@@ -2358,6 +2390,7 @@ public class Phase3Driver implements GlobalConst {
                     e.printStackTrace();
                 }
             }
+            System.err.println("Clustered Btree Index might not be available!");
         }
 
 
@@ -2371,7 +2404,7 @@ public class Phase3Driver implements GlobalConst {
         /**
          * Collect arguments
          */
-        boolean isSort = tokens[1].equals("SORT");
+        boolean isSort = tokens[1].toLowerCase().equals("sort");
         String aggOperator = tokens[2].toLowerCase();
         int groupByAttr = Integer.parseInt(tokens[3]);
         String aggListNonNormalized = tokens[4];
@@ -2385,7 +2418,15 @@ public class Phase3Driver implements GlobalConst {
         }
 
         AggType aggType = getGroupByAggOperatorType(aggOperator);
+        if (aggType == null) {
+            System.out.println("No valid aggregator found!");
+            return;
+        }
         int[] aggList = getAggList(aggListNonNormalized);
+        if (aggType.aggType != AggType.aggSkyline && aggList.length != 1) {
+            System.out.println("Please enter only one value for agg list attribute on which aggregation MIN/MAX/AGG needs to be performed");
+            return;
+        }
 
         IteratorDesc iteratorDesc = null;
         try {
@@ -2435,7 +2476,7 @@ public class Phase3Driver implements GlobalConst {
 
     private static AggType getGroupByAggOperatorType(String aggOperator) {
         AggType aggType = null;
-        switch (aggOperator) {
+        switch (aggOperator.toLowerCase()) {
             case "min":
                 aggType = new AggType(AggType.aggMin);
                 break;
