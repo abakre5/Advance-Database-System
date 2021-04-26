@@ -45,6 +45,7 @@ public class IndexNestedLoopsJoins extends Iterator {
     private boolean isHash = false;
     private AttrType[] Jtypes;
     private String indexFileName;
+    private List<RID> innerRidList;
 
     /**
      * constructor
@@ -307,6 +308,7 @@ public class IndexNestedLoopsJoins extends Iterator {
         Scan scan = null;
         hash.KeyClass key = null;
 
+
         try {
             hashf = new HashFile(_relationName, indexFileName, joinFldInner, innerTypes[joinFldInner - 1].attrType,
                     num_records, heapf, innerTypes, innerStrSizes, nInnerRecs);
@@ -351,8 +353,12 @@ public class IndexNestedLoopsJoins extends Iterator {
 
 
             try {
-                // perform searchIndex to get RID of corresponding inner
-                RID inRid = hashf.searchIndexForJoin(key);
+                // perform searchIndex to get RIDs of corresponding inner tuples
+                if (innerRidList == null) {
+                    innerRidList = hashf.searchHashIndexForJoin(key);
+                }
+
+                RID inRid = innerRidList.get(0);
 
                 // get inner tuple using this RID
                 Tuple tt = new Tuple();
@@ -365,11 +371,15 @@ public class IndexNestedLoopsJoins extends Iterator {
 
                 tt = heapf.getRecord(inRid);
                 t.tupleCopy(tt);
-                get_from_outer = true;
+
+                innerRidList.remove(0);
+                if (innerRidList.size() == 0) {
+                    get_from_outer = true;
+                    innerRidList = null;
+                }
 
                 if (t != null) {
                     Projection.Join(outer_tuple, outerTypes, t, innerTypes, Jtuple, perm_mat, nOutFlds);
-                    Jtuple.print(Jtypes);
                     return Jtuple;
                 }
 
