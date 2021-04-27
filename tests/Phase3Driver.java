@@ -1025,6 +1025,7 @@ public class Phase3Driver implements GlobalConst {
         Tuple temp;
         boolean tupleDel = false;
         int numRowsDeleted = 0;
+        List<RID> delRids = new ArrayList<>();
         try {
             while (!delTuples.isEmpty() && status && ((temp = scan.getNext(rid)) != null)) {
                 t.tupleCopy(temp);
@@ -1034,10 +1035,17 @@ public class Phase3Driver implements GlobalConst {
                 //System.err.println("tuple(rid=" + rid.hashCode() + ") equality: " + t.equals(delTuples.get(0)));
                 if (delTuples.contains(t)) {
                     deleteFromIndex(tableName, numAttribs, t, rid);
-                    tupleDel = tableFile.deleteRecord(rid);
+                    delRids.add(new RID(rid.pageNo, rid.slotNo));
+                    //tupleDel = tableFile.deleteRecord(rid);
                     delTuples.remove(t);
                     numRowsDeleted++;
                 }
+            }
+
+            scan.closescan();
+
+            for (int i = 0; i < delRids.size(); ++i) {
+                tableFile.deleteRecord(delRids.get(i));
             }
 
             //scan.closescan();
@@ -1257,7 +1265,7 @@ public class Phase3Driver implements GlobalConst {
 
             ExtendedSystemDefs.MINIBASE_ATTRCAT.getTupleStructure(tableName, numAttribs, attrTypes, strSizes);
             chf = new ClusteredHashFile(tableName, indexAttr, attrTypes[indexAttr-1].attrType);
-            System.out.println(tableName + "attr=" + indexAttr + " keys:");
+            System.out.println("Clustered Hash Index Keys::");
             chf.printKeys();
         } catch (Exception e) {
             System.err.println("*** error fetching catalog info");
