@@ -1642,18 +1642,20 @@ public class HashFile extends IndexFile implements GlobalConst {
                 RIDList = findKeysForJoin(fs, bucket_file,key);
             }
 
-            if(RIDList.isEmpty() && secondTry) {
+            if((RIDList == null || RIDList.isEmpty()) && secondTry) {
                 if(secondTry) {
                     System.out.println("Trying in another bucket");
                     globalSplit = 0;
                     split = false;
                     secondTry = false;
                     List<RID> RID_List = searchHashIndexForJoin(key);
-                    RIDList.addAll(RID_List);
+                    if (RIDList == null) {
+                        RIDList.addAll(RID_List);
+                    }
                     return RIDList;
                 }
                 return null;
-            } else if(RIDList.isEmpty() && !secondTry) {
+            } else if((RIDList == null || RIDList.isEmpty()) && !secondTry) {
                 System.out.println("Key not present");
                 return RIDList;
 

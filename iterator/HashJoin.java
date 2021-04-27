@@ -364,25 +364,30 @@ public class HashJoin extends Iterator {
     private void closeBucketFiles() throws HashJoinException {
         Heapfile f = null;
         try {
-            for (int hash : iHashList) {
-                String fileName = "inner_hash_bucket_"+hash;
-                f = new Heapfile(fileName);
-                f.deleteFile();
+            if (iHashList != null) {
+                for (int hash : iHashList) {
+                    String fileName = "inner_hash_bucket_"+hash;
+                    f = new Heapfile(fileName);
+                    f.deleteFile();
+                }
+                iHashList.clear();
+                iHashList = null;
             }
 
-            for (int hash : oHashList) {
-                String fileName = "outer_hash_bucket_"+hash;
-                f = new Heapfile(fileName);
-                f.deleteFile();
+            if (oHashList != null) {
+                for (int hash : oHashList) {
+                    String fileName = "outer_hash_bucket_" + hash;
+                    f = new Heapfile(fileName);
+                    f.deleteFile();
+                }
+                oHashList.clear();
+                oHashList = null;
             }
-
-            iHashList.clear();
-            iHashList = null;
 
             f = new Heapfile("hashJoinFile.in");
             f.deleteFile();
         } catch (Exception e) {
-            throw new HashJoinException(e, "Create new heapfile failed.");
+            throw new HashJoinException(e, "Close HeapJoin failed.");
         }
     }
 

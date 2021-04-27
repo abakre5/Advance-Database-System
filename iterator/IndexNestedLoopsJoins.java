@@ -338,7 +338,7 @@ public class IndexNestedLoopsJoins extends Iterator {
                         key = new IntegerKey(outer_tuple.getIntFld(joinFldOuter));
                         break;
                     }
-                    case (AttrType.attrReal) : {
+                    case (AttrType.attrString) : {
                         key = new StringKey(outer_tuple.getStrFld(joinFldOuter));
                         break;
                     }
