@@ -20,25 +20,17 @@ import tests.Phase3Utils;
 
 public class ClusteredHashFile  implements GlobalConst {
     /* class constants */
-    private static final int    MAGICWORD       = 0xDEAD;
-    private static final double UTIL_THRESHOLD  = 0.7;
+    private static final int MAGICWORD = 0xDEAD;
 
     String          relationName;
     String          hashIndexName;
     int             keyAttrIndex;
     int             keyType;
-    //Heapfile[]      buckets;
-    int             numBucketNoSplit;
-    int             multiplier = 2;
-    int             numBuckets = 64;
+    int             maxExpRecords;
+    Heapfile[]      buckets;
+    int             numBuckets = 30;
     Heapfile        headerFile;
-    boolean         split = false;
-    int             maxRecordsPerBucket = 0;
-
-    int             relNumAttrs = 0;
-    AttrType[]      relAttrTypes;
-    short[]         relStrSz;
-
+    final double    utilThreshold = 0.8;
 
   
     /**
@@ -46,6 +38,8 @@ public class ClusteredHashFile  implements GlobalConst {
      * @param RelationName:     relation on which ClusteredHashIndex is created
      * @param KeyAttrIdx:       search key attribute index (1-based)
      * @param KeyType:          search key type (AttrType.attrInteger or AttrType.attrString)
+     * @param TupleSize:        Size of tuple in relation
+     * @param NumRecords:       An initial estimate of number of tuples in relation
      */
     public ClusteredHashFile(String RelationName, int KeyAttrIdx, int KeyType)
             throws IOException, HFException, HFDiskMgrException, HFBufMgrException,
@@ -62,157 +56,28 @@ public class ClusteredHashFile  implements GlobalConst {
         //headerFile = new Heapfile(hashIndexName);
         //System.out.println("Num of records = " + num_records);
 
-        try {
-            RelDesc rec = new RelDesc();
-            int numAttrs;
+        //int numTuplesPerPage =  (GlobalConst.MINIBASE_PAGESIZE - HFPage.DPFIXED) / (TupleSize) ;
+        //System.out.println(n);
+        //this.numBuckets = Math.max(this.numBuckets, (int) Math.ceil(NumRecords / (numTuplesPerPage * this.utilThreshold)));
+        //System.out.println("hashIndexName: " + this.hashIndexName);
+        //System.out.println("NumBuckets: " + this.numBuckets);
 
-            ExtendedSystemDefs.MINIBASE_RELCAT.getInfo(RelationName, rec);
-            this.relNumAttrs = numAttrs = rec.getAttrCnt();
-            this.relAttrTypes = new AttrType[numAttrs];
-            this.relStrSz = new short[numAttrs];
-            ExtendedSystemDefs.MINIBASE_ATTRCAT.getTupleStructure(RelationName, numAttrs, this.relAttrTypes, this.relStrSz);
-        } catch (Exception e) {
-            System.err.println("hereeee:" + e);
-        }
-
-        if (indexMetadataExists()) {
-            //System.err.println("MD exists...!");
-            readMetadata();
-        } else {
-            try {
-                Tuple t = new Tuple();
-                int tupleSize;
-                int numTuplesPerPage;
-                int numRecords;
-                Heapfile relFile;
-                int numAttrs;
-
-                t.setHdr((short)this.relNumAttrs, this.relAttrTypes, this.relStrSz);
-                tupleSize = t.size();
-
-                numTuplesPerPage = (GlobalConst.MINIBASE_PAGESIZE - HFPage.DPFIXED) / (tupleSize);
-
-                relFile = new Heapfile(relationName);
-                numRecords = relFile.getRecCnt();
-
-                this.maxRecordsPerBucket = (int) Math.floor(numTuplesPerPage * UTIL_THRESHOLD);
-                this.numBuckets = numBucketNoSplit = (int) Math.ceil((double)numRecords / maxRecordsPerBucket);
-                /*
-                System.out.printf("numRecords=%d; maxRecPerBucket=%d; numBuckets=%d;  numTuplesPerPage=%d\n",
-                        numRecords, this.maxRecordsPerBucket, this.numBuckets, numTuplesPerPage);
-                */
-
-                writeMetaData();
-            } catch (Exception e) {
-                System.err.println(e);
-            }
-        }
-
-        /*
         this.buckets = new Heapfile[this.numBuckets];
         for (int i = 0; i < this.numBuckets; ++i) {
-            this.buckets[i] = getBucketFile(i);
+            this.buckets[i] = new Heapfile(this.hashIndexName + "_" + i);
         }
-        */
 
-	}
-
-	private void writeMetaData() {
         try {
             Tuple t = getIndexHdrTupleStructure();
             t.setIntFld(1, MAGICWORD);
             t.setIntFld(2, numBuckets);
-            t.setIntFld(3, split ? 1 : 0 );
-            t.setIntFld(4, maxRecordsPerBucket);
-            t.setIntFld(5, numBucketNoSplit);
-
-            Scan scan = this.headerFile.openScan();
-            Tuple temp = null;
-            RID rid = new RID();
-
-            temp = scan.getNext(rid);
-            /* no tuple, exists. write one */
-            if (temp == null) {
-                this.headerFile.insertRecord(t.getTupleByteArray());
-            } else {
-                /* tuple exists, overwrite it */
-                this.headerFile.updateRecord(rid, t);
-            }
-        } catch (Exception e) {
-            System.err.println("writeMetaData: " + e);
-        }
-    }
-
-    private boolean indexMetadataExists() {
-        try {
-            Tuple t = getIndexHdrTupleStructure();
-
-            Scan scan = this.headerFile.openScan();
-            Tuple temp = null;
-            RID rid = new RID();
-
-            temp = scan.getNext(rid);
-            /* no metadata written */
-            if (temp == null) {
-                return false;
-            } else {
-                /* tuple exists, read data */
-                t.tupleCopy(temp);
-                int magicWord = t.getIntFld(1);
-                if (magicWord != MAGICWORD) {
-                    return false;
-                }
-
-                return true;
-            }
-        } catch (Exception e) {
-            System.err.println("check_index_exists: " + e);
-            return false;
-        }
-    }
-
-    private void readMetadata() {
-        try {
-            Tuple t = getIndexHdrTupleStructure();
-
-            Scan scan = this.headerFile.openScan();
-            Tuple temp = null;
-            RID rid = new RID();
-
-            temp = scan.getNext(rid);
-            /* no tuple, exists. shouldn't happen */
-            if (temp == null) {
-                System.err.println("hash_index: metadata missing!!!");
-            } else {
-                /* tuple exists, read data */
-                t.tupleCopy(temp);
-                int magicWord = t.getIntFld(1);
-                if (magicWord != MAGICWORD) {
-                    System.err.println("hash_index: metadata is corrupted!!!");
-                }
-                this.numBuckets = t.getIntFld(2);
-                assert this.numBuckets > 0;
-                this.split = t.getIntFld(3) > 1 ? true : false;
-                this.maxRecordsPerBucket = t.getIntFld(4);
-                assert this.maxRecordsPerBucket > 0;
-
-                this.numBucketNoSplit = t.getIntFld(5);
-                assert this.numBucketNoSplit > 0;
-
-                scan.closescan();
-                scan = null;
-
-                /*
-                System.err.printf("hash_index_readMD: numBuckets=%d; numBucketsNoSplit=%d; split=%d; multiplier=%d; maxRecsPerBucket=%d \n",
-                        this.numBuckets, this.numBucketNoSplit, this.split?1:0, this.multiplier, this.maxRecordsPerBucket);
-
-                 */
-
-            }
+            this.headerFile.insertRecord(t.getTupleByteArray());
         } catch (Exception e) {
             System.err.println(e);
         }
-    }
+
+	}
+
     private String getIndexHdrFileName(String RelationName, int KeyAttrIdx) {
         return RelationName + "-clustered-hash-" + KeyAttrIdx + ".hdr";
     }
@@ -259,9 +124,7 @@ public class ClusteredHashFile  implements GlobalConst {
     InvalidBufferException,InvalidSlotNumberException, InvalidTupleSizeException, SpaceNotAvailableException, FileAlreadyDeletedException {
 
         int bucketIdx;
-        Heapfile bucketFile;
         KeyClass value = null;
-        RID rid = new RID();
 
         switch (this.keyType) {
             case AttrType.attrInteger: {
@@ -279,65 +142,10 @@ public class ClusteredHashFile  implements GlobalConst {
         }
         bucketIdx = getBucketIndex(value);
         //System.err.println("insert> bucketNum: " + bucketIdx);
-        bucketFile = getBucketFile(bucketIdx);
-
-
-        if (bucketFile.getRecCnt() >= this.maxRecordsPerBucket) {
-            /* trigger split */
-            this.split = true;
-            int newBucketIdx = getBucketIndex(value);
-
-            if (newBucketIdx != bucketIdx) {
-                /* move tuples that hash to new index */
-                Heapfile newBucket = getBucketFile(newBucketIdx);
-                Tuple tup = new Tuple();
-                try {
-                    tup.setHdr((short) this.relNumAttrs, this.relAttrTypes, this.relStrSz);
-                    Tuple temp;
-                    Scan scan = bucketFile.openScan();
-                    List<RID> ridsToDelete = new ArrayList<>();
-
-                    KeyClass tupKey = null;
-                    int distribute_index;
-                    while ((temp = scan.getNext(rid)) != null) {
-                        tup.tupleCopy(temp);
-                        if (this.keyType == AttrType.attrInteger) {
-                            tupKey = new IntKey(tup.getIntFld(this.keyAttrIndex));
-                        } else {
-                            tupKey = new StrKey(tup.getStrFld(this.keyAttrIndex));
-                        }
-                        distribute_index = getBucketIndex(tupKey);
-                        if (distribute_index == newBucketIdx) {
-                            //bucketFile.deleteRecord(rid);
-                            ridsToDelete.add(new RID(rid.pageNo, rid.slotNo));
-                            newBucket.insertRecord(tup.getTupleByteArray());
-                        }
-                    }
-
-                    scan.closescan();
-
-                    for (int i = 0; i < ridsToDelete.size(); ++i) {
-                        bucketFile.deleteRecord(ridsToDelete.get(i));
-                    }
-
-                    this.numBuckets++;
-                    /* if num buckets is doubled, remove split logic */
-                    if (this.numBuckets == 2 * this.numBucketNoSplit) {
-                        this.numBucketNoSplit = this.numBuckets;
-                        this.split = false;
-                    }
-                    writeMetaData();
-
-                } catch (Exception e) {
-                    System.err.println("insert: " + e);
-                }
-            }
-
-        }
-
-        bucketIdx = getBucketIndex(value);
+        Heapfile bucketFile = this.buckets[bucketIdx];
+        RID rid = null;
         try {
-            rid = getBucketFile(bucketIdx).insertRecord(t.getTupleByteArray());
+            rid = bucketFile.insertRecord(t.getTupleByteArray());
         } catch(Exception e) {
             e.printStackTrace();
         }
@@ -357,31 +165,24 @@ public class ClusteredHashFile  implements GlobalConst {
 
         bucketIdx = getBucketIndex(key);
         //System.err.println("delete> bucketNum: " + bucketIdx);
-        assert bucketIdx < (this.split? 2*this.numBucketNoSplit : this.numBucketNoSplit);
-
+        assert bucketIdx < this.numBuckets;
         try {
-            Heapfile bucketFile = getBucketFile(bucketIdx);
+            Heapfile bucketFile = this.buckets[bucketIdx];
             Scan scan = bucketFile.openScan();
             Tuple temp = null;
             RID rid = new RID();
             Tuple tup = new Tuple(t);
-            List<RID> ridsToDelete = new ArrayList<>();
             while ((temp = scan.getNext(rid)) != null) {
                 tup.tupleCopy(temp);
                 if (tup.equals(t)) {
                     //System.out.println("clustered hash> found tuple to delete");
-                    ridsToDelete.add(new RID(rid.pageNo, rid.slotNo));
-                    //status = bucketFile.deleteRecord(rid);
+                    status = bucketFile.deleteRecord(rid);
+                    //scan.closescan();
                     break;
                 }
             }
-            scan.closescan();
-            for (int i = 0; i < ridsToDelete.size(); ++i) {
-                bucketFile.deleteRecord(ridsToDelete.get(i));
-            }
-
         } catch (Exception e) {
-            System.err.println("delete(): " + e);
+            //throw e;
         }
         return status;
     }
@@ -391,59 +192,42 @@ public class ClusteredHashFile  implements GlobalConst {
         Tuple t = null;
         AttrType[] attrTypes = null;
         short[] strSizes = null;
-        Tuple temp;
-        RID rid;
-        KeyClass key = null;
-
-
         try {
-            Heapfile rel = new Heapfile(this.relationName);
-            if (rel.getRecCnt() == 0) {
-                System.out.println("index is empty");
-                return;
-            }
+            int numAttribs;
+            RelDesc rec = new RelDesc();
+            ExtendedSystemDefs.MINIBASE_RELCAT.getInfo(this.relationName, rec);
+            numAttribs = rec.getAttrCnt();
+            attrTypes = new AttrType[numAttribs];
+            strSizes = new short[numAttribs];
 
-            int numBuckets = (this.split) ? (2*this.numBucketNoSplit) : (this.numBucketNoSplit);
-
+            ExtendedSystemDefs.MINIBASE_ATTRCAT.getTupleStructure(this.relationName, numAttribs, attrTypes, strSizes);
             t = new Tuple();
-            t.setHdr((short)this.relNumAttrs, this.relAttrTypes, this.relStrSz);
-
-            PageId tmpId;
-            int keysInBucket;
-            for (int bucketIdx = 0; bucketIdx < numBuckets; ++bucketIdx) {
-                tmpId = SystemDefs.JavabaseDB.get_file_entry(getBucketFileName(bucketIdx));
-                /* if bucket file does not exists, skip this bucket index */
-                if (tmpId == null) {
-                    continue;
-                }
-                keysInBucket = 0;
-                scan = getBucketFile(bucketIdx).openScan();
-
-                rid = new RID();
+            t.setHdr((short)numAttribs, attrTypes, strSizes);
+        } catch (Exception e) {
+            System.err.println("*** error fetching catalog info");
+            return;
+        }
+        Tuple temp;
+        RID rid = new RID();
+        KeyClass key = null;
+        try {
+            for (int bucketIdx = 0; bucketIdx < this.numBuckets; ++bucketIdx) {
+                scan = this.buckets[bucketIdx].openScan();
                 while ((temp = scan.getNext(rid)) != null) {
-                    if (keysInBucket == 0) {
-                        System.out.println("\n\nBucket" + bucketIdx);
-                    }
                     t.tupleCopy(temp);
                     if (this.keyType == AttrType.attrInteger) {
                         key = new IntKey(t.getIntFld(this.keyAttrIndex));
                     } else {
                         key = new StrKey(t.getStrFld(this.keyAttrIndex));
                     }
-                    keysInBucket++;
-                    System.out.print(key + "  ");
-                    if ((keysInBucket % 5) == 0) {
-                        System.out.println();
-                    }
+                    System.out.println(key);
                 }
                 scan.closescan();
 
             }
         } catch (Exception e) {
-            System.err.println("ddddd:" + e);
-            e.printStackTrace();
+            System.err.println(e);
         }
-        System.out.println();
     }
 
     /**
@@ -453,16 +237,13 @@ public class ClusteredHashFile  implements GlobalConst {
     private Tuple getIndexHdrTupleStructure()
     {
 
-        int numFields = 5;
+        int numFields = 2;
         /* a bucket file tuple stores [magicword, number of buckets(int)]] */
         AttrType[] Ptypes = new AttrType[numFields];
 
         Ptypes[0] = new AttrType (AttrType.attrInteger); // MAGIC WORD
         Ptypes[1] = new AttrType (AttrType.attrInteger); // NUM BUCKETS
-        Ptypes[2] = new AttrType (AttrType.attrInteger); // split: 1=split; 0=no split
-        Ptypes[3] = new AttrType (AttrType.attrInteger); // maxRecordsPerBucket
-        Ptypes[4] = new AttrType (AttrType.attrInteger); // numBucketsNoSplit
-        //Ptypes[5] = new AttrType (AttrType.attrInteger); // hash function mod multiplier
+        //Ptypes[2] = new AttrType (AttrType.attrInteger);
 
         Tuple t = new Tuple();
         try {
@@ -476,25 +257,11 @@ public class ClusteredHashFile  implements GlobalConst {
         return t;
     }
 
-    private String getBucketFileName(int bucketIdx) {
-        return this.hashIndexName + "_" + bucketIdx;
-    }
-    private Heapfile getBucketFile(int bucketIdx) {
-        Heapfile file = null;
-        try {
-            file = new Heapfile(getBucketFileName(bucketIdx));
-        } catch (Exception e) {
-            System.err.println(e);
-        }
-        return file;
-    }
     private int getBucketIndex(KeyClass value) {
-        int hashCode = Math.abs(value.hashCode());
-
-        if (this.split) {
-            return (hashCode % (this.multiplier*this.numBucketNoSplit));
-        } else {
-            return (hashCode % (this.numBucketNoSplit));
-        }
+        /*
+        if(split) {
+            return (value.hashCode() % (2*N));
+        }*/
+        return (Math.abs(value.hashCode()) % this.numBuckets);
     }
 }
