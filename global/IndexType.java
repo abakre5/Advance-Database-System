@@ -61,7 +61,7 @@ public class IndexType {
             case Hash:
                 return "_Hash_";
             case B_ClusteredIndex:
-                return  "_B_ClusteredIndex_";
+                return  "_btc_";
             case Clustered_Hash:
                 return "_Hash_ClusteredIndex_";
         }

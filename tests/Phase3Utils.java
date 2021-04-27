@@ -387,7 +387,7 @@ public class Phase3Utils {
 
     public static String getClusteredBtreeHeapName(String tableName, int attrNo)
     {
-        String heapFileName = tableName + IndexType.getStringForType(IndexType.B_ClusteredIndex) + Integer.toString(attrNo) + "_data";
+        String heapFileName = tableName + IndexType.getStringForType(IndexType.B_ClusteredIndex) + Integer.toString(attrNo) + "_d";
         return heapFileName;
     }
 
